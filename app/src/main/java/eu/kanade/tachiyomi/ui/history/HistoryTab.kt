@@ -25,6 +25,8 @@ import eu.kanade.presentation.history.components.HistoryDeleteAllDialog
 import eu.kanade.presentation.history.components.HistoryDeleteDialog
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
+import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
@@ -131,6 +133,10 @@ object HistoryTab : Tab {
             resumeLastChapterReadEvent.receiveAsFlow().collectLatest {
                 openChapter(context, screenModel.getNextChapter())
             }
+        }
+
+        LaunchedEffect(Unit) {
+            DiscordRPCService.setScreen(context, DiscordScreen.HISTORY)
         }
     }
 
