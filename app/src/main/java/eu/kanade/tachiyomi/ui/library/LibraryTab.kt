@@ -40,6 +40,8 @@ import eu.kanade.presentation.manga.components.LibraryBottomActionMenu
 import eu.kanade.presentation.more.onboarding.GETTING_STARTED_URL
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
+import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.data.library.LibraryUpdateJob
 import eu.kanade.tachiyomi.data.sync.SyncDataJob
 import eu.kanade.tachiyomi.ui.browse.migration.advanced.design.PreMigrationScreen
@@ -353,6 +355,7 @@ object LibraryTab : Tab {
         LaunchedEffect(state.isLoading) {
             if (!state.isLoading) {
                 (context as? MainActivity)?.ready = true
+                DiscordRPCService.setScreen(context, DiscordScreen.LIBRARY)
             }
         }
 
