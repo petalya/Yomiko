@@ -6,7 +6,6 @@ import android.app.assist.AssistContent
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
@@ -14,6 +13,7 @@ import android.graphics.Paint
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -44,12 +44,14 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.viewModelScope
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
 import com.google.android.material.elevation.SurfaceColors
 import com.google.android.material.transition.platform.MaterialContainerTransform
 import com.hippo.unifile.UniFile
 import dev.chrisbanes.insetter.applyInsetter
 import eu.kanade.domain.base.BasePreferences
+import eu.kanade.domain.connections.service.ConnectionsPreferences
 import eu.kanade.domain.manga.model.readingMode
 import eu.kanade.presentation.reader.ChapterListDialog
 import eu.kanade.presentation.reader.DisplayRefreshHost
@@ -62,9 +64,12 @@ import eu.kanade.presentation.reader.appbars.NavBarType
 import eu.kanade.presentation.reader.appbars.ReaderAppBars
 import eu.kanade.presentation.reader.settings.ReaderSettingsDialog
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
+import eu.kanade.tachiyomi.data.connections.discord.ReaderData
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.databinding.ReaderActivityBinding
+import eu.kanade.tachiyomi.source.isNsfw
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
@@ -141,6 +146,8 @@ class ReaderActivity : BaseActivity() {
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
         }
+
+        private val connectionsPreferences: ConnectionsPreferences = Injekt.get()
 
         const val SHIFT_DOUBLE_PAGES = "shiftingDoublePages"
         const val SHIFTED_PAGE_INDEX = "shiftedPageIndex"
@@ -256,6 +263,9 @@ class ReaderActivity : BaseActivity() {
                     ReaderViewModel.Event.ReloadViewerChapters -> {
                         viewModel.state.value.viewerChapters?.let(::setChapters)
                     }
+                    ReaderViewModel.Event.ChapterChanged -> {
+                        updateDiscordRPC(exitingReader = false)
+                    }
                     ReaderViewModel.Event.PageChanged -> {
                         displayRefreshHost.flash()
                     }
@@ -274,6 +284,10 @@ class ReaderActivity : BaseActivity() {
                 }
             }
             .launchIn(lifecycleScope)
+
+//        viewModel.viewModelScope.launchUI {
+//            updateDiscordRPC(exitingReader = false)
+//        }
     }
 
     /**
@@ -285,6 +299,7 @@ class ReaderActivity : BaseActivity() {
         config = null
         menuToggleToast?.cancel()
         readingModeToast?.cancel()
+        updateDiscordRPC(exitingReader = true)
     }
 
     override fun onPause() {
@@ -1345,6 +1360,37 @@ class ReaderActivity : BaseActivity() {
         private fun setLayerPaint(grayscale: Boolean, invertedColors: Boolean) {
             val paint = if (grayscale || invertedColors) getCombinedPaint(grayscale, invertedColors) else null
             binding.viewerContainer.setLayerType(LAYER_TYPE_HARDWARE, paint)
+        }
+    }
+
+    /**
+     * Updates the Discord Rich Presence (RPC) status based on the current reader activity.
+     *
+     * @param exitingReader A boolean flag indicating whether the user is exiting the reader.
+     * If true, the Discord RPC status is set to the last used screen.
+     * If false, the Discord RPC status is set to the current reader activity, displaying details such as the manga title, chapter number, and chapter title.
+     */
+    private fun updateDiscordRPC(exitingReader: Boolean) {
+        if (connectionsPreferences.enableDiscordRPC().get()) {
+            viewModel.viewModelScope.launchIO {
+                if (!exitingReader) {
+                    DiscordRPCService.setReaderActivity(
+                        context = this@ReaderActivity,
+                        ReaderData(
+                            incognitoMode = viewModel.currentSource.isNsfw() || viewModel.incognitoMode,
+                            mangaId = viewModel.manga?.id,
+                            mangaTitle = viewModel.manga?.ogTitle,
+                            thumbnailUrl = viewModel.manga?.thumbnailUrl,
+                            chapterNumber = Pair(viewModel.state.value.currentChapter?.chapter?.chapter_number ?: -1f, viewModel.getChapters().size),
+                            chapterTitle = if(connectionsPreferences.useChapterTitles().get()) viewModel.state.value.currentChapter?.chapter?.name
+                                            else viewModel.state.value.currentChapter?.chapter?.chapter_number.toString(),
+                        ),
+                    )
+                } else {
+                    Log.d("discord_rpc_tachiyomi", "Exiting reader, setting last used screen")
+                    DiscordRPCService.setScreen(this@ReaderActivity, DiscordRPCService.lastUsedScreen)
+                }
+            }
         }
     }
 }
