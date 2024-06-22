@@ -151,8 +151,6 @@ class ReaderViewModel @JvmOverloads constructor(
     val manga: Manga?
         get() = state.value.manga
 
-    val currentChapter: Chapter?
-        get() = state.value.chapter
     val currentSource: Source?
         get() = state.value.source
 
@@ -376,6 +374,7 @@ class ReaderViewModel @JvmOverloads constructor(
                         it.copy(
                             manga = manga,
                             /* SY --> */
+                            source = source,
                             meta = metadata,
                             mergedManga = mergedManga,
                             dateRelativeTime = relativeTime,
