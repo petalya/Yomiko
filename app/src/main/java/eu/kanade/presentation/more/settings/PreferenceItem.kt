@@ -14,7 +14,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.unit.dp
 import eu.kanade.domain.connections.service.ConnectionsPreferences
-import eu.kanade.domain.track.service.TrackPreferences
 import eu.kanade.presentation.more.settings.widget.ConnectionsPreferenceWidget
 import eu.kanade.presentation.more.settings.widget.EditTextPreferenceWidget
 import eu.kanade.presentation.more.settings.widget.InfoWidget
@@ -27,6 +26,8 @@ import kotlinx.coroutines.launch
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.presentation.core.components.SliderItem
 import tachiyomi.presentation.core.util.collectAsState
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
 val LocalPreferenceHighlighted = compositionLocalOf(structuralEqualityPolicy()) { false }
 val LocalPreferenceMinHeight = compositionLocalOf(structuralEqualityPolicy()) { 56.dp }
