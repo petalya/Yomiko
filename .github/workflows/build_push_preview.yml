@@ -33,6 +33,11 @@ jobs:
           java-version: 17
           distribution: temurin
 
+      - name: Create Tag
+        run: |
+          git tag "preview-${{ github.run_number }}"
+          git push origin "preview-${{ github.run_number }}"
+
       - name: Prepare build
         run: |
           set -e
