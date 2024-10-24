@@ -13,6 +13,7 @@ import eu.kanade.tachiyomi.core.security.SecurityPreferences
 import eu.kanade.tachiyomi.data.cache.ChapterCache
 import eu.kanade.tachiyomi.data.cache.CoverCache
 import eu.kanade.tachiyomi.data.cache.PagePreviewCache
+import eu.kanade.tachiyomi.data.connections.ConnectionsManager
 import eu.kanade.tachiyomi.data.download.DownloadCache
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.DownloadProvider
@@ -47,8 +48,10 @@ import tachiyomi.domain.source.service.SourceManager
 import tachiyomi.domain.storage.service.StorageManager
 import tachiyomi.source.local.image.LocalCoverManager
 import tachiyomi.source.local.io.LocalSourceFileSystem
-import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.InjektModule
 import uy.kohesive.injekt.api.InjektRegistrar
+import uy.kohesive.injekt.api.addSingleton
+import uy.kohesive.injekt.api.addSingletonFactory
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 
@@ -168,25 +171,25 @@ class AppModule(val app: Application) : InjektModule {
         addSingletonFactory { EHentaiUpdateHelper(app) }
 
         addSingletonFactory { PagePreviewCache(app) }
+        // SY <--
+
+        addSingletonFactory { ConnectionsManager() }
+
+        // Asynchronously init expensive components for a faster cold start
+        ContextCompat.getMainExecutor(app).execute {
+            get<NetworkHelper>()
+
+            get<SourceManager>()
+
+            get<Database>()
+
+            get<DownloadManager>()
+
+            // SY -->
+            get<GetCustomMangaInfo>()
+            // SY <--
+        }
 
         addSingletonFactory { GoogleDriveService(app) }
-        // SY <--
-    }
-}
-
-fun initExpensiveComponents(app: Application) {
-    // Asynchronously init expensive components for a faster cold start
-    ContextCompat.getMainExecutor(app).execute {
-        Injekt.get<NetworkHelper>()
-
-        Injekt.get<SourceManager>()
-
-        Injekt.get<Database>()
-
-        Injekt.get<DownloadManager>()
-
-        // SY -->
-        Injekt.get<GetCustomMangaInfo>()
-        // SY <--
     }
 }
