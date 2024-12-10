@@ -36,10 +36,10 @@ import com.github.chrisbanes.photoview.PhotoView
 import eu.kanade.tachiyomi.data.coil.cropBorders
 import eu.kanade.tachiyomi.data.coil.customDecoder
 import eu.kanade.tachiyomi.ui.reader.viewer.webtoon.WebtoonSubsamplingImageView
-import eu.kanade.tachiyomi.util.system.GLUtil
 import eu.kanade.tachiyomi.util.system.animatorDurationScale
 import eu.kanade.tachiyomi.util.view.isVisibleOnScreen
 import okio.BufferedSource
+import tachiyomi.core.common.util.system.ImageUtil
 
 /**
  * A wrapper view for showing page image.
@@ -116,21 +116,22 @@ open class ReaderPageImageView @JvmOverloads constructor(
     }
 
     private fun SubsamplingScaleImageView.landscapeZoom(forward: Boolean) {
+        val config = config
         if (config != null &&
-            config!!.landscapeZoom &&
-            config!!.minimumScaleType == SCALE_TYPE_CENTER_INSIDE &&
+            config.landscapeZoom &&
+            config.minimumScaleType == SCALE_TYPE_CENTER_INSIDE &&
             sWidth > sHeight &&
             scale == minScale
         ) {
             handler?.postDelayed(500) {
-                val point = when (config!!.zoomStartPosition) {
+                val point = when (config.zoomStartPosition) {
                     ZoomStartPosition.LEFT -> if (forward) PointF(0F, 0F) else PointF(sWidth.toFloat(), 0F)
                     ZoomStartPosition.RIGHT -> if (forward) PointF(sWidth.toFloat(), 0F) else PointF(0F, 0F)
                     ZoomStartPosition.CENTER -> center
                 }
 
                 val targetScale = height.toFloat() / sHeight.toFloat()
-                animateScaleAndCenter(targetScale, point)!!
+                (animateScaleAndCenter(targetScale, point) ?: return@postDelayed)
                     .withDuration(500)
                     .withEasing(EASE_IN_OUT_QUAD)
                     .withInterruptible(true)
@@ -232,7 +233,7 @@ open class ReaderPageImageView @JvmOverloads constructor(
         } else {
             SubsamplingScaleImageView(context)
         }.apply {
-            setMaxTileSize(GLUtil.maxTextureSize)
+            setMaxTileSize(ImageUtil.hardwareBitmapThreshold)
             setDoubleTapZoomStyle(SubsamplingScaleImageView.ZOOM_FOCUS_CENTER)
             setPanLimit(SubsamplingScaleImageView.PAN_LIMIT_INSIDE)
             setMinimumTileDpi(180)
@@ -287,35 +288,44 @@ open class ReaderPageImageView @JvmOverloads constructor(
             },
         )
 
-        if (isWebtoon) {
-            val request = ImageRequest.Builder(context)
-                .data(data)
-                .memoryCachePolicy(CachePolicy.DISABLED)
-                .diskCachePolicy(CachePolicy.DISABLED)
-                .target(
-                    onSuccess = { result ->
-                        val image = result as BitmapImage
-                        setImage(ImageSource.bitmap(image.bitmap))
-                        isVisible = true
-                    },
-                    onError = {
-                        this@ReaderPageImageView.onImageLoadError()
-                    },
-                )
-                .size(ViewSizeResolver(this@ReaderPageImageView))
-                .precision(Precision.INEXACT)
-                .cropBorders(config.cropBorders)
-                .customDecoder(true)
-                .crossfade(false)
-                .build()
-            context.imageLoader.enqueue(request)
-        } else {
-            when (data) {
-                is BitmapDrawable -> setImage(ImageSource.bitmap(data.bitmap))
-                is BufferedSource -> setImage(ImageSource.inputStream(data.inputStream()))
-                else -> throw IllegalArgumentException("Not implemented for class ${data::class.simpleName}")
+        when (data) {
+            is BitmapDrawable -> {
+                setImage(ImageSource.bitmap(data.bitmap))
+                isVisible = true
             }
-            isVisible = true
+            is BufferedSource -> {
+                if (!isWebtoon) {
+                    setHardwareConfig(ImageUtil.canUseHardwareBitmap(data))
+                    setImage(ImageSource.inputStream(data.inputStream()))
+                    isVisible = true
+                    return@apply
+                }
+
+                ImageRequest.Builder(context)
+                    .data(data)
+                    .memoryCachePolicy(CachePolicy.DISABLED)
+                    .diskCachePolicy(CachePolicy.DISABLED)
+                    .target(
+                        onSuccess = { result ->
+                            val image = result as BitmapImage
+                            setImage(ImageSource.bitmap(image.bitmap))
+                            isVisible = true
+                        },
+                        onError = {
+                            onImageLoadError()
+                        },
+                    )
+                    .size(ViewSizeResolver(this@ReaderPageImageView))
+                    .precision(Precision.INEXACT)
+                    .cropBorders(config.cropBorders)
+                    .customDecoder(true)
+                    .crossfade(false)
+                    .build()
+                    .let(context.imageLoader::enqueue)
+            }
+            else -> {
+                throw IllegalArgumentException("Not implemented for class ${data::class.simpleName}")
+            }
         }
     }
 

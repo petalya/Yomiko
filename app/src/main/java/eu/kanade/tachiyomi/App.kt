@@ -15,6 +15,8 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import androidx.work.Configuration
+import androidx.work.WorkManager
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
@@ -57,6 +59,7 @@ import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.ui.base.delegate.SecureActivityDelegate
 import eu.kanade.tachiyomi.util.system.DeviceUtil
+import eu.kanade.tachiyomi.util.system.GLUtil
 import eu.kanade.tachiyomi.util.system.WebViewUtil
 import eu.kanade.tachiyomi.util.system.animatorDurationScale
 import eu.kanade.tachiyomi.util.system.cancelNotification
@@ -79,6 +82,7 @@ import org.conscrypt.Conscrypt
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
+import tachiyomi.core.common.util.system.ImageUtil
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.storage.service.StorageManager
 import tachiyomi.i18n.MR
@@ -174,6 +178,14 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
             .onEach(FirebaseConfig::setCrashlyticsEnabled)
             .launchIn(scope)
 
+        basePreferences.hardwareBitmapThreshold().let { preference ->
+            if (!preference.isSet()) preference.set(GLUtil.DEVICE_TEXTURE_LIMIT)
+        }
+
+        basePreferences.hardwareBitmapThreshold().changes()
+            .onEach { ImageUtil.hardwareBitmapThreshold = it }
+            .launchIn(scope)
+
         setAppCompatDelegateThemeMode(Injekt.get<UiPreferences>().themeMode().get())
 
         // Updates widget update
@@ -183,6 +195,9 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
             LogcatLogger.install(AndroidLogcatLogger(LogPriority.VERBOSE))
         }*/
 
+        if (!WorkManager.isInitialized()) {
+            WorkManager.initialize(this, Configuration.Builder().build())
+        }
         val syncPreferences: SyncPreferences = Injekt.get()
         val syncTriggerOpt = syncPreferences.getSyncTriggerOptions()
         if (syncPreferences.isSyncEnabled() && syncTriggerOpt.syncOnAppStart) {
@@ -285,12 +300,6 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
             Notifications.createChannels(this)
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Failed to modify notification channels" }
-        }
-
-        val syncPreferences: SyncPreferences = Injekt.get()
-        val syncTriggerOpt = syncPreferences.getSyncTriggerOptions()
-        if (syncPreferences.isSyncEnabled() && syncTriggerOpt.syncOnAppStart) {
-            SyncDataJob.startNow(this@App)
         }
     }
 

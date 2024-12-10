@@ -1,11 +1,15 @@
 package exh.eh
 
 import android.content.Context
+import android.content.pm.ServiceInfo
+import android.os.Build
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
 import com.elvishew.xlog.Logger
@@ -14,8 +18,10 @@ import eu.kanade.domain.chapter.interactor.SyncChaptersWithSource
 import eu.kanade.domain.manga.interactor.UpdateManga
 import eu.kanade.domain.manga.model.toSManga
 import eu.kanade.tachiyomi.data.library.LibraryUpdateNotifier
+import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.source.online.all.EHentai
 import eu.kanade.tachiyomi.util.system.isConnectedToWifi
+import eu.kanade.tachiyomi.util.system.setForegroundSafely
 import eu.kanade.tachiyomi.util.system.workManager
 import exh.debug.DebugToggles
 import exh.eh.EHentaiUpdateWorkerConstants.UPDATES_PER_ITERATION
@@ -27,9 +33,11 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import tachiyomi.core.common.preference.getAndSet
 import tachiyomi.domain.UnsortedPreferences
 import tachiyomi.domain.chapter.interactor.GetChaptersByMangaId
 import tachiyomi.domain.chapter.model.Chapter
+import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.library.service.LibraryPreferences.Companion.DEVICE_CHARGING
 import tachiyomi.domain.library.service.LibraryPreferences.Companion.DEVICE_ONLY_ON_WIFI
 import tachiyomi.domain.manga.interactor.GetExhFavoriteMangaWithMetadata
@@ -46,9 +54,10 @@ import kotlin.time.Duration.Companion.days
 class EHentaiUpdateWorker(private val context: Context, workerParams: WorkerParameters) :
     CoroutineWorker(context, workerParams) {
     private val preferences: UnsortedPreferences by injectLazy()
+    private val libraryPreferences: LibraryPreferences by injectLazy()
     private val sourceManager: SourceManager by injectLazy()
     private val updateHelper: EHentaiUpdateHelper by injectLazy()
-    private val logger: Logger = xLog()
+    private val logger: Logger by lazy { xLog() }
     private val updateManga: UpdateManga by injectLazy()
     private val syncChaptersWithSource: SyncChaptersWithSource by injectLazy()
     private val getChaptersByMangaId: GetChaptersByMangaId by injectLazy()
@@ -56,20 +65,36 @@ class EHentaiUpdateWorker(private val context: Context, workerParams: WorkerPara
     private val insertFlatMetadata: InsertFlatMetadata by injectLazy()
     private val getExhFavoriteMangaWithMetadata: GetExhFavoriteMangaWithMetadata by injectLazy()
 
-    private val updateNotifier by lazy { LibraryUpdateNotifier(context) }
+    private val updateNotifier by lazy { EHentaiUpdateNotifier(context) }
+    private val libraryUpdateNotifier by lazy { LibraryUpdateNotifier(context) }
 
     override suspend fun doWork(): Result {
         return try {
             if (requiresWifiConnection(preferences) && !context.isConnectedToWifi()) {
                 Result.success() // retry again later
             } else {
+                setForegroundSafely()
                 startUpdating()
                 logger.d("Update job completed!")
                 Result.success()
             }
         } catch (e: Exception) {
             Result.success() // retry again later
+        } finally {
+            updateNotifier.cancelProgressNotification()
         }
+    }
+
+    override suspend fun getForegroundInfo(): ForegroundInfo {
+        return ForegroundInfo(
+            Notifications.ID_EHENTAI_PROGRESS,
+            updateNotifier.progressNotificationBuilder.build(),
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            } else {
+                0
+            },
+        )
     }
 
     private suspend fun startUpdating() {
@@ -138,6 +163,11 @@ class EHentaiUpdateWorker(private val context: Context, workerParams: WorkerPara
                 }
 
                 val (new, chapters) = try {
+                    updateNotifier.showProgressNotification(
+                        manga,
+                        updatedThisIteration + failuresThisIteration,
+                        mangaMetaToUpdateThisIter.size,
+                    )
                     updateEntryAndGetChapters(manga)
                 } catch (e: GalleryNotUpdatedException) {
                     if (e.network) {
@@ -169,13 +199,15 @@ class EHentaiUpdateWorker(private val context: Context, workerParams: WorkerPara
                 }
 
                 // Find accepted root and discard others
-                val (acceptedRoot, discardedRoots, hasNew) =
+                val (acceptedRoot, discardedRoots, exhNew) =
                     updateHelper.findAcceptedRootAndDiscardOthers(manga.source, chapters)
 
-                if ((new.isNotEmpty() && manga.id == acceptedRoot.manga.id) ||
-                    (hasNew && updatedManga.none { it.first.id == acceptedRoot.manga.id })
-                ) {
+                if (new.isNotEmpty() && manga.id == acceptedRoot.manga.id) {
+                    libraryPreferences.newUpdatesCount().getAndSet { it + new.size }
                     updatedManga += acceptedRoot.manga to new.toTypedArray()
+                } else if (exhNew.isNotEmpty() && updatedManga.none { it.first.id == acceptedRoot.manga.id }) {
+                    libraryPreferences.newUpdatesCount().getAndSet { it + exhNew.size }
+                    updatedManga += acceptedRoot.manga to exhNew.toTypedArray()
                 }
 
                 modifiedThisIteration += acceptedRoot.manga.id
@@ -193,8 +225,9 @@ class EHentaiUpdateWorker(private val context: Context, workerParams: WorkerPara
                 ),
             )
 
+            updateNotifier.cancelProgressNotification()
             if (updatedManga.isNotEmpty()) {
-                updateNotifier.showUpdateNotifications(updatedManga)
+                libraryUpdateNotifier.showUpdateNotifications(updatedManga)
             }
         }
     }
@@ -237,7 +270,12 @@ class EHentaiUpdateWorker(private val context: Context, workerParams: WorkerPara
         private val logger by lazy { XLog.tag("EHUpdaterScheduler") }
 
         fun launchBackgroundTest(context: Context) {
-            context.workManager.enqueue(OneTimeWorkRequestBuilder<EHentaiUpdateWorker>().build())
+            context.workManager.enqueue(
+                OneTimeWorkRequestBuilder<EHentaiUpdateWorker>()
+                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                    .addTag(TAG)
+                    .build(),
+            )
         }
 
         fun scheduleBackground(context: Context, prefInterval: Int? = null, prefRestrictions: Set<String>? = null) {

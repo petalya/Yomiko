@@ -30,13 +30,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.util.fastFilter
 import androidx.compose.ui.util.fastForEach
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabNavigator
 import eu.kanade.core.preference.asState
-import eu.kanade.core.util.fastFilter
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.util.Screen
@@ -73,11 +73,11 @@ object HomeScreen : Screen() {
     private const val TAB_FADE_DURATION = 200
     private const val TAB_NAVIGATOR_KEY = "HomeTabs"
 
-    private val tabs = listOf(
+    private val TABS = listOf(
         LibraryTab,
         UpdatesTab,
         HistoryTab,
-        BrowseTab(),
+        BrowseTab,
         MoreTab,
     )
 
@@ -102,7 +102,7 @@ object HomeScreen : Screen() {
                     startBar = {
                         if (isTabletUi()) {
                             NavigationRail {
-                                tabs
+                                TABS
                                     // SY -->
                                     .fastFilter { it.isEnabled() }
                                     // SY <--
@@ -123,7 +123,7 @@ object HomeScreen : Screen() {
                                 exit = shrinkVertically(),
                             ) {
                                 NavigationBar {
-                                    tabs
+                                    TABS
                                         // SY -->
                                         .fastFilter { it.isEnabled() }
                                         // SY <--
@@ -179,7 +179,12 @@ object HomeScreen : Screen() {
                             is Tab.Library -> LibraryTab
                             Tab.Updates -> UpdatesTab
                             Tab.History -> HistoryTab
-                            is Tab.Browse -> BrowseTab(it.toExtensions)
+                            is Tab.Browse -> {
+                                if (it.toExtensions) {
+                                    BrowseTab.showExtension()
+                                }
+                                BrowseTab
+                            }
                             is Tab.More -> MoreTab
                         }
 

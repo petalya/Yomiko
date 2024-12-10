@@ -39,7 +39,7 @@ import tachiyomi.presentation.core.i18n.stringResource
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
-object UpdatesTab : Tab {
+data object UpdatesTab : Tab {
 
     override val options: TabOptions
         @Composable

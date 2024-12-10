@@ -393,6 +393,9 @@
     <string name="pref_show_reading_mode">Show reading mode</string>
     <string name="pref_show_reading_mode_summary">Briefly show current mode when reader is opened</string>
     <string name="pref_display_profile">Custom display profile</string>
+    <string name="pref_hardware_bitmap_threshold">Custom hardware bitmap threshold</string>
+    <string name="pref_hardware_bitmap_threshold_default">Default (%d)</string>
+    <string name="pref_hardware_bitmap_threshold_summary">If reader loads a blank image incrementally reduce the threshold.\nSelected: %s</string>
     <string name="pref_crop_borders">Crop borders</string>
     <string name="pref_custom_brightness">Custom brightness</string>
     <string name="pref_grayscale">Grayscale</string>
@@ -510,6 +513,7 @@
     <!-- Tracking section -->
     <string name="tracking_guide">Tracking guide</string>
     <string name="pref_auto_update_manga_sync">Update progress after reading</string>
+    <string name="pref_auto_update_manga_on_mark_read">Update progress when marked as read</string>
     <string name="services">Trackers</string>
     <string name="tracking_info">One-way sync to update the chapter progress in external tracker services. Set up tracking for individual entries from their tracking button.</string>
     <string name="enhanced_services">Enhanced trackers</string>
@@ -566,7 +570,7 @@
     <string name="backup_restore_missing_trackers">Trackers not logged into:</string>
     <string name="backup_restore_content_full">You may need to install any missing extensions and log in to tracking services afterwards to use them.</string>
     <string name="restore_completed">Restore completed</string>
-    <string name="restore_duration">%02d min, %02d sec</string>
+    <string name="restore_duration">%1$02d min, %2$02d sec</string>
     <string name="backup_in_progress">Backup is already in progress</string>
     <string name="backup_choice">What do you want to backup?</string>
     <string name="app_settings">App settings</string>
@@ -766,6 +770,7 @@
     <string name="exclude_scanlators">Exclude scanlators</string>
     <string name="no_scanlators_found">No scanlators found</string>
     <string name="confirm_tracker_update">Update trackers to chapter %d?</string>
+    <string name="trackers_updated_summary">Trackers updated to chapter %d</string>
 
     <!-- Tracking Screen -->
     <string name="manga_tracking_tab">Tracking</string>
