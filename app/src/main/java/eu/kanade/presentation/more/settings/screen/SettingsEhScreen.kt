@@ -139,6 +139,12 @@ object SettingsEhScreen : SearchableSettings {
 
         return listOf(
             Preference.PreferenceGroup(
+                stringResource(MR.strings.source_settings),
+                preferenceItems = persistentListOf(
+                    ehIncognitoMode(unsortedPreferences),
+                )
+            ),
+            Preference.PreferenceGroup(
                 stringResource(SYMR.strings.ehentai_prefs_account_settings),
                 preferenceItems = persistentListOf(
                     getLoginPreference(unsortedPreferences, openWarnConfigureDialogController),
@@ -176,6 +182,17 @@ object SettingsEhScreen : SearchableSettings {
                     ),
                 ),
             ),
+        )
+    }
+
+    @Composable
+    fun ehIncognitoMode(
+        unsortedPreferences: UnsortedPreferences,
+    ): Preference.PreferenceItem.SwitchPreference {
+        return Preference.PreferenceItem.SwitchPreference(
+            pref = unsortedPreferences.ehIncognitoMode(),
+            title = stringResource(MR.strings.pref_incognito_mode),
+            subtitle = stringResource(MR.strings.pref_incognito_mode_summary),
         )
     }
 

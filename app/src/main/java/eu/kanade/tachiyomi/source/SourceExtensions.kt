@@ -2,6 +2,8 @@ package eu.kanade.tachiyomi.source
 
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.extension.ExtensionManager
+import exh.source.isEhBasedSource
+import tachiyomi.domain.UnsortedPreferences
 import tachiyomi.domain.source.model.StubSource
 import tachiyomi.source.local.isLocal
 import uy.kohesive.injekt.Injekt
@@ -62,6 +64,7 @@ fun Source?.isNsfw(): Boolean {
 }
 
 fun Source.isIncognitoModeEnabled(): Boolean {
+    if (isEhBasedSource()) return Injekt.get<UnsortedPreferences>().ehIncognitoMode().get()
     val extensionPackage = Injekt.get<ExtensionManager>().getExtensionPackage(id)
     return extensionPackage in Injekt.get<SourcePreferences>().incognitoExtensions().get()
 }
