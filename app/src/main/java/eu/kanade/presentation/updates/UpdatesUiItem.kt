@@ -1,5 +1,13 @@
 package eu.kanade.presentation.updates
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.graphics.res.animatedVectorResource
+import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
+import androidx.compose.animation.graphics.vector.AnimatedImageVector
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -39,6 +48,7 @@ import eu.kanade.presentation.manga.components.DotSeparatorText
 import eu.kanade.presentation.manga.components.MangaCover
 import eu.kanade.presentation.util.animateItemFastScroll
 import eu.kanade.presentation.util.relativeTimeSpanString
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.ui.updates.UpdatesItem
 import tachiyomi.domain.updates.model.UpdatesWithRelations
@@ -47,7 +57,9 @@ import tachiyomi.presentation.core.components.ListGroupHeader
 import tachiyomi.presentation.core.components.material.DISABLED_ALPHA
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
+import tachiyomi.presentation.core.util.clickableNoIndication
 import tachiyomi.presentation.core.util.selectedBackground
+import java.time.LocalDate
 
 internal fun LazyListScope.updatesLastUpdatedItem(
     lastUpdated: Long,
@@ -67,7 +79,8 @@ internal fun LazyListScope.updatesLastUpdatedItem(
 }
 
 internal fun LazyListScope.updatesUiItems(
-    uiModels: List<UpdatesUiModel>,
+    groupedUiModels: List<GroupedUpdatesUiModel>,
+    expandedStates: Map<Pair<Long, LocalDate>, Boolean>,
     selectionMode: Boolean,
     // SY -->
     preserveReadingPosition: Boolean,
@@ -75,66 +88,85 @@ internal fun LazyListScope.updatesUiItems(
     onUpdateSelected: (UpdatesItem, Boolean, Boolean, Boolean) -> Unit,
     onClickCover: (UpdatesItem) -> Unit,
     onClickUpdate: (UpdatesItem) -> Unit,
+    onExpandClicked: (UpdatesItem) -> Unit,
     onDownloadChapter: (List<UpdatesItem>, ChapterDownloadAction) -> Unit,
 ) {
+
+
     items(
-        items = uiModels,
+        items = groupedUiModels,
         contentType = {
             when (it) {
-                is UpdatesUiModel.Header -> "header"
-                is UpdatesUiModel.Item -> "item"
+                is GroupedUpdatesUiModel.DateHeader -> "header"
+                is GroupedUpdatesUiModel.ItemGroup -> "item"
             }
         },
         key = {
             when (it) {
-                is UpdatesUiModel.Header -> "updatesHeader-${it.hashCode()}"
-                is UpdatesUiModel.Item -> "updates-${it.item.update.mangaId}-${it.item.update.chapterId}"
+                is GroupedUpdatesUiModel.DateHeader -> "updatesHeader-${it.hashCode()}"
+                is GroupedUpdatesUiModel.ItemGroup -> "updates-${it.item.update.mangaId}-${it.item.update.chapterId}"
             }
         },
-    ) { item ->
-        when (item) {
-            is UpdatesUiModel.Header -> {
+    ) { groupedItem ->
+        when (groupedItem) {
+            is GroupedUpdatesUiModel.DateHeader -> {
                 ListGroupHeader(
                     modifier = Modifier.animateItemFastScroll(),
-                    text = relativeDateText(item.date),
+                    text = relativeDateText(groupedItem.date),
                 )
             }
-            is UpdatesUiModel.Item -> {
-                val updatesItem = item.item
-                UpdatesUiItem(
-                    modifier = Modifier.animateItemFastScroll(),
-                    update = updatesItem.update,
-                    selected = updatesItem.selected,
-                    readProgress = updatesItem.update.lastPageRead
-                        .takeIf {
-                            /* SY --> */(
+
+            is GroupedUpdatesUiModel.ItemGroup -> {
+                val updatesItem = groupedItem.item
+                val mangaId = updatesItem.update.mangaId
+                val groupDate = groupedItem.groupDate
+                val isFirstInGroup = groupedItem.isFirstInGroup
+                val hasSubsequentChapters = groupedItem.hasSubsequentItems
+                val expanded = expandedStates[Pair(mangaId, groupDate)] == true
+
+                AnimatedVisibility(
+                    visible = isFirstInGroup || expanded,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    UpdatesUiItem(
+                        modifier = Modifier.animateItemFastScroll(),
+                        update = updatesItem.update,
+                        selected = updatesItem.selected,
+                        readProgress = updatesItem.update.lastPageRead
+                            .takeIf {
+                                /* SY --> */(
                                 !updatesItem.update.read ||
                                     (preserveReadingPosition && updatesItem.isEhBasedUpdate())
                                 )/* SY <-- */ &&
                                 it > 0L
-                        }
-                        ?.let {
-                            stringResource(
-                                MR.strings.chapter_progress,
-                                it + 1,
-                            )
+                            }
+                            ?.let {
+                                stringResource(
+                                    MR.strings.chapter_progress,
+                                    it + 1,
+                                )
+                            },
+                        onLongClick = {
+                            onUpdateSelected(updatesItem, !updatesItem.selected, true, true)
                         },
-                    onLongClick = {
-                        onUpdateSelected(updatesItem, !updatesItem.selected, true, true)
-                    },
-                    onClick = {
-                        when {
-                            selectionMode -> onUpdateSelected(updatesItem, !updatesItem.selected, true, false)
-                            else -> onClickUpdate(updatesItem)
-                        }
-                    },
-                    onClickCover = { onClickCover(updatesItem) }.takeIf { !selectionMode },
-                    onDownloadChapter = { action: ChapterDownloadAction ->
-                        onDownloadChapter(listOf(updatesItem), action)
-                    }.takeIf { !selectionMode },
-                    downloadStateProvider = updatesItem.downloadStateProvider,
-                    downloadProgressProvider = updatesItem.downloadProgressProvider,
-                )
+                        onClick = {
+                            when {
+                                selectionMode -> onUpdateSelected(updatesItem, !updatesItem.selected, true, false)
+                                else -> onClickUpdate(updatesItem)
+                            }
+                        },
+                        onClickCover = { onClickCover(updatesItem) }.takeIf { isFirstInGroup && !selectionMode },
+                        onDownloadChapter = { action: ChapterDownloadAction ->
+                            onDownloadChapter(listOf(updatesItem), action)
+                        }.takeIf { !selectionMode },
+                        downloadStateProvider = updatesItem.downloadStateProvider,
+                        downloadProgressProvider = updatesItem.downloadProgressProvider,
+                        isFirstInGroup = isFirstInGroup,
+                        expanded = expanded,
+                        onExpandClick = { onExpandClicked(groupedItem.item) }.takeIf { isFirstInGroup && hasSubsequentChapters } ,
+                    )
+                }
             }
         }
     }
@@ -152,6 +184,9 @@ private fun UpdatesUiItem(
     // Download Indicator
     downloadStateProvider: () -> Download.State,
     downloadProgressProvider: () -> Int,
+    isFirstInGroup: Boolean,
+    expanded: Boolean,
+    onExpandClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -167,14 +202,15 @@ private fun UpdatesUiItem(
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 },
             )
-            .height(56.dp)
+            .height(if (isFirstInGroup) 56.dp else 40.dp)   // shorter height for subsequent chapters
             .padding(horizontal = MaterialTheme.padding.medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MangaCover.Square(
             modifier = Modifier
                 .padding(vertical = 6.dp)
-                .fillMaxHeight(),
+                .fillMaxHeight()
+                .alpha(if (isFirstInGroup) 1f else 0f), // Hide cover for subsequent items in group
             data = update.coverData,
             onClick = onClickCover,
         )
@@ -184,13 +220,15 @@ private fun UpdatesUiItem(
                 .padding(horizontal = MaterialTheme.padding.medium)
                 .weight(1f),
         ) {
-            Text(
-                text = update.mangaTitle,
-                maxLines = 1,
-                style = MaterialTheme.typography.bodyMedium,
-                color = LocalContentColor.current.copy(alpha = textAlpha),
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (isFirstInGroup) {
+                Text(
+                    text = update.mangaTitle,
+                    maxLines = 1,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = LocalContentColor.current.copy(alpha = textAlpha),
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 var textHeight by remember { mutableIntStateOf(0) }
@@ -234,6 +272,21 @@ private fun UpdatesUiItem(
                     )
                 }
             }
+        }
+
+        if (onExpandClick != null) {
+            Icon(
+                painter = rememberAnimatedVectorPainter(
+                    AnimatedImageVector.animatedVectorResource(R.drawable.anim_caret_down),
+                    !expanded,
+                ),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .clickableNoIndication { onExpandClick() }
+                    .padding(start = 4.dp)
+                    .fillMaxHeight(),
+            )
         }
 
         ChapterDownloadIndicator(
