@@ -25,9 +25,9 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.manga.model.hasCustomCover
 import eu.kanade.domain.manga.model.toSManga
+import eu.kanade.domain.source.interactor.GetIncognitoState
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.components.NavigatorAdaptiveSheet
 import eu.kanade.presentation.manga.ChapterSettingsDialog
@@ -154,7 +154,7 @@ class MangaScreen(
                 .launchIn(this)
 
             DiscordRPCService.setScreen(context, DiscordScreen.LIBRARY, ReaderData(
-                incognitoMode = Injekt.get<BasePreferences>().incognitoMode().get(),
+                incognitoMode = Injekt.get<GetIncognitoState>().await(successState.manga.source),
                 mangaId = successState.manga.id,
                 chapterTitle = successState.manga.title,
             ))
