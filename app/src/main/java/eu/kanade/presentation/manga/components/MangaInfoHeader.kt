@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.AttachMoney
 import androidx.compose.material.icons.outlined.Block
-import androidx.compose.material.icons.outlined.CallMerge
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Done
 import androidx.compose.material.icons.outlined.DoneAll
@@ -68,6 +67,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -104,6 +104,7 @@ fun MangaInfoBox(
     manga: Manga,
     sourceName: String,
     isStubSource: Boolean,
+    isSourceIncognito: Boolean,
     onCoverClick: () -> Unit,
     doSearch: (query: String, global: Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -141,6 +142,7 @@ fun MangaInfoBox(
                     manga = manga,
                     sourceName = sourceName,
                     isStubSource = isStubSource,
+                    isSourceIncognito = isSourceIncognito,
                     onCoverClick = onCoverClick,
                     doSearch = doSearch,
                 )
@@ -150,6 +152,7 @@ fun MangaInfoBox(
                     manga = manga,
                     sourceName = sourceName,
                     isStubSource = isStubSource,
+                    isSourceIncognito = isSourceIncognito,
                     onCoverClick = onCoverClick,
                     doSearch = doSearch,
                 )
@@ -373,6 +376,7 @@ private fun MangaAndSourceTitlesLarge(
     manga: Manga,
     sourceName: String,
     isStubSource: Boolean,
+    isSourceIncognito: Boolean,
     onCoverClick: () -> Unit,
     doSearch: (query: String, global: Boolean) -> Unit,
 ) {
@@ -399,6 +403,7 @@ private fun MangaAndSourceTitlesLarge(
             status = manga.status,
             sourceName = sourceName,
             isStubSource = isStubSource,
+            isSourceIncognito = isSourceIncognito,
             doSearch = doSearch,
             textAlign = TextAlign.Center,
         )
@@ -411,6 +416,7 @@ private fun MangaAndSourceTitlesSmall(
     manga: Manga,
     sourceName: String,
     isStubSource: Boolean,
+    isSourceIncognito: Boolean,
     onCoverClick: () -> Unit,
     doSearch: (query: String, global: Boolean) -> Unit,
 ) {
@@ -442,6 +448,7 @@ private fun MangaAndSourceTitlesSmall(
                 status = manga.status,
                 sourceName = sourceName,
                 isStubSource = isStubSource,
+                isSourceIncognito = isSourceIncognito,
                 doSearch = doSearch,
             )
         }
@@ -456,6 +463,7 @@ private fun ColumnScope.MangaContentInfo(
     status: Long,
     sourceName: String,
     isStubSource: Boolean,
+    isSourceIncognito: Boolean,
     doSearch: (query: String, global: Boolean) -> Unit,
     textAlign: TextAlign? = LocalTextStyle.current.textAlign,
 ) {
@@ -590,6 +598,23 @@ private fun ColumnScope.MangaContentInfo(
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1,
             )
+            if (isSourceIncognito) {
+                DotSeparatorText()
+                Icon(
+                    imageVector = ImageVector.vectorResource(R.drawable.ic_glasses_24dp),
+                    contentDescription = "Incognito Mode State for Source",
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = stringResource(MR.strings.pref_incognito_mode),
+                    color = MaterialTheme.colorScheme.primary,
+                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }

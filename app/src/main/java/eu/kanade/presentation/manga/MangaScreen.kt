@@ -67,6 +67,7 @@ import eu.kanade.presentation.util.formatChapterNumber
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.getNameForMangaInfo
+import eu.kanade.tachiyomi.source.isIncognitoModeEnabled
 import eu.kanade.tachiyomi.source.online.MetadataSource
 import eu.kanade.tachiyomi.source.online.all.EHentai
 import eu.kanade.tachiyomi.source.online.all.MangaDex
@@ -474,6 +475,7 @@ private fun MangaScreenSmallImpl(
                             manga = state.manga,
                             sourceName = remember { state.source.getNameForMangaInfo(state.mergedData?.sources) },
                             isStubSource = remember { state.source is StubSource },
+                            isSourceIncognito = remember { state.source.isIncognitoModeEnabled() },
                             onCoverClick = onCoverClicked,
                             doSearch = onSearch,
                         )
@@ -791,6 +793,7 @@ fun MangaScreenLargeImpl(
                             manga = state.manga,
                             sourceName = remember { state.source.getNameForMangaInfo(state.mergedData?.sources) },
                             isStubSource = remember { state.source is StubSource },
+                            isSourceIncognito = remember { state.source.isIncognitoModeEnabled() },
                             onCoverClick = onCoverClicked,
                             doSearch = onSearch,
                         )

@@ -60,3 +60,8 @@ fun Source?.isNsfw(): Boolean {
         .find { ext -> ext.sources.any { it.id == this.id } }!!
     return sourceUsed.isNsfw
 }
+
+fun Source.isIncognitoModeEnabled(): Boolean {
+    val extensionPackage = Injekt.get<ExtensionManager>().getExtensionPackage(id)
+    return extensionPackage in Injekt.get<SourcePreferences>().incognitoExtensions().get()
+}
