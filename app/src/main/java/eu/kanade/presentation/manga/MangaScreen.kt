@@ -167,6 +167,7 @@ fun MangaScreen(
     onChapterSelected: (ChapterList.Item, Boolean, Boolean, Boolean) -> Unit,
     onAllChapterSelected: (Boolean) -> Unit,
     onInvertSelection: () -> Unit,
+    onClickSourceSettingsClicked: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val onCopyTagToClipboard: (tag: String) -> Unit = {
@@ -220,6 +221,7 @@ fun MangaScreen(
             onChapterSelected = onChapterSelected,
             onAllChapterSelected = onAllChapterSelected,
             onInvertSelection = onInvertSelection,
+            onClickSourceSettingsClicked = onClickSourceSettingsClicked,
         )
     } else {
         MangaScreenLargeImpl(
@@ -266,6 +268,7 @@ fun MangaScreen(
             onChapterSelected = onChapterSelected,
             onAllChapterSelected = onAllChapterSelected,
             onInvertSelection = onInvertSelection,
+            onClickSourceSettingsClicked = onClickSourceSettingsClicked,
         )
     }
 }
@@ -313,6 +316,7 @@ private fun MangaScreenSmallImpl(
     onOpenPagePreview: (Int) -> Unit,
     onMorePreviewsClicked: () -> Unit,
     previewsRowCount: Int,
+    onClickSourceSettingsClicked: (() -> Unit)?,
     // SY <--
 
     // For bottom action menu
@@ -394,6 +398,7 @@ private fun MangaScreenSmallImpl(
                 actionModeCounter = selectedChapterCount,
                 onSelectAll = { onAllChapterSelected(true) },
                 onInvertSelection = { onInvertSelection() },
+                onClickSourceSettings = onClickSourceSettingsClicked,
             )
         },
         bottomBar = {
@@ -636,6 +641,7 @@ fun MangaScreenLargeImpl(
     onOpenPagePreview: (Int) -> Unit,
     onMorePreviewsClicked: () -> Unit,
     previewsRowCount: Int,
+    onClickSourceSettingsClicked: (() -> Unit)?,
     // SY <--
 
     // For bottom action menu
@@ -708,6 +714,7 @@ fun MangaScreenLargeImpl(
                 actionModeCounter = selectedChapterCount,
                 onSelectAll = { onAllChapterSelected(true) },
                 onInvertSelection = { onInvertSelection() },
+                onClickSourceSettings = onClickSourceSettingsClicked,
             )
         },
         bottomBar = {

@@ -38,15 +38,18 @@ import eu.kanade.presentation.manga.components.DeleteChaptersDialog
 import eu.kanade.presentation.manga.components.MangaCoverDialog
 import eu.kanade.presentation.manga.components.ScanlatorFilterDialog
 import eu.kanade.presentation.manga.components.SetIntervalDialog
+import eu.kanade.presentation.more.settings.screen.SettingsEhScreen
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.data.connections.discord.ReaderData
+import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.isLocalOrStub
 import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.ui.browse.extension.details.ExtensionDetailsScreen
 import eu.kanade.tachiyomi.ui.browse.migration.advanced.design.PreMigrationScreen
 import eu.kanade.tachiyomi.ui.browse.source.SourcesScreen
 import eu.kanade.tachiyomi.ui.browse.source.browse.BrowseSourceScreen
@@ -66,6 +69,7 @@ import exh.pagepreview.PagePreviewScreen
 import exh.recs.RecommendsScreen
 import exh.source.MERGED_SOURCE_ID
 import exh.source.getMainSource
+import exh.source.isEhBasedSource
 import exh.ui.ifSourcesLoaded
 import exh.ui.metadata.MetadataViewScreen
 import kotlinx.coroutines.CancellationException
@@ -240,6 +244,17 @@ class MangaScreen(
             onChapterSelected = screenModel::toggleSelection,
             onAllChapterSelected = screenModel::toggleAllSelection,
             onInvertSelection = screenModel::invertSelection,
+            onClickSourceSettingsClicked = {
+                when {
+                    successState.source.isLocalOrStub() -> null
+                    successState.source.isEhBasedSource() -> navigator.push(SettingsEhScreen)
+                    else -> {
+                        val extensionManager = Injekt.get<ExtensionManager>()
+                        val pkgName = extensionManager.getExtensionPackage(successState.manga.source)
+                        pkgName?.let { navigator.push(ExtensionDetailsScreen(it)) }
+                    }
+                }
+            },
         )
 
         var showScanlatorsDialog by remember { mutableStateOf(false) }
