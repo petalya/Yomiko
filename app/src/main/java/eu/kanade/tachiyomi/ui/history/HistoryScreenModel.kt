@@ -63,7 +63,7 @@ class HistoryScreenModel(
         return map { history ->
             val previousHistory = getHistory.await(history.mangaId)
                 .sortedByDescending { it.readAt }
-                .filter { it.chapterId != history.chapterId }
+                .filter { it.chapterId != history.chapterId && (it.readAt?.time ?: 0) > 0 }
                 .map { HistoryWithRelations.from(it, history) }
             HistoryUiModel.Item(history, previousHistory)
         }.insertSeparators { before, after ->
