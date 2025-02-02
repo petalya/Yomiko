@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.ui.history
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.mutableStateMapOf
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.core.util.insertSeparators
@@ -58,17 +59,22 @@ class HistoryScreenModel(
         }
     }
 
-    private fun List<HistoryWithRelations>.toHistoryUiModels(): List<HistoryUiModel> {
-        return map { HistoryUiModel.Item(it) }
-            .insertSeparators { before, after ->
-                val beforeDate = before?.item?.readAt?.time?.toLocalDate()
-                val afterDate = after?.item?.readAt?.time?.toLocalDate()
-                when {
-                    beforeDate != afterDate && afterDate != null -> HistoryUiModel.Header(afterDate)
-                    // Return null to avoid adding a separator between two items.
-                    else -> null
-                }
+    private suspend fun List<HistoryWithRelations>.toHistoryUiModels(): List<HistoryUiModel> {
+        return map { history ->
+            val previousHistory = getHistory.await(history.mangaId)
+                .sortedByDescending { it.readAt }
+                .filter { it.chapterId != history.chapterId }
+                .map { HistoryWithRelations.from(it, history) }
+            HistoryUiModel.Item(history, previousHistory)
+        }.insertSeparators { before, after ->
+            val beforeDate = before?.item?.readAt?.time?.toLocalDate()
+            val afterDate = after?.item?.readAt?.time?.toLocalDate()
+            when {
+                beforeDate != afterDate && afterDate != null -> HistoryUiModel.Header(afterDate)
+                // Return null to avoid adding a separator between two items.
+                else -> null
             }
+        }
     }
 
     suspend fun getNextChapter(): Chapter? {
@@ -85,6 +91,12 @@ class HistoryScreenModel(
         val chapter = chapters.firstOrNull()
         _events.send(Event.OpenChapter(chapter))
     }
+
+fun toggleExpandHistory(mangaId: Long) {
+    mutableState.update {
+        it.copy(expandedStates = it.expandedStates.apply { this[mangaId] = !(this[mangaId] ?: false) })
+    }
+}
 
     fun removeFromHistory(history: HistoryWithRelations) {
         screenModelScope.launchIO {
@@ -119,6 +131,7 @@ class HistoryScreenModel(
         val searchQuery: String? = null,
         val list: ImmutableList<HistoryUiModel>? = null,
         val dialog: Dialog? = null,
+        val expandedStates: MutableMap<Long, Boolean> = mutableStateMapOf(),
     )
 
     sealed interface Dialog {

@@ -1,16 +1,31 @@
 package eu.kanade.presentation.history
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarActions
 import eu.kanade.presentation.components.AppBarTitle
@@ -31,6 +46,7 @@ import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.screens.LoadingScreen
 import java.time.LocalDate
+import kotlin.math.min
 
 @Composable
 fun HistoryScreen(
@@ -39,6 +55,7 @@ fun HistoryScreen(
     onSearchQueryChange: (String?) -> Unit,
     onClickCover: (mangaId: Long) -> Unit,
     onClickResume: (mangaId: Long, chapterId: Long) -> Unit,
+    onClickExpand: (mangaId: Long) -> Unit,
     onDialogChange: (HistoryScreenModel.Dialog?) -> Unit,
 ) {
     Scaffold(
@@ -80,10 +97,12 @@ fun HistoryScreen(
                 )
             } else {
                 HistoryScreenContent(
+                    state = state,
                     history = it,
                     contentPadding = contentPadding,
                     onClickCover = { history -> onClickCover(history.mangaId) },
                     onClickResume = { history -> onClickResume(history.mangaId, history.chapterId) },
+                    onClickExpand = { history -> onClickExpand(history.mangaId) },
                     onClickDelete = { item -> onDialogChange(HistoryScreenModel.Dialog.Delete(item)) },
                 )
             }
@@ -93,10 +112,12 @@ fun HistoryScreen(
 
 @Composable
 private fun HistoryScreenContent(
+    state: HistoryScreenModel.State,
     history: ImmutableList<HistoryUiModel>,
     contentPadding: PaddingValues,
     onClickCover: (HistoryWithRelations) -> Unit,
     onClickResume: (HistoryWithRelations) -> Unit,
+    onClickExpand: (HistoryWithRelations) -> Unit,
     onClickDelete: (HistoryWithRelations) -> Unit,
 ) {
     FastScrollLazyColumn(
@@ -119,15 +140,68 @@ private fun HistoryScreenContent(
                         text = relativeDateText(item.date),
                     )
                 }
+
                 is HistoryUiModel.Item -> {
-                    val value = item.item
-                    HistoryItem(
-                        modifier = Modifier.animateItemFastScroll(),
-                        history = value,
-                        onClickCover = { onClickCover(value) },
-                        onClickResume = { onClickResume(value) },
-                        onClickDelete = { onClickDelete(value) },
-                    )
+                    val mainHistory = item.item
+                    val expanded = state.expandedStates[mainHistory.mangaId] == true
+
+                    Column {
+                        HistoryItem(
+                            modifier = Modifier.animateItemFastScroll(),
+                            history = mainHistory,
+                            expanded = expanded,
+                            onClickCover = { onClickCover(mainHistory) },
+                            onClickExpand = { onClickExpand(mainHistory) }.takeIf { item.previousHistory.isNotEmpty() },
+                            onClickResume = { onClickResume(mainHistory) },
+                            onClickDelete = { onClickDelete(mainHistory) },
+                        )
+
+                        AnimatedVisibility(
+                            visible = expanded,
+                            enter = fadeIn() + expandVertically(),
+                            exit = fadeOut() + shrinkVertically()
+                        ) {
+                            val itemsCount = item.previousHistory.size
+                            LazyColumn(
+                                modifier = Modifier.height((60 * min(14, itemsCount) + if (itemsCount > 14) 70 else 0).dp),
+                            ) {
+                                val splitIndex = if (itemsCount > 14) 7 else itemsCount
+                                val firstPart = item.previousHistory.take(splitIndex)
+                                val secondPart = item.previousHistory.takeLast(splitIndex)
+
+                                // Add a null item to separate the two lists
+                                items(firstPart + listOf(null) + secondPart) { previous ->
+                                    if (previous == null) {
+                                        if (itemsCount > 14) {
+                                            Box(
+                                                contentAlignment = Alignment.CenterStart,
+                                                modifier = Modifier
+                                                    .clickable { }
+                                                    .height(70.dp)
+                                                    .fillMaxSize(),
+                                            ) {
+                                                Text(
+                                                    text = stringResource(MR.strings.and_more, itemsCount - splitIndex * 2),
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    modifier = Modifier.padding(horizontal = 60.dp, vertical = 20.dp),
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        HistoryItem(
+                                            modifier = Modifier.animateItemFastScroll(),
+                                            history = previous,
+                                            isPreviousHistory = true,
+                                            expanded = false,
+                                            onClickResume = { onClickResume(previous) },
+                                            onClickDelete = { onClickDelete(previous) },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -136,7 +210,10 @@ private fun HistoryScreenContent(
 
 sealed interface HistoryUiModel {
     data class Header(val date: LocalDate) : HistoryUiModel
-    data class Item(val item: HistoryWithRelations) : HistoryUiModel
+    data class Item(
+        val item: HistoryWithRelations,
+        val previousHistory: List<HistoryWithRelations>,
+    ) : HistoryUiModel
 }
 
 @PreviewLightDark
@@ -152,6 +229,7 @@ internal fun HistoryScreenPreviews(
             onSearchQueryChange = {},
             onClickCover = {},
             onClickResume = { _, _ -> run {} },
+            onClickExpand = {},
             onDialogChange = {},
         )
     }
