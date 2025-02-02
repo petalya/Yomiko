@@ -21,6 +21,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -163,12 +165,15 @@ private fun HistoryScreenContent(
                             exit = fadeOut() + shrinkVertically()
                         ) {
                             val itemsCount = item.previousHistory.size
+                            val showMoreState = remember { mutableStateOf(false) }
+
                             LazyColumn(
                                 modifier = Modifier.height((60 * min(14, itemsCount) + if (itemsCount > 14) 70 else 0).dp),
                             ) {
-                                val splitIndex = if (itemsCount > 14) 7 else itemsCount
+                                val splitIndex = if (itemsCount > 14 && !showMoreState.value) 7 else itemsCount
+                                println(splitIndex == itemsCount)
                                 val firstPart = item.previousHistory.take(splitIndex)
-                                val secondPart = item.previousHistory.takeLast(splitIndex)
+                                val secondPart = item.previousHistory.takeLast(if (splitIndex == itemsCount) 0 else splitIndex)
 
                                 // Add a null item to separate the two lists
                                 items(firstPart + listOf(null) + secondPart) { previous ->
@@ -177,12 +182,18 @@ private fun HistoryScreenContent(
                                             Box(
                                                 contentAlignment = Alignment.CenterStart,
                                                 modifier = Modifier
-                                                    .clickable { }
+                                                    .clickable {
+                                                        println("Show more: ${showMoreState.value}")
+                                                        showMoreState.value = !showMoreState.value
+                                                    }
                                                     .height(70.dp)
                                                     .fillMaxSize(),
                                             ) {
                                                 Text(
-                                                    text = stringResource(MR.strings.and_more, itemsCount - splitIndex * 2),
+                                                    text = if (showMoreState.value) stringResource(MR.strings.show_less) else stringResource(
+                                                        MR.strings.show_n_more_chapters,
+                                                        itemsCount - splitIndex * 2,
+                                                    ),
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     modifier = Modifier.padding(horizontal = 60.dp, vertical = 20.dp),
