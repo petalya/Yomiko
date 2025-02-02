@@ -85,6 +85,7 @@ data object UpdatesTab : Tab {
             onSelectAll = screenModel::toggleAllSelection,
             onInvertSelection = screenModel::invertSelection,
             onUpdateLibrary = screenModel::updateLibrary,
+            onExpandGroupClicked = screenModel::toggleGroupExpanded,
             onDownloadChapter = screenModel::downloadChapters,
             onMultiBookmarkClicked = screenModel::bookmarkUpdates,
             onMultiMarkAsReadClicked = screenModel::markUpdatesRead,

@@ -3,12 +3,13 @@ package eu.kanade.tachiyomi.ui.updates
 import android.app.Application
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import eu.kanade.core.preference.asState
 import eu.kanade.core.util.addOrRemove
-import eu.kanade.core.util.insertSeparators
 import eu.kanade.domain.chapter.interactor.SetReadStatus
 import eu.kanade.presentation.manga.components.ChapterDownloadAction
 import eu.kanade.presentation.updates.UpdatesUiModel
@@ -48,6 +49,7 @@ import tachiyomi.domain.updates.interactor.GetUpdates
 import tachiyomi.domain.updates.model.UpdatesWithRelations
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.time.LocalDate
 import java.time.ZonedDateTime
 
 class UpdatesScreenModel(
@@ -95,9 +97,11 @@ class UpdatesScreenModel(
                 }
                 .collectLatest { updates ->
                     mutableState.update {
+                        val updateItems = updates.toUpdateItems()
                         it.copy(
                             isLoading = false,
-                            items = updates.toUpdateItems(),
+                            items = updateItems,
+                            expandedStates = initializeExpandedStates(updateItems),
                         )
                     }
                 }
@@ -137,12 +141,41 @@ class UpdatesScreenModel(
             .toPersistentList()
     }
 
+
+    private fun initializeExpandedStates(items: PersistentList<UpdatesItem>): MutableMap<Pair<Long, LocalDate>, Boolean> {
+        return mutableStateMapOf<Pair<Long, LocalDate>, Boolean>().apply {
+            val groupedUiModels = State(items = items).uiModels // Use a temporary State to group
+            groupedUiModels.forEach { groupedItem ->
+                if (groupedItem is UpdatesUiModel.Item && groupedItem.isFirstInGroup && groupedItem.hasUnreadItems) {
+                    put(Pair(groupedItem.item.update.mangaId, groupedItem.item.update.dateFetch.toLocalDate()), true)
+                }
+            }
+        }
+    }
+
     fun updateLibrary(): Boolean {
         val started = LibraryUpdateJob.startNow(Injekt.get<Application>())
         screenModelScope.launch {
             _events.send(Event.LibraryUpdateTriggered(started))
         }
         return started
+    }
+
+    /**
+     * Toggles the expanded state of an Item with subsequent chapters.
+     *
+     * @param item The update item whose group expanded state is to be toggled.
+     */
+    fun toggleGroupExpanded(item: UpdatesItem) {
+        val mangaId = item.update.mangaId
+        val date = item.update.dateFetch.toLocalDate()
+        mutableState.update {
+            it.copy(
+                expandedStates = it.expandedStates.apply {
+                    merge(Pair(mangaId, date), true, Boolean::xor)
+                }
+            )
+        }
     }
 
     /**
@@ -377,22 +410,51 @@ class UpdatesScreenModel(
         val isLoading: Boolean = true,
         val items: PersistentList<UpdatesItem> = persistentListOf(),
         val dialog: Dialog? = null,
+        val expandedStates: MutableMap<Pair<Long, LocalDate>, Boolean> = mutableStateMapOf(),
     ) {
         val selected = items.filter { it.selected }
         val selectionMode = selected.isNotEmpty()
 
-        fun getUiModel(): List<UpdatesUiModel> {
-            return items
-                .map { UpdatesUiModel.Item(it) }
-                .insertSeparators { before, after ->
-                    val beforeDate = before?.item?.update?.dateFetch?.toLocalDate()
-                    val afterDate = after?.item?.update?.dateFetch?.toLocalDate()
-                    when {
-                        beforeDate != afterDate && afterDate != null -> UpdatesUiModel.Header(afterDate)
-                        // Return null to avoid adding a separator between two items.
-                        else -> null
-                    }
+        val uiModels by derivedStateOf {    // use derivedStateOf to avoid recomputing on every recomposition
+            val uiModels = mutableListOf<UpdatesUiModel>()
+            var currentMangaId: Long? = null
+            var currentDate: LocalDate? = null
+
+            for (i in items.indices) {
+                val item = items[i]
+                val mangaId = item.update.mangaId
+                val itemDate = item.update.dateFetch.toLocalDate()
+
+                if (itemDate != currentDate) {
+                    uiModels.add(UpdatesUiModel.Header(itemDate))
+                    currentDate = itemDate
+                    currentMangaId = null // Reset manga group for new date
                 }
+
+                val isFirstInGroup = mangaId != currentMangaId
+                var hasSubsequentItems = false
+                var hasUnreadItemsInGroup = !item.update.read
+
+                for (j in (i + 1) until items.size) {
+                    val nextItem = items[j]
+                    if (nextItem.update.mangaId == mangaId) {
+                        hasSubsequentItems = true
+                        if (!nextItem.update.read) hasUnreadItemsInGroup = true
+                    } else break
+                }
+
+                uiModels.add(
+                    UpdatesUiModel.Item(
+                        item = item,
+                        isFirstInGroup = isFirstInGroup,
+                        hasSubsequentItems = hasSubsequentItems,
+                        hasUnreadItems = hasUnreadItemsInGroup,
+                        groupDate = itemDate,
+                    ),
+                )
+                if (isFirstInGroup) currentMangaId = mangaId
+            }
+            uiModels.toPersistentList() // Convert to PersistentList for immutability
         }
     }
 

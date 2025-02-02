@@ -79,7 +79,7 @@ internal fun LazyListScope.updatesLastUpdatedItem(
 }
 
 internal fun LazyListScope.updatesUiItems(
-    groupedUiModels: List<GroupedUpdatesUiModel>,
+    uiModels: List<UpdatesUiModel>,
     expandedStates: Map<Pair<Long, LocalDate>, Boolean>,
     selectionMode: Boolean,
     // SY -->
@@ -94,29 +94,29 @@ internal fun LazyListScope.updatesUiItems(
 
 
     items(
-        items = groupedUiModels,
+        items = uiModels,
         contentType = {
             when (it) {
-                is GroupedUpdatesUiModel.DateHeader -> "header"
-                is GroupedUpdatesUiModel.ItemGroup -> "item"
+                is UpdatesUiModel.Header -> "header"
+                is UpdatesUiModel.Item -> "item"
             }
         },
         key = {
             when (it) {
-                is GroupedUpdatesUiModel.DateHeader -> "updatesHeader-${it.hashCode()}"
-                is GroupedUpdatesUiModel.ItemGroup -> "updates-${it.item.update.mangaId}-${it.item.update.chapterId}"
+                is UpdatesUiModel.Header -> "updatesHeader-${it.hashCode()}"
+                is UpdatesUiModel.Item -> "updates-${it.item.update.mangaId}-${it.item.update.chapterId}"
             }
         },
     ) { groupedItem ->
         when (groupedItem) {
-            is GroupedUpdatesUiModel.DateHeader -> {
+            is UpdatesUiModel.Header -> {
                 ListGroupHeader(
                     modifier = Modifier.animateItemFastScroll(),
                     text = relativeDateText(groupedItem.date),
                 )
             }
 
-            is GroupedUpdatesUiModel.ItemGroup -> {
+            is UpdatesUiModel.Item -> {
                 val updatesItem = groupedItem.item
                 val mangaId = updatesItem.update.mangaId
                 val groupDate = groupedItem.groupDate
@@ -281,7 +281,7 @@ private fun UpdatesUiItem(
                     !expanded,
                 ),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .clickableNoIndication { onExpandClick() }
                     .padding(start = 4.dp)

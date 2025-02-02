@@ -13,7 +13,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -28,7 +27,6 @@ import eu.kanade.presentation.manga.components.MangaBottomActionMenu
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.ui.updates.UpdatesItem
 import eu.kanade.tachiyomi.ui.updates.UpdatesScreenModel
-import eu.kanade.tachiyomi.util.lang.toLocalDate
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -55,6 +53,7 @@ fun UpdateScreen(
     onInvertSelection: () -> Unit,
     onCalendarClicked: () -> Unit,
     onUpdateLibrary: () -> Boolean,
+    onExpandGroupClicked: (UpdatesItem) -> Unit,
     onDownloadChapter: (List<UpdatesItem>, ChapterDownloadAction) -> Unit,
     onMultiBookmarkClicked: (List<UpdatesItem>, bookmark: Boolean) -> Unit,
     onMultiMarkAsReadClicked: (List<UpdatesItem>, read: Boolean) -> Unit,
@@ -97,18 +96,6 @@ fun UpdateScreen(
                 val scope = rememberCoroutineScope()
                 var isRefreshing by remember { mutableStateOf(false) }
 
-                val groupedUiModels = remember { groupUiModels(state.getUiModel()) }
-                // Initialize expandedStates based on hasUnreadItems
-                val expandedStates = remember {
-                    mutableStateMapOf<Pair<Long, LocalDate>, Boolean>().apply {
-                        groupedUiModels.forEach { groupedItem ->
-                            if (groupedItem is GroupedUpdatesUiModel.ItemGroup && groupedItem.isFirstInGroup && groupedItem.hasUnreadItems) {
-                                put(Pair(groupedItem.item.update.mangaId, groupedItem.item.update.dateFetch.toLocalDate()), true )
-                            }
-                        }
-                    }
-                }
-
                 PullRefresh(
                     refreshing = isRefreshing,
                     onRefresh = {
@@ -130,8 +117,8 @@ fun UpdateScreen(
                         updatesLastUpdatedItem(lastUpdated)
 
                         updatesUiItems(
-                            groupedUiModels = groupedUiModels,
-                            expandedStates = expandedStates,
+                            uiModels = state.uiModels,
+                            expandedStates = state.expandedStates,
                             selectionMode = state.selectionMode,
                             // SY -->
                             preserveReadingPosition = preserveReadingPosition,
@@ -139,7 +126,7 @@ fun UpdateScreen(
                             onUpdateSelected = onUpdateSelected,
                             onClickCover = onClickCover,
                             onClickUpdate = onOpenChapter,
-                            onExpandClicked = { item -> expandedStates.merge(Pair(item.update.mangaId, item.update.dateFetch.toLocalDate()), true, Boolean::xor) },
+                            onExpandClicked = onExpandGroupClicked,
                             onDownloadChapter = onDownloadChapter,
                         )
                     }
@@ -236,68 +223,13 @@ private fun UpdatesBottomBar(
     )
 }
 
-private fun groupUiModels(uiModels: List<UpdatesUiModel>): List<GroupedUpdatesUiModel> {
-    val groupedList = mutableListOf<GroupedUpdatesUiModel>()
-    var currentMangaId: Long? = null
-    var currentDate: LocalDate? = null
-
-    var i = 0
-    while (i < uiModels.size) {
-        val uiModel = uiModels[i]
-        when (uiModel) {
-            is UpdatesUiModel.Header -> {
-                groupedList.add(GroupedUpdatesUiModel.DateHeader(uiModel.date))
-                currentMangaId = null
-                currentDate = uiModel.date
-            }
-
-            is UpdatesUiModel.Item -> {
-                val mangaId = uiModel.item.update.mangaId
-                val groupDate = currentDate!!
-                val isFirstInGroup = mangaId != currentMangaId
-                var hasSubsequentItems = false
-                var hasUnreadItemsInGroup = !uiModel.item.update.read
-
-                for (j in (i + 1) until uiModels.size) {
-                    val nextUiModel = uiModels[j]
-                    if (nextUiModel is UpdatesUiModel.Item &&
-                        nextUiModel.item.update.mangaId == mangaId &&
-                        nextUiModel.item.update.dateFetch.toLocalDate() == groupDate
-                    ) {
-                        hasSubsequentItems = true
-                        if (!nextUiModel.item.update.read) hasUnreadItemsInGroup = true
-                    } else break
-                }
-
-                groupedList.add(
-                    GroupedUpdatesUiModel.ItemGroup(
-                        item = uiModel.item,
-                        isFirstInGroup = isFirstInGroup,
-                        hasSubsequentItems = hasSubsequentItems,
-                        hasUnreadItems = hasUnreadItemsInGroup,
-                        groupDate = groupDate,
-                    ),
-                )
-                if (isFirstInGroup) currentMangaId = mangaId
-            }
-        }
-        i++
-    }
-    return groupedList
-}
-
 sealed interface UpdatesUiModel {
     data class Header(val date: LocalDate) : UpdatesUiModel
-    data class Item(val item: UpdatesItem) : UpdatesUiModel
-}
-
-sealed interface GroupedUpdatesUiModel {
-    data class DateHeader(val date: LocalDate) : GroupedUpdatesUiModel
-    data class ItemGroup(
+    data class Item(
         val item: UpdatesItem,
         val isFirstInGroup: Boolean,
         val hasSubsequentItems: Boolean,
         val hasUnreadItems: Boolean,
         val groupDate: LocalDate,
-    ) : GroupedUpdatesUiModel
+    ) : UpdatesUiModel
 }
