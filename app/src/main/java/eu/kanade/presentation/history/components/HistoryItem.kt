@@ -33,7 +33,6 @@ import eu.kanade.presentation.util.relativeTimeSpanString
 import eu.kanade.tachiyomi.R
 import tachiyomi.domain.history.model.HistoryWithRelations
 import tachiyomi.i18n.MR
-import tachiyomi.presentation.core.components.material.DISABLED_ALPHA
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.clickableNoIndication
@@ -94,7 +93,7 @@ fun HistoryItem(
                 text = stringResource(MR.strings.label_read_chapters) + " " + relativeTimeSpanString(
                     history.readAt?.time ?: 0,
                 ),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_ALPHA),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = textStyle,
             )
 
