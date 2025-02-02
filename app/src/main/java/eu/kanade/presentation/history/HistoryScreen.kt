@@ -37,6 +37,7 @@ import eu.kanade.presentation.util.animateItemFastScroll
 import eu.kanade.tachiyomi.ui.history.HistoryScreenModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.history.model.HistoryWithRelations
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.FastScrollLazyColumn
@@ -54,7 +55,7 @@ fun HistoryScreen(
     snackbarHostState: SnackbarHostState,
     onSearchQueryChange: (String?) -> Unit,
     onClickCover: (mangaId: Long) -> Unit,
-    onClickResume: (mangaId: Long, chapterId: Long) -> Unit,
+    onClickResume: (chapter: Chapter?) -> Unit,
     onClickExpand: (mangaId: Long) -> Unit,
     onDialogChange: (HistoryScreenModel.Dialog?) -> Unit,
 ) {
@@ -101,7 +102,7 @@ fun HistoryScreen(
                     history = it,
                     contentPadding = contentPadding,
                     onClickCover = { history -> onClickCover(history.mangaId) },
-                    onClickResume = { history -> onClickResume(history.mangaId, history.chapterId) },
+                    onClickResume = { history -> onClickResume(history.chapter) },
                     onClickExpand = { history -> onClickExpand(history.mangaId) },
                     onClickDelete = { item -> onDialogChange(HistoryScreenModel.Dialog.Delete(item)) },
                 )
@@ -228,7 +229,7 @@ internal fun HistoryScreenPreviews(
             snackbarHostState = SnackbarHostState(),
             onSearchQueryChange = {},
             onClickCover = {},
-            onClickResume = { _, _ -> run {} },
+            onClickResume = { _ -> run {} },
             onClickExpand = {},
             onDialogChange = {},
         )

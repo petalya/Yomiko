@@ -81,9 +81,15 @@ class HistoryScreenModel(
         return withIOContext { getNextChapters.await(onlyUnread = false).firstOrNull() }
     }
 
-    fun getNextChapterForManga(mangaId: Long, chapterId: Long) {
+    fun resumeManga(chapter: Chapter?) {
         screenModelScope.launchIO {
-            sendNextChapterEvent(getNextChapters.await(mangaId, chapterId, onlyUnread = false))
+            if (chapter == null) return@launchIO
+            val nextChapters = getNextChapters.await(chapter.mangaId, chapter.id, onlyUnread = false)
+            if (nextChapters.firstOrNull()?.read == true) {
+                sendNextChapterEvent(nextChapters.toMutableList().apply { add(0, chapter) })
+            } else {
+                sendNextChapterEvent(nextChapters)
+            }
         }
     }
 
@@ -92,11 +98,11 @@ class HistoryScreenModel(
         _events.send(Event.OpenChapter(chapter))
     }
 
-fun toggleExpandHistory(mangaId: Long) {
-    mutableState.update {
-        it.copy(expandedStates = it.expandedStates.apply { this[mangaId] = !(this[mangaId] ?: false) })
+    fun toggleExpandHistory(mangaId: Long) {
+        mutableState.update {
+            it.copy(expandedStates = it.expandedStates.apply { this[mangaId] = !(this[mangaId] ?: false) })
+        }
     }
-}
 
     fun removeFromHistory(history: HistoryWithRelations) {
         screenModelScope.launchIO {
