@@ -101,7 +101,11 @@ class UpdatesScreenModel(
                         it.copy(
                             isLoading = false,
                             items = updateItems,
-                            expandedStates = initializeExpandedStates(updateItems),
+                            expandedStates =  if (it.items.isEmpty() && updateItems.isNotEmpty()) { // Check if initial load
+                                initializeExpandedStates(updateItems) // Initialize only on initial load
+                            } else {
+                                it.expandedStates // Keep existing expandedStates for subsequent updates
+                            },
                         )
                     }
                 }
