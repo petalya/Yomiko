@@ -4,9 +4,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.FlipToBack
 import androidx.compose.material.icons.outlined.SelectAll
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -31,13 +31,11 @@ import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.sy.SYMR
 import tachiyomi.presentation.core.i18n.stringResource
-import tachiyomi.presentation.core.theme.active
 
 @Composable
 fun MangaToolbar(
     title: String,
     titleAlphaProvider: () -> Float,
-    hasFilters: Boolean,
     onBackClicked: () -> Unit,
     onClickFilter: () -> Unit,
     onClickShare: (() -> Unit)?,
@@ -106,7 +104,6 @@ fun MangaToolbar(
                         )
                     }
 
-                    val filterTint = if (hasFilters) MaterialTheme.colorScheme.active else LocalContentColor.current
                     AppBarActions(
                         actions = persistentListOf<AppBar.AppBarAction>().builder()
                             .apply {
@@ -119,14 +116,15 @@ fun MangaToolbar(
                                         ),
                                     )
                                 }
-                                add(
-                                    AppBar.Action(
-                                        title = stringResource(MR.strings.action_filter),
-                                        icon = Icons.Outlined.FilterList,
-                                        iconTint = filterTint,
-                                        onClick = onClickFilter,
-                                    ),
-                                )
+                                if (onClickShare != null) {
+                                    add(
+                                        AppBar.Action(
+                                            title = stringResource(MR.strings.action_share),
+                                            icon = Icons.Outlined.Share,
+                                            onClick = onClickShare,
+                                        ),
+                                    )
+                                }
                                 add(
                                     AppBar.OverflowAction(
                                         title = stringResource(MR.strings.action_webview_refresh),
@@ -149,11 +147,11 @@ fun MangaToolbar(
                                         ),
                                     )
                                 }
-                                if (onClickShare != null) {
+                                if (onClickFilter != null) {
                                     add(
                                         AppBar.OverflowAction(
-                                            title = stringResource(MR.strings.action_share),
-                                            onClick = onClickShare,
+                                            title = stringResource(MR.strings.action_filter),
+                                            onClick = onClickFilter,
                                         ),
                                     )
                                 }
