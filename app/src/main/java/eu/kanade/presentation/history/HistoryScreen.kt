@@ -58,7 +58,7 @@ fun HistoryScreen(
     onSearchQueryChange: (String?) -> Unit,
     onClickCover: (mangaId: Long) -> Unit,
     onClickResume: (chapter: Chapter?) -> Unit,
-    onClickExpand: (mangaId: Long) -> Unit,
+    onClickExpand: (historyItem: HistoryWithRelations) -> Unit,
     onDialogChange: (HistoryScreenModel.Dialog?) -> Unit,
 ) {
     Scaffold(
@@ -105,7 +105,7 @@ fun HistoryScreen(
                     contentPadding = contentPadding,
                     onClickCover = { history -> onClickCover(history.mangaId) },
                     onClickResume = { history -> onClickResume(history.chapter) },
-                    onClickExpand = { history -> onClickExpand(history.mangaId) },
+                    onClickExpand = { history -> onClickExpand(history) },
                     onClickDelete = { item -> onDialogChange(HistoryScreenModel.Dialog.Delete(item)) },
                 )
             }
@@ -145,18 +145,19 @@ private fun HistoryScreenContent(
                 }
 
                 is HistoryUiModel.Item -> {
-                    val mainHistory = item.item
-                    val expanded = state.expandedStates[mainHistory.mangaId] == true
+                    val mainItem = item.item
+                    val prevHistory = item.previousHistory
+                    val expanded = state.expandedStates[mainItem.mangaId] == true
 
                     Column {
                         HistoryItem(
                             modifier = Modifier.animateItemFastScroll(),
-                            history = mainHistory,
+                            history = mainItem,
                             expanded = expanded,
-                            onClickCover = { onClickCover(mainHistory) },
-                            onClickExpand = { onClickExpand(mainHistory) }.takeIf { item.previousHistory.isNotEmpty() },
-                            onClickResume = { onClickResume(mainHistory) },
-                            onClickDelete = { onClickDelete(mainHistory) },
+                            onClickCover = { onClickCover(mainItem) },
+                            onClickExpand = { onClickExpand(mainItem) },
+                            onClickResume = { onClickResume(mainItem) },
+                            onClickDelete = { onClickDelete(mainItem) },
                         )
 
                         AnimatedVisibility(
@@ -164,16 +165,16 @@ private fun HistoryScreenContent(
                             enter = fadeIn() + expandVertically(),
                             exit = fadeOut() + shrinkVertically()
                         ) {
-                            val itemsCount = item.previousHistory.size
+                            if (prevHistory == null) return@AnimatedVisibility
+                            val itemsCount = prevHistory.size
                             val showMoreState = remember { mutableStateOf(false) }
 
                             LazyColumn(
                                 modifier = Modifier.height((60 * min(14, itemsCount) + if (itemsCount > 14) 70 else 0).dp),
                             ) {
                                 val splitIndex = if (itemsCount > 14 && !showMoreState.value) 7 else itemsCount
-                                println(splitIndex == itemsCount)
-                                val firstPart = item.previousHistory.take(splitIndex)
-                                val secondPart = item.previousHistory.takeLast(if (splitIndex == itemsCount) 0 else splitIndex)
+                                val firstPart = prevHistory.take(splitIndex)
+                                val secondPart = prevHistory.takeLast(if (splitIndex == itemsCount) 0 else splitIndex)
 
                                 // Add a null item to separate the two lists
                                 items(firstPart + listOf(null) + secondPart) { previous ->
@@ -182,10 +183,7 @@ private fun HistoryScreenContent(
                                             Box(
                                                 contentAlignment = Alignment.CenterStart,
                                                 modifier = Modifier
-                                                    .clickable {
-                                                        println("Show more: ${showMoreState.value}")
-                                                        showMoreState.value = !showMoreState.value
-                                                    }
+                                                    .clickable { showMoreState.value = !showMoreState.value }
                                                     .height(70.dp)
                                                     .fillMaxSize(),
                                             ) {
@@ -196,7 +194,10 @@ private fun HistoryScreenContent(
                                                     ),
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    modifier = Modifier.padding(horizontal = 60.dp, vertical = 20.dp),
+                                                    modifier = Modifier.padding(
+                                                        horizontal = 60.dp,
+                                                        vertical = 20.dp
+                                                    ),
                                                 )
                                             }
                                         }
@@ -206,6 +207,8 @@ private fun HistoryScreenContent(
                                             history = previous,
                                             isPreviousHistory = true,
                                             expanded = false,
+                                            onClickCover = { onClickCover(previous) },
+                                            onClickExpand = { onClickExpand(previous) },
                                             onClickResume = { onClickResume(previous) },
                                             onClickDelete = { onClickDelete(previous) },
                                         )
@@ -224,7 +227,7 @@ sealed interface HistoryUiModel {
     data class Header(val date: LocalDate) : HistoryUiModel
     data class Item(
         val item: HistoryWithRelations,
-        val previousHistory: List<HistoryWithRelations>,
+        val previousHistory: ImmutableList<HistoryWithRelations>? = null,
     ) : HistoryUiModel
 }
 

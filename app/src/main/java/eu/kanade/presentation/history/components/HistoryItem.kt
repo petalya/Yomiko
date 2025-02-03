@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -36,6 +37,8 @@ import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.clickableNoIndication
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
 fun HistoryItem(
@@ -43,9 +46,9 @@ fun HistoryItem(
     history: HistoryWithRelations,
     isPreviousHistory: Boolean = false,
     expanded: Boolean = false,
-    onClickCover: (() -> Unit)? = null,
+    onClickCover: () -> Unit,
     onClickResume: () -> Unit,
-    onClickExpand: (() -> Unit)? = null,
+    onClickExpand: () -> Unit,
     onClickDelete: () -> Unit,
 ) {
     Row(
@@ -69,10 +72,12 @@ fun HistoryItem(
                 .weight(1f)
                 .padding(start = MaterialTheme.padding.medium, end = MaterialTheme.padding.small),
         ) {
-//            val chapter = produceState<Chapter?>(Chapter.create()) {
-//                value = history.getChapter()
-//            }
             val textStyle = MaterialTheme.typography.bodyMedium
+            val formattedReadAtString = remember {
+                history.readAt?.let {
+                    SimpleDateFormat("EEE, d MMM yyyy 'at' h:mm a", Locale.getDefault()).format(it)
+                } ?: ""
+            }
 
             if (!isPreviousHistory) {
                 Text(
@@ -84,22 +89,25 @@ fun HistoryItem(
                 )
             }
             Text(
-                text = history.chapter?.name ?: stringResource(MR.strings.display_mode_chapter, formatChapterNumber(history.chapterNumber)),
+                text = history.chapter?.name ?: stringResource(
+                    MR.strings.display_mode_chapter,
+                    formatChapterNumber(history.chapterNumber),
+                ),
                 style = textStyle,
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1,
             )
             Text(
-                text = stringResource(MR.strings.label_read_chapters) + " " + relativeTimeSpanString(
-                    history.readAt?.time ?: 0,
-                ),
+                text = stringResource(MR.strings.label_read_chapters) + " " +
+                    if (isPreviousHistory) formattedReadAtString
+                    else relativeTimeSpanString(history.readAt?.time ?: 0),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = textStyle,
             )
 
         }
 
-        if (onClickExpand != null) {
+        if (!isPreviousHistory) {
             Icon(
                 painter = rememberAnimatedVectorPainter(
                     AnimatedImageVector.animatedVectorResource(R.drawable.anim_caret_down),
@@ -112,14 +120,14 @@ fun HistoryItem(
                     .padding(start = 4.dp)
                     .fillMaxHeight(),
             )
-        }
 
-        IconButton(onClick = onClickDelete) {
-            Icon(
-                imageVector = Icons.Outlined.Delete,
-                contentDescription = stringResource(MR.strings.action_delete),
-                tint = MaterialTheme.colorScheme.onSurface,
-            )
+            IconButton(onClick = onClickDelete) {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = stringResource(MR.strings.action_delete),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }
@@ -136,6 +144,7 @@ private fun HistoryItemPreviews(
                 history = historyWithRelations,
                 onClickCover = {},
                 onClickResume = {},
+                onClickExpand = {},
                 onClickDelete = {},
             )
         }

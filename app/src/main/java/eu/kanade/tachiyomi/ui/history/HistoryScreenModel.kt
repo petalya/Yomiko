@@ -59,22 +59,17 @@ class HistoryScreenModel(
         }
     }
 
-    private suspend fun List<HistoryWithRelations>.toHistoryUiModels(): List<HistoryUiModel> {
-        return map { history ->
-            val previousHistory = getHistory.await(history.mangaId)
-                .sortedByDescending { it.readAt }
-                .filter { it.chapterId != history.chapterId && (it.readAt?.time ?: 0) > 0 }
-                .map { HistoryWithRelations.from(it, history) }
-            HistoryUiModel.Item(history, previousHistory)
-        }.insertSeparators { before, after ->
-            val beforeDate = before?.item?.readAt?.time?.toLocalDate()
-            val afterDate = after?.item?.readAt?.time?.toLocalDate()
-            when {
-                beforeDate != afterDate && afterDate != null -> HistoryUiModel.Header(afterDate)
-                // Return null to avoid adding a separator between two items.
-                else -> null
+    private fun List<HistoryWithRelations>.toHistoryUiModels(): List<HistoryUiModel> {
+        return map { history -> HistoryUiModel.Item(history) }
+            .insertSeparators { before, after ->
+                val beforeDate = before?.item?.readAt?.time?.toLocalDate()
+                val afterDate = after?.item?.readAt?.time?.toLocalDate()
+                when {
+                    beforeDate != afterDate && afterDate != null -> HistoryUiModel.Header(afterDate)
+                    // Return null to avoid adding a separator between two items.
+                    else -> null
+                }
             }
-        }
     }
 
     suspend fun getNextChapter(): Chapter? {
@@ -98,9 +93,43 @@ class HistoryScreenModel(
         _events.send(Event.OpenChapter(chapter))
     }
 
-    fun toggleExpandHistory(mangaId: Long) {
-        mutableState.update {
-            it.copy(expandedStates = it.expandedStates.apply { this[mangaId] = !(this[mangaId] ?: false) })
+    fun toggleExpandHistory(historyItem: HistoryWithRelations) {
+        val mangaId = historyItem.mangaId
+        screenModelScope.launch {
+            val currentState = mutableState.value
+            val isExpanded = currentState.expandedStates[mangaId] ?: false
+            mutableState.update {
+                it.copy(expandedStates = it.expandedStates.apply { this[mangaId] = !isExpanded })
+            }
+
+            if (!isExpanded) { // If expanding, load previous history if not already loaded
+                if ((currentState.list?.find {
+                    it is HistoryUiModel.Item && it.item.mangaId == mangaId
+                } as? HistoryUiModel.Item)?.previousHistory == null) {
+                    loadPreviousHistory(historyItem)
+                }
+            }
+        }
+    }
+
+    private fun loadPreviousHistory(historyItem: HistoryWithRelations) {
+        screenModelScope.launch {
+            val previousHistoryList = getHistory.await(historyItem.mangaId)
+                .filter { (it.readAt?.time ?: 0) > 0 }
+                .sortedByDescending { it.readAt }
+                .map { HistoryWithRelations.from(it, historyItem) }
+//                .drop(1) //remove current history from previous history list
+                .toImmutableList()
+
+            mutableState.update { currentState ->
+                val newList = currentState.list?.map { uiModel ->
+                    if (uiModel is HistoryUiModel.Item && uiModel.item.mangaId == historyItem.mangaId)
+                        uiModel.copy(previousHistory = previousHistoryList)
+                    else uiModel
+                }?.toImmutableList()
+
+                currentState.copy(list = newList ?: currentState.list) // Update list only if not null
+            }
         }
     }
 
