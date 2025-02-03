@@ -437,7 +437,7 @@ class UpdatesScreenModel(
 
                 for (j in (i + 1) until items.size) {
                     val nextItem = items[j]
-                    if (nextItem.update.mangaId == mangaId) {
+                    if (nextItem.update.mangaId == mangaId && nextItem.update.dateFetch.toLocalDate() == currentDate) {
                         hasSubsequentItems = true
                         if (!nextItem.update.read) hasUnreadItemsInGroup = true
                     } else break
