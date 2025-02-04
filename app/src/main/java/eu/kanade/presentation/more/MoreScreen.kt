@@ -1,5 +1,8 @@
 package eu.kanade.presentation.more
 
+import androidx.compose.animation.graphics.res.animatedVectorResource
+import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
+import androidx.compose.animation.graphics.vector.AnimatedImageVector
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -14,21 +17,16 @@ import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.GetApp
-import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Label
 import androidx.compose.material.icons.outlined.NewReleases
-import androidx.compose.material.icons.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.vectorResource
 import eu.kanade.presentation.components.WarningBanner
 import eu.kanade.presentation.more.settings.widget.SwitchPreferenceWidget
 import eu.kanade.presentation.more.settings.widget.TextPreferenceWidget
@@ -105,7 +103,10 @@ fun MoreScreen(
                 SwitchPreferenceWidget(
                     title = stringResource(MR.strings.pref_incognito_mode),
                     subtitle = stringResource(MR.strings.pref_incognito_mode_summary),
-                    icon = ImageVector.vectorResource(R.drawable.ic_glasses_24dp),
+                    icon = rememberAnimatedVectorPainter(
+                        AnimatedImageVector.animatedVectorResource(R.drawable.anim_incognito),
+                        incognitoMode
+                    ),
                     checked = incognitoMode,
                     onCheckedChanged = onIncognitoModeChange,
                 )

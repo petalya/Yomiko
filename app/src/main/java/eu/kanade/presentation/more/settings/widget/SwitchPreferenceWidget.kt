@@ -8,7 +8,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 
@@ -17,7 +16,7 @@ fun SwitchPreferenceWidget(
     modifier: Modifier = Modifier,
     title: String,
     subtitle: CharSequence? = null,
-    icon: ImageVector? = null,
+    icon: Any? = null, // Can be either ImageVector or Painter
     checked: Boolean = false,
     onCheckedChanged: (Boolean) -> Unit,
 ) {

@@ -601,7 +601,7 @@ private fun ColumnScope.MangaContentInfo(
             if (isSourceIncognito) {
                 DotSeparatorText()
                 Icon(
-                    imageVector = ImageVector.vectorResource(R.drawable.ic_glasses_24dp),
+                    imageVector = ImageVector.vectorResource(R.drawable.ic_glasses_with_hat_24dp),
                     contentDescription = "Incognito Mode State for Source",
                     modifier = Modifier
                         .padding(end = 4.dp)
