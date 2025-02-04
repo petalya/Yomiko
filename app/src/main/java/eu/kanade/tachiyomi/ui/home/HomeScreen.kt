@@ -127,6 +127,7 @@ object HomeScreen : Screen() {
                                 enter = expandVertically(),
                                 exit = shrinkVertically(),
                             ) {
+                                val filteredTabs = TABS.fastFilter { it.isEnabled() }
                                 var flickOffsetX by remember { mutableFloatStateOf(0f) }
 
                                 NavigationBar(
@@ -137,7 +138,7 @@ object HomeScreen : Screen() {
                                                 flickOffsetX += dragAmount.x
                                             },
                                             onDragEnd = {
-                                                val currentIndex = TABS.indexOf(tabNavigator.current)
+                                                val currentIndex = filteredTabs.indexOf(tabNavigator.current)
                                                 val newIndex = when {
                                                     (flickOffsetX < 0F) -> currentIndex - 1
                                                     (flickOffsetX > 0F) -> currentIndex + 1
@@ -146,7 +147,7 @@ object HomeScreen : Screen() {
 
                                                 flickOffsetX = 0F
 
-                                                tabNavigator.current = TABS.getOrNull(newIndex) ?: tabNavigator.current
+                                                tabNavigator.current = filteredTabs.getOrNull(newIndex) ?: tabNavigator.current
                                             }
                                         )
                                     }
