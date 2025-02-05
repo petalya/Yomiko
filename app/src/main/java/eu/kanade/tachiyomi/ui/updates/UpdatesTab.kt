@@ -81,6 +81,8 @@ data object UpdatesTab : Tab {
             // SY -->
             preserveReadingPosition = screenModel.preserveReadingPosition,
             // SY <--
+            updateSwipeStartAction = screenModel.chapterSwipeStartAction,
+            updateSwipeEndAction = screenModel.chapterSwipeEndAction,
             onClickCover = { item -> navigator.push(MangaScreen(item.update.mangaId)) },
             onSelectAll = screenModel::toggleAllSelection,
             onInvertSelection = screenModel::invertSelection,
@@ -95,6 +97,7 @@ data object UpdatesTab : Tab {
                 val intent = ReaderActivity.newIntent(context, it.update.mangaId, it.update.chapterId)
                 context.startActivity(intent)
             },
+            onUpdateSwipe = screenModel::updateSwipe,
             onCalendarClicked = { navigator.push(UpcomingScreen()) },
         )
 

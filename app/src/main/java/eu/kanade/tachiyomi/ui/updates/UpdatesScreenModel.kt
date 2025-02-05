@@ -42,6 +42,7 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.chapter.interactor.GetChapter
 import tachiyomi.domain.chapter.interactor.UpdateChapter
 import tachiyomi.domain.chapter.model.ChapterUpdate
+import tachiyomi.domain.library.model.ChapterSwipeAction
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.manga.interactor.GetManga
 import tachiyomi.domain.source.service.SourceManager
@@ -80,6 +81,10 @@ class UpdatesScreenModel(
     // First and last selected index in list
     private val selectedPositions: Array<Int> = arrayOf(-1, -1)
     private val selectedChapterIds: HashSet<Long> = HashSet()
+
+    // Swipe actions for update Items.
+    val chapterSwipeStartAction by libraryPreferences.swipeToEndAction().asState(screenModelScope)
+    val chapterSwipeEndAction by libraryPreferences.swipeToStartAction().asState(screenModelScope)
 
     init {
         screenModelScope.launchIO {
@@ -407,6 +412,29 @@ class UpdatesScreenModel(
 
     fun resetNewUpdatesCount() {
         libraryPreferences.newUpdatesCount().set(0)
+    }
+
+    fun updateSwipe(update: UpdatesItem, action: ChapterSwipeAction) {
+        screenModelScope.launch {
+            val item = update.update
+            when(action) {
+                ChapterSwipeAction.ToggleRead -> {
+                    markUpdatesRead(listOf(update), !item.read)
+                }
+                ChapterSwipeAction.ToggleBookmark -> {
+                    bookmarkUpdates(listOf(update), !item.bookmark)
+                }
+                ChapterSwipeAction.Download -> {
+                    val downloadAction = when (update.downloadStateProvider()) {
+                        Download.State.NOT_DOWNLOADED, Download.State.ERROR -> ChapterDownloadAction.START
+                        Download.State.QUEUE, Download.State.DOWNLOADING -> ChapterDownloadAction.CANCEL
+                        Download.State.DOWNLOADED -> ChapterDownloadAction.DELETE
+                    }
+                    downloadChapters(listOf(update), downloadAction)
+                }
+                ChapterSwipeAction.Disabled -> throw IllegalStateException()
+            }
+        }
     }
 
     @Immutable

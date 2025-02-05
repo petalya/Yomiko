@@ -30,6 +30,7 @@ import eu.kanade.tachiyomi.ui.updates.UpdatesScreenModel
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import tachiyomi.domain.library.model.ChapterSwipeAction
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.FastScrollLazyColumn
 import tachiyomi.presentation.core.components.material.PullRefresh
@@ -48,6 +49,8 @@ fun UpdateScreen(
     // SY -->
     preserveReadingPosition: Boolean,
     // SY <--
+    updateSwipeStartAction: ChapterSwipeAction,
+    updateSwipeEndAction: ChapterSwipeAction,
     onClickCover: (UpdatesItem) -> Unit,
     onSelectAll: (Boolean) -> Unit,
     onInvertSelection: () -> Unit,
@@ -60,6 +63,7 @@ fun UpdateScreen(
     onMultiDeleteClicked: (List<UpdatesItem>) -> Unit,
     onUpdateSelected: (UpdatesItem, Boolean, Boolean, Boolean) -> Unit,
     onOpenChapter: (UpdatesItem) -> Unit,
+    onUpdateSwipe: (UpdatesItem, ChapterSwipeAction) -> Unit,
 ) {
     BackHandler(enabled = state.selectionMode, onBack = { onSelectAll(false) })
 
@@ -123,11 +127,14 @@ fun UpdateScreen(
                             // SY -->
                             preserveReadingPosition = preserveReadingPosition,
                             // SY <--
+                            updateSwipeToStart = updateSwipeStartAction,
+                            updateSwipeToEnd = updateSwipeEndAction,
                             onUpdateSelected = onUpdateSelected,
                             onClickCover = onClickCover,
                             onClickUpdate = onOpenChapter,
                             onExpandClicked = onExpandGroupClicked,
                             onDownloadChapter = onDownloadChapter,
+                            onUpdateSwipe = onUpdateSwipe,
                         )
                     }
                 }
