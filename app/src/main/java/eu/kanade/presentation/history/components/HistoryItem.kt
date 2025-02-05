@@ -114,7 +114,7 @@ fun HistoryItem(
                     !expanded,
                 ),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .clickableNoIndication { onClickExpand() }
                     .padding(start = 4.dp)

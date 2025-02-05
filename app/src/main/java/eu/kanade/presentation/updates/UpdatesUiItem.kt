@@ -319,7 +319,7 @@ private fun UpdatesUiItem(
                         !expanded,
                     ),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .clickableNoIndication { onExpandClick() }
                         .padding(start = 4.dp)
