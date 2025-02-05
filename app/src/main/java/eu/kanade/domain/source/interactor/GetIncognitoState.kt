@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
+import tachiyomi.domain.manga.interactor.GetCustomMangaInfo
 import tachiyomi.domain.source.service.SourceManager
 
 class GetIncognitoState(
@@ -15,23 +16,33 @@ class GetIncognitoState(
     private val sourcePreferences: SourcePreferences,
     private val extensionManager: ExtensionManager,
     private val sourceManager: SourceManager,
-) {
-    fun await(sourceId: Long?): Boolean {
+    private val customMangaManager: GetCustomMangaInfo,
+){
+    fun await(sourceId: Long? = null, mangaId: Long? = null): Boolean {
         if (basePreferences.incognitoMode().get()) return true
-        if (sourceId == null) return false
-        return sourceManager.get(sourceId)?.isIncognitoModeEnabled() == true
+        var isIncognito = false
+        if (sourceId != null) {
+            val source = sourceManager.get(sourceId)
+            if (source != null) isIncognito = source.isIncognitoModeEnabled() == true
+        }
+        if (mangaId != null) {
+            val manga = customMangaManager.get(mangaId)
+            if (manga != null) isIncognito = isIncognito || manga.incognitoMode == true
+        }
+        return isIncognito
     }
 
-    fun subscribe(sourceId: Long?): Flow<Boolean> {
-        if (sourceId == null) return basePreferences.incognitoMode().changes()
+    fun subscribe(sourceId: Long?, mangaId: Long? = null): Flow<Boolean> {
+        if (sourceId == null && mangaId == null) return basePreferences.incognitoMode().changes()
 
         return combine(
             basePreferences.incognitoMode().changes(),
             sourcePreferences.incognitoExtensions().changes(),
-            extensionManager.getExtensionPackageAsFlow(sourceId),
-            flow { emit(sourceManager.get(sourceId)?.isIncognitoModeEnabled() == true) },
-        ) { incognito, incognitoExtensions, extensionPackage, isSourceIncognito ->
-            incognito || (extensionPackage in incognitoExtensions) || isSourceIncognito
+            if (sourceId != null) extensionManager.getExtensionPackageAsFlow(sourceId) else flow { emit(null) },
+            if (sourceId != null) flow { emit(sourceManager.get(sourceId)?.isIncognitoModeEnabled() == true) } else flow { emit(false) },
+            if (mangaId != null) flow { emit(customMangaManager.getIncognitoMode(mangaId)) } else flow { emit(false) },
+        ) { incognito, incognitoExtensions, extensionPackage, isSourceIncognito, isMangaIncognito ->
+            incognito || (extensionPackage in incognitoExtensions) || isSourceIncognito || isMangaIncognito
         }
             .distinctUntilChanged()
     }

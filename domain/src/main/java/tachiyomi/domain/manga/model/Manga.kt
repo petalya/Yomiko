@@ -101,6 +101,8 @@ data class Manga(
             else -> TriState.DISABLED
         }
 
+    val incognitoMode = customMangaInfo?.incognitoMode ?: false
+
     fun sortDescending(): Boolean {
         return chapterFlags and CHAPTER_SORT_DIR_MASK == CHAPTER_SORT_DESC
     }

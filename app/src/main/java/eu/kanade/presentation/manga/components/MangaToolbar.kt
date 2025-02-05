@@ -1,12 +1,14 @@
 package eu.kanade.presentation.manga.components
 
+import androidx.compose.animation.graphics.res.animatedVectorResource
+import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
+import androidx.compose.animation.graphics.vector.AnimatedImageVector
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FlipToBack
 import androidx.compose.material.icons.outlined.SelectAll
-import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +29,7 @@ import eu.kanade.presentation.components.AppBarActions
 import eu.kanade.presentation.components.DownloadDropdownMenu
 import eu.kanade.presentation.components.UpIcon
 import eu.kanade.presentation.manga.DownloadAction
+import eu.kanade.tachiyomi.R
 import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.sy.SYMR
@@ -35,8 +38,10 @@ import tachiyomi.presentation.core.i18n.stringResource
 @Composable
 fun MangaToolbar(
     title: String,
+    incognitoMode: Boolean?,
     titleAlphaProvider: () -> Float,
     onBackClicked: () -> Unit,
+    onToggleMangaIncognito: (() -> Unit)?,
     onClickFilter: () -> Unit,
     onClickShare: (() -> Unit)?,
     onClickDownload: ((DownloadAction) -> Unit)?,
@@ -107,21 +112,26 @@ fun MangaToolbar(
                     AppBarActions(
                         actions = persistentListOf<AppBar.AppBarAction>().builder()
                             .apply {
+                                if (onToggleMangaIncognito != null) {
+                                    add(
+                                        AppBar.Action(
+                                            title = stringResource(MR.strings.pref_incognito_mode),
+                                            icon = null,
+                                            iconPainter = rememberAnimatedVectorPainter(
+                                                AnimatedImageVector.animatedVectorResource(R.drawable.anim_incognito),
+                                                incognitoMode==true,
+                                            ),
+                                            iconTint = if (incognitoMode==true) MaterialTheme.colorScheme.primary else null,
+                                            onClick = onToggleMangaIncognito,
+                                        ),
+                                    )
+                                }
                                 if (onClickDownload != null) {
                                     add(
                                         AppBar.Action(
                                             title = stringResource(MR.strings.manga_download),
                                             icon = Icons.Outlined.Download,
                                             onClick = { downloadExpanded = !downloadExpanded },
-                                        ),
-                                    )
-                                }
-                                if (onClickShare != null) {
-                                    add(
-                                        AppBar.Action(
-                                            title = stringResource(MR.strings.action_share),
-                                            icon = Icons.Outlined.Share,
-                                            onClick = onClickShare,
                                         ),
                                     )
                                 }
@@ -152,6 +162,14 @@ fun MangaToolbar(
                                         AppBar.OverflowAction(
                                             title = stringResource(MR.strings.action_filter),
                                             onClick = onClickFilter,
+                                        ),
+                                    )
+                                }
+                                if (onClickShare != null) {
+                                    add(
+                                        AppBar.OverflowAction(
+                                            title = stringResource(MR.strings.action_share),
+                                            onClick = onClickShare,
                                         ),
                                     )
                                 }
@@ -193,7 +211,7 @@ fun MangaToolbar(
                                         AppBar.OverflowAction(
                                             title = stringResource(MR.strings.source_settings),
                                             onClick = onClickSourceSettings,
-                                        )
+                                        ),
                                     )
                                 }
                                 // SY <--

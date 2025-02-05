@@ -9,4 +9,5 @@ data class CustomMangaInfo(
     val description: String? = null,
     val genre: List<String>? = null,
     val status: Long? = null,
+    val incognitoMode: Boolean? = null
 )

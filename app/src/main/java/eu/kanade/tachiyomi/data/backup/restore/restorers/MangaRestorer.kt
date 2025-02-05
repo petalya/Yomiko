@@ -526,7 +526,8 @@ class MangaRestorer(
             customThumbnailUrl != null ||
             customDescription != null ||
             customGenre != null ||
-            customStatus != 0
+            customStatus != 0 ||
+            incognitoMode != null
         ) {
             return CustomMangaInfo(
                 id = 0L,
@@ -537,6 +538,7 @@ class MangaRestorer(
                 description = customDescription,
                 genre = customGenre,
                 status = customStatus.takeUnless { it == 0 }?.toLong(),
+                incognitoMode = incognitoMode,
             )
         }
         return null

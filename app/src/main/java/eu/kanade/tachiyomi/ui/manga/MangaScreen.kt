@@ -154,7 +154,7 @@ class MangaScreen(
                 .launchIn(this)
 
             DiscordRPCService.setScreen(context, DiscordScreen.LIBRARY, ReaderData(
-                incognitoMode = Injekt.get<GetIncognitoState>().await(successState.manga.source),
+                incognitoMode = Injekt.get<GetIncognitoState>().await(successState.manga.source, successState.manga.id),
                 mangaId = successState.manga.id,
                 chapterTitle = successState.manga.title,
             ))
@@ -163,6 +163,7 @@ class MangaScreen(
 
         MangaScreen(
             state = successState,
+            mangaIncognitoState = screenModel.mangaIncognitoMode.value,
             snackbarHostState = screenModel.snackbarHostState,
             nextUpdate = successState.manga.expectedNextUpdate,
             isTabletUi = isTabletUi(),
@@ -208,6 +209,7 @@ class MangaScreen(
                 }
             },
             onTagSearch = { scope.launch { performGenreSearch(navigator, it, screenModel.source!!) } },
+            onMangaIncognitoToggled = screenModel::toggleMangaIncognitoMode,
             onFilterButtonClicked = screenModel::showSettingsDialog,
             onRefresh = screenModel::fetchAllFromSource,
             onContinueReading = { continueReading(context, screenModel.getNextUnreadChapter()) },

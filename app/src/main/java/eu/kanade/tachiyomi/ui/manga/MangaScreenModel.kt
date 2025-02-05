@@ -6,6 +6,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.util.fastAny
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.flowWithLifecycle
@@ -26,6 +27,7 @@ import eu.kanade.domain.manga.model.chaptersFiltered
 import eu.kanade.domain.manga.model.copyFrom
 import eu.kanade.domain.manga.model.downloadedFilter
 import eu.kanade.domain.manga.model.toSManga
+import eu.kanade.domain.source.interactor.GetIncognitoState
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.track.interactor.AddTracks
 import eu.kanade.domain.track.interactor.TrackChapter
@@ -173,6 +175,7 @@ class MangaScreenModel(
     private val insertTrack: InsertTrack = Injekt.get(),
     private val setCustomMangaInfo: SetCustomMangaInfo = Injekt.get(),
     // SY <--
+    private val getIncognitoState: GetIncognitoState = Injekt.get(),
     private val getDuplicateLibraryManga: GetDuplicateLibraryManga = Injekt.get(),
     private val getAvailableScanlators: GetAvailableScanlators = Injekt.get(),
     private val getExcludedScanlators: GetExcludedScanlators = Injekt.get(),
@@ -203,6 +206,8 @@ class MangaScreenModel(
 
     private val isFavorited: Boolean
         get() = manga?.favorite ?: false
+
+    var mangaIncognitoMode = mutableStateOf(getIncognitoState.await(mangaId = mangaId))
 
     private val allChapters: List<ChapterList.Item>?
         get() = successState?.chapters
@@ -566,6 +571,7 @@ class MangaScreenModel(
                     description?.trimOrNull(),
                     genre,
                     status.takeUnless { it == state.manga.ogStatus },
+                    mangaIncognitoMode.value
                 ),
             )
             manga = manga.copy(lastUpdate = manga.lastUpdate + 1)
@@ -1669,6 +1675,11 @@ class MangaScreenModel(
         val manga = successState?.manga ?: return
         updateSuccessState { it.copy(dialog = Dialog.Migrate(newManga = manga, oldManga = duplicate)) }
     } SY <-- */
+
+    fun toggleMangaIncognitoMode() {
+        mangaIncognitoMode.value = !mangaIncognitoMode.value
+        setCustomMangaInfo.setIncognitoMode(mangaId, mangaIncognitoMode.value)
+    }
 
     fun setExcludedScanlators(excludedScanlators: Set<String>) {
         screenModelScope.launchIO {

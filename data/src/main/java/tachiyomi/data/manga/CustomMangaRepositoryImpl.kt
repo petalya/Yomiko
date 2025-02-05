@@ -2,8 +2,6 @@ package tachiyomi.data.manga
 
 import android.content.Context
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import tachiyomi.domain.manga.model.CustomMangaInfo
 import tachiyomi.domain.manga.repository.CustomMangaRepository
@@ -45,7 +43,8 @@ class CustomMangaRepositoryImpl(context: Context) : CustomMangaRepository {
             mangaInfo.thumbnailUrl == null &&
             mangaInfo.description == null &&
             mangaInfo.genre == null &&
-            mangaInfo.status == null
+            mangaInfo.status == null &&
+            mangaInfo.incognitoMode != true
         ) {
             customMangaMap.remove(mangaInfo.id)
         } else {
@@ -77,6 +76,7 @@ class CustomMangaRepositoryImpl(context: Context) : CustomMangaRepository {
         val description: String? = null,
         val genre: List<String>? = null,
         val status: Long? = null,
+        val incognitoMode: Boolean? = null
     ) {
 
         fun toManga() = CustomMangaInfo(
@@ -88,6 +88,7 @@ class CustomMangaRepositoryImpl(context: Context) : CustomMangaRepository {
             description = this@MangaJson.description,
             genre = this@MangaJson.genre,
             status = this@MangaJson.status?.takeUnless { it == 0L },
+            incognitoMode = this@MangaJson.incognitoMode
         )
     }
 
@@ -101,6 +102,7 @@ class CustomMangaRepositoryImpl(context: Context) : CustomMangaRepository {
             description,
             genre,
             status,
+            incognitoMode,
         )
     }
 }

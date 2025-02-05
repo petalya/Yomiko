@@ -193,6 +193,6 @@ class DomainModule : InjektModule {
         addFactory { ReplaceExtensionRepo(get()) }
         addFactory { UpdateExtensionRepo(get(), get()) }
         addFactory { ToggleIncognito(get()) }
-        addFactory { GetIncognitoState(get(), get(), get(), get()) }
+        addFactory { GetIncognitoState(get(), get(), get(), get(), get()) }
     }
 }

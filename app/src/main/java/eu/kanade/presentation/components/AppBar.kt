@@ -40,6 +40,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -206,11 +207,19 @@ fun AppBarActions(
                 onClick = it.onClick,
                 enabled = it.enabled,
             ) {
-                Icon(
-                    imageVector = it.icon,
-                    tint = it.iconTint ?: LocalContentColor.current,
-                    contentDescription = it.title,
-                )
+                if (it.iconPainter != null) {
+                    Icon(
+                        painter = it.iconPainter,
+                        tint = it.iconTint ?: LocalContentColor.current,
+                        contentDescription = it.title,
+                    )
+                } else {
+                    Icon(
+                        imageVector = it.icon!!,
+                        tint = it.iconTint ?: LocalContentColor.current,
+                        contentDescription = it.title,
+                    )
+                }
             }
         }
     }
@@ -413,7 +422,8 @@ sealed interface AppBar {
 
     data class Action(
         val title: String,
-        val icon: ImageVector,
+        val icon: ImageVector?,
+        val iconPainter: Painter? = null,   // If iconPainter is passed, icon will be ignored
         val iconTint: Color? = null,
         val onClick: () -> Unit,
         val enabled: Boolean = true,
