@@ -174,8 +174,8 @@ internal fun LazyListScope.updatesUiItems(
                         downloadProgressProvider = updatesItem.downloadProgressProvider,
                         isFirstInGroup = isFirstInGroup,
                         expanded = expanded,
-                        onExpandClick = { onExpandClicked(groupedItem.item) }.takeIf { isFirstInGroup && hasSubsequentChapters },
-                        onUpdateSwipe = { onUpdateSwipe(groupedItem.item, it) },
+                        onExpandClick = { onExpandClicked(updatesItem) }.takeIf { isFirstInGroup && hasSubsequentChapters },
+                        onUpdateSwipe = { onUpdateSwipe(updatesItem, it) },
                     )
                 }
             }
