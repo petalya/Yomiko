@@ -1,5 +1,6 @@
 package eu.kanade.presentation.history.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
@@ -97,13 +98,15 @@ fun HistoryItem(
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1,
             )
-            Text(
-                text = stringResource(MR.strings.label_read_chapters) + " " +
-                    if (isPreviousHistory) formattedReadAtString
-                    else relativeTimeSpanString(history.readAt?.time ?: 0),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = textStyle,
-            )
+            AnimatedVisibility(visible = !expanded) {
+                Text(
+                    text = stringResource(MR.strings.label_read_chapters) + " " +
+                        if (isPreviousHistory) formattedReadAtString
+                        else relativeTimeSpanString(history.readAt?.time ?: 0),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = textStyle,
+                )
+            }
 
         }
 
