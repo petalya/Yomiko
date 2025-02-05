@@ -4,6 +4,7 @@ import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.preference.TriState
 import tachiyomi.core.common.preference.getEnum
+import tachiyomi.domain.library.model.ChapterSwipeAction
 import tachiyomi.domain.library.model.GroupLibraryMode
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.domain.library.model.LibraryGroup
@@ -200,13 +201,6 @@ class LibraryPreferences(
     )
 
     // endregion
-
-    enum class ChapterSwipeAction {
-        ToggleRead,
-        ToggleBookmark,
-        Download,
-        Disabled,
-    }
 
     // SY -->
 

@@ -108,6 +108,7 @@ import tachiyomi.domain.chapter.model.ChapterUpdate
 import tachiyomi.domain.chapter.model.NoChaptersException
 import tachiyomi.domain.chapter.service.calculateChapterGap
 import tachiyomi.domain.chapter.service.getChapterSort
+import tachiyomi.domain.library.model.ChapterSwipeAction
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.manga.interactor.DeleteByMergeId
 import tachiyomi.domain.manga.interactor.DeleteMangaById
@@ -1112,30 +1113,30 @@ class MangaScreenModel(
     }
 
     /**
-     * @throws IllegalStateException if the swipe action is [LibraryPreferences.ChapterSwipeAction.Disabled]
+     * @throws IllegalStateException if the swipe action is [ChapterSwipeAction.Disabled]
      */
-    fun chapterSwipe(chapterItem: ChapterList.Item, swipeAction: LibraryPreferences.ChapterSwipeAction) {
+    fun chapterSwipe(chapterItem: ChapterList.Item, swipeAction: ChapterSwipeAction) {
         screenModelScope.launch {
             executeChapterSwipeAction(chapterItem, swipeAction)
         }
     }
 
     /**
-     * @throws IllegalStateException if the swipe action is [LibraryPreferences.ChapterSwipeAction.Disabled]
+     * @throws IllegalStateException if the swipe action is [ChapterSwipeAction.Disabled]
      */
     private fun executeChapterSwipeAction(
         chapterItem: ChapterList.Item,
-        swipeAction: LibraryPreferences.ChapterSwipeAction,
+        swipeAction: ChapterSwipeAction,
     ) {
         val chapter = chapterItem.chapter
         when (swipeAction) {
-            LibraryPreferences.ChapterSwipeAction.ToggleRead -> {
+            ChapterSwipeAction.ToggleRead -> {
                 markChaptersRead(listOf(chapter), !chapter.read)
             }
-            LibraryPreferences.ChapterSwipeAction.ToggleBookmark -> {
+            ChapterSwipeAction.ToggleBookmark -> {
                 bookmarkChapters(listOf(chapter), !chapter.bookmark)
             }
-            LibraryPreferences.ChapterSwipeAction.Download -> {
+            ChapterSwipeAction.Download -> {
                 val downloadAction: ChapterDownloadAction = when (chapterItem.downloadState) {
                     Download.State.ERROR,
                     Download.State.NOT_DOWNLOADED,
@@ -1150,7 +1151,7 @@ class MangaScreenModel(
                     action = downloadAction,
                 )
             }
-            LibraryPreferences.ChapterSwipeAction.Disabled -> throw IllegalStateException()
+            ChapterSwipeAction.Disabled -> throw IllegalStateException()
         }
     }
 

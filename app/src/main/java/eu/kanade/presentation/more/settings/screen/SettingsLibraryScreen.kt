@@ -29,6 +29,7 @@ import tachiyomi.domain.UnsortedPreferences
 import tachiyomi.domain.category.interactor.GetCategories
 import tachiyomi.domain.category.interactor.ResetCategoryFlags
 import tachiyomi.domain.category.model.Category
+import tachiyomi.domain.library.model.ChapterSwipeAction
 import tachiyomi.domain.library.model.GroupLibraryMode
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.library.service.LibraryPreferences.Companion.DEVICE_CHARGING
@@ -250,28 +251,20 @@ object SettingsLibraryScreen : SearchableSettings {
                     pref = libraryPreferences.swipeToStartAction(),
                     title = stringResource(MR.strings.pref_chapter_swipe_start),
                     entries = persistentMapOf(
-                        LibraryPreferences.ChapterSwipeAction.Disabled to
-                            stringResource(MR.strings.disabled),
-                        LibraryPreferences.ChapterSwipeAction.ToggleBookmark to
-                            stringResource(MR.strings.action_bookmark),
-                        LibraryPreferences.ChapterSwipeAction.ToggleRead to
-                            stringResource(MR.strings.action_mark_as_read),
-                        LibraryPreferences.ChapterSwipeAction.Download to
-                            stringResource(MR.strings.action_download),
+                        ChapterSwipeAction.Disabled to stringResource(MR.strings.disabled),
+                        ChapterSwipeAction.ToggleBookmark to stringResource(MR.strings.action_bookmark),
+                        ChapterSwipeAction.ToggleRead to stringResource(MR.strings.action_mark_as_read),
+                        ChapterSwipeAction.Download to stringResource(MR.strings.action_download),
                     ),
                 ),
                 Preference.PreferenceItem.ListPreference(
                     pref = libraryPreferences.swipeToEndAction(),
                     title = stringResource(MR.strings.pref_chapter_swipe_end),
                     entries = persistentMapOf(
-                        LibraryPreferences.ChapterSwipeAction.Disabled to
-                            stringResource(MR.strings.disabled),
-                        LibraryPreferences.ChapterSwipeAction.ToggleBookmark to
-                            stringResource(MR.strings.action_bookmark),
-                        LibraryPreferences.ChapterSwipeAction.ToggleRead to
-                            stringResource(MR.strings.action_mark_as_read),
-                        LibraryPreferences.ChapterSwipeAction.Download to
-                            stringResource(MR.strings.action_download),
+                        ChapterSwipeAction.Disabled to stringResource(MR.strings.disabled),
+                        ChapterSwipeAction.ToggleBookmark to stringResource(MR.strings.action_bookmark),
+                        ChapterSwipeAction.ToggleRead to stringResource(MR.strings.action_mark_as_read),
+                        ChapterSwipeAction.Download to stringResource(MR.strings.action_download),
                     ),
                 ),
             ),
