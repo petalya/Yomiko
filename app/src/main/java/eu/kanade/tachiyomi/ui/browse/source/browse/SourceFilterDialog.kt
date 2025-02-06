@@ -52,6 +52,8 @@ fun SourceFilterDialog(
     onSavedSearchPress: (EXHSavedSearch) -> Unit,
     openMangaDexRandom: (() -> Unit)?,
     openMangaDexFollows: (() -> Unit)?,
+    hideEntriesInLibraryState: Boolean?,
+    onHideEntriesInLibraryChange: (Boolean) -> Unit,
     // SY <--
 ) {
     val updateFilters = { onUpdate(filters) }
@@ -109,6 +111,15 @@ fun SourceFilterDialog(
                     onSavedSearch = onSavedSearch,
                     onSavedSearchPress = onSavedSearchPress,
                 )
+            }
+
+            item {
+                CheckboxItem(
+                    label = stringResource(MR.strings.pref_hide_in_library_items),
+                    checked = hideEntriesInLibraryState?:false,
+                ) {
+                    onHideEntriesInLibraryChange(!(hideEntriesInLibraryState?:false))
+                }
             }
 
             items(filters) {

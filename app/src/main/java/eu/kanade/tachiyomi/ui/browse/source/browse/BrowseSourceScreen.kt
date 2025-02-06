@@ -313,6 +313,8 @@ data class BrowseSourceScreen(
                     } else {
                         null
                     },
+                    hideEntriesInLibraryState = state.hideEntriesInLibraryState,
+                    onHideEntriesInLibraryChange = screenModel::onHideEntriesInLibraryChange
                     // SY <--
                 )
             }

@@ -139,6 +139,8 @@ class SourceFeedScreen(val sourceId: Long) : Screen() {
                     } else {
                         null
                     },
+                    hideEntriesInLibraryState = state.hideEntriesInLibraryState,
+                    onHideEntriesInLibraryChange = screenModel::onHideEntriesInLibraryChange,
                 )
             }
             null -> Unit

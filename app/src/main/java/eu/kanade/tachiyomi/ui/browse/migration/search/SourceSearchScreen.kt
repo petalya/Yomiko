@@ -124,6 +124,8 @@ data class SourceSearchScreen(
                     onSavedSearchPress = {},
                     openMangaDexRandom = null,
                     openMangaDexFollows = null,
+                    hideEntriesInLibraryState = state.hideEntriesInLibraryState,
+                    onHideEntriesInLibraryChange = screenModel::onHideEntriesInLibraryChange,
                     // SY <--
                 )
             }

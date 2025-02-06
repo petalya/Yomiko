@@ -50,7 +50,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import tachiyomi.core.common.preference.CheckboxState
@@ -92,7 +91,7 @@ open class BrowseSourceScreenModel(
     private val savedSearch: Long? = null,
     // SY <--
     private val sourceManager: SourceManager = Injekt.get(),
-    sourcePreferences: SourcePreferences = Injekt.get(),
+    private val sourcePreferences: SourcePreferences = Injekt.get(),
     private val libraryPreferences: LibraryPreferences = Injekt.get(),
     private val coverCache: CoverCache = Injekt.get(),
     private val getRemoteManga: GetRemoteManga = Injekt.get(),
@@ -145,6 +144,7 @@ open class BrowseSourceScreenModel(
                     listing = listing,
                     filters = source.getFilterList(),
                     toolbarQuery = query,
+                    hideEntriesInLibraryState = sourcePreferences.hideInLibraryItems().get()
                 )
             }
         }
@@ -184,7 +184,6 @@ open class BrowseSourceScreenModel(
     /**
      * Flow of Pager flow tied to [State.listing]
      */
-    private val hideInLibraryItems = sourcePreferences.hideInLibraryItems().get()
     val mangaPagerFlowFlow = state.map { it.listing }
         .distinctUntilChanged()
         .map { listing ->
@@ -202,7 +201,7 @@ open class BrowseSourceScreenModel(
                         // SY <--
                         .stateIn(ioCoroutineScope)
                 }
-                    .filter { !hideInLibraryItems || !it.value.first.favorite }
+                    .filter { !(state.value.hideEntriesInLibraryState?:false) || !it.value.first.favorite }
             }
                 .cachedIn(ioCoroutineScope)
         }
@@ -237,7 +236,10 @@ open class BrowseSourceScreenModel(
     fun resetFilters() {
         if (source !is CatalogueSource) return
 
-        mutableState.update { it.copy(filters = source.getFilterList()) }
+        mutableState.update { it.copy(
+            filters = source.getFilterList(),
+            hideEntriesInLibraryState = sourcePreferences.hideInLibraryItems().get()
+        ) }
     }
 
     fun setListing(listing: Listing) {
@@ -469,6 +471,7 @@ open class BrowseSourceScreenModel(
         val filters: FilterList = FilterList(),
         val toolbarQuery: String? = null,
         val dialog: Dialog? = null,
+        val hideEntriesInLibraryState: Boolean? = null,
         // SY -->
         val savedSearches: ImmutableList<EXHSavedSearch> = persistentListOf(),
         val filterable: Boolean = true,
@@ -558,6 +561,10 @@ open class BrowseSourceScreenModel(
                 ?: return@launchIO
             onRandomFound(random)
         }
+    }
+
+    fun onHideEntriesInLibraryChange(value: Boolean) {
+        mutableState.update { it.copy(hideEntriesInLibraryState = value) }
     }
     // EXH <--
 }
