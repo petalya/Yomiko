@@ -16,6 +16,8 @@ data class BackupTracking(
     // trackingUrl is called mediaUrl in 1.x
     @ProtoNumber(4) var trackingUrl: String = "",
     @ProtoNumber(5) var title: String = "",
+    @ProtoNumber(12) var lastVolumeRead: Float = 0F,
+    @ProtoNumber(13) var totalVolumes: Int = 0,
     // lastChapterRead is called last read, and it has been changed to a float in 1.x
     @ProtoNumber(6) var lastChapterRead: Float = 0F,
     @ProtoNumber(7) var totalChapters: Int = 0,
@@ -41,6 +43,8 @@ data class BackupTracking(
             },
             libraryId = this@BackupTracking.libraryId,
             title = this@BackupTracking.title,
+            lastVolumeRead = this@BackupTracking.lastVolumeRead.toDouble(),
+            totalVolumes = this@BackupTracking.totalVolumes.toLong(),
             lastChapterRead = this@BackupTracking.lastChapterRead.toDouble(),
             totalChapters = this@BackupTracking.totalChapters.toLong(),
             score = this@BackupTracking.score.toDouble(),
@@ -59,6 +63,8 @@ val backupTrackMapper = {
         mediaId: Long,
         libraryId: Long?,
         title: String,
+        lastVolumeRead: Double,
+        totalVolumes: Long,
         lastChapterRead: Double,
         totalChapters: Long,
         status: Long,
@@ -73,6 +79,8 @@ val backupTrackMapper = {
         // forced not null so its compatible with 1.x backup system
         libraryId = libraryId ?: 0,
         title = title,
+        lastVolumeRead = lastVolumeRead.toFloat(),
+        totalVolumes = totalVolumes.toInt(),
         lastChapterRead = lastChapterRead.toFloat(),
         totalChapters = totalChapters.toInt(),
         score = score.toFloat(),

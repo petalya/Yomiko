@@ -440,6 +440,8 @@ class MangaRestorer(
                         track.remoteId,
                         track.libraryId,
                         track.title,
+                        track.lastVolumeRead,
+                        track.totalVolumes,
                         track.lastChapterRead,
                         track.totalChapters,
                         track.status,
