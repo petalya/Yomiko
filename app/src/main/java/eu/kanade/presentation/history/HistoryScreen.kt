@@ -1,5 +1,6 @@
 package eu.kanade.presentation.history
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -61,6 +62,10 @@ fun HistoryScreen(
     onClickExpand: (historyItem: HistoryWithRelations) -> Unit,
     onDialogChange: (HistoryScreenModel.Dialog?) -> Unit,
 ) {
+    BackHandler(!state.searchQuery.isNullOrEmpty()) {
+        onSearchQueryChange(null)
+    }
+
     Scaffold(
         topBar = { scrollBehavior ->
             SearchToolbar(
