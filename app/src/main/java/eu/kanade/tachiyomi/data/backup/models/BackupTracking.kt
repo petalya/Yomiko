@@ -26,10 +26,10 @@ data class BackupTracking(
     // finishedReadingDate is called endReadTime in 1.x
     @ProtoNumber(11) var finishedReadingDate: Long = 0,
     @ProtoNumber(12) var private: Boolean = false,
-    @ProtoNumber(100) var mediaId: Long = 0,
     // volume support is exclusive to this fork (for now), so im using a random starting range for proto number
-    @ProtoNumber(1780) var lastVolumeRead: Float = 0F,
-    @ProtoNumber(1781) var totalVolumes: Int = 0,
+    @ProtoNumber(20) var lastVolumeRead: Float = 0F,
+    @ProtoNumber(21) var totalVolumes: Int = 0,
+    @ProtoNumber(100) var mediaId: Long = 0,
 ) {
 
     @Suppress("DEPRECATION")
