@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,7 +44,6 @@ import java.util.Locale
 
 @Composable
 fun HistoryItem(
-    modifier: Modifier = Modifier,
     history: HistoryWithRelations,
     isPreviousHistory: Boolean = false,
     expanded: Boolean = false,
@@ -51,6 +51,8 @@ fun HistoryItem(
     onClickResume: () -> Unit,
     onClickExpand: () -> Unit,
     onClickDelete: () -> Unit,
+    onClickFavorite: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier
@@ -107,7 +109,6 @@ fun HistoryItem(
                     style = textStyle,
                 )
             }
-
         }
 
         if (!isPreviousHistory) {
@@ -123,6 +124,16 @@ fun HistoryItem(
                     .padding(start = 4.dp)
                     .fillMaxHeight(),
             )
+
+            if (!history.coverData.isMangaFavorite) {
+                IconButton(onClick = onClickFavorite) {
+                    Icon(
+                        imageVector = Icons.Outlined.FavoriteBorder,
+                        contentDescription = stringResource(MR.strings.add_to_library),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
 
             IconButton(onClick = onClickDelete) {
                 Icon(
@@ -149,6 +160,7 @@ private fun HistoryItemPreviews(
                 onClickResume = {},
                 onClickExpand = {},
                 onClickDelete = {},
+                onClickFavorite = {},
             )
         }
     }

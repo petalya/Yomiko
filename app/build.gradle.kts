@@ -31,7 +31,7 @@ android {
     defaultConfig {
         applicationId = "eu.kanade.tachiyomi.sy"
 
-        versionCode = 71
+        versionCode = 72
         versionName = "1.11.0"
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getCommitCount()}\"")
@@ -262,6 +262,7 @@ dependencies {
     implementation(libs.swipe)
     implementation(libs.compose.webview)
     implementation(libs.compose.grid)
+    implementation(libs.reorderable)
 
     // Logging
     implementation(libs.logcat)

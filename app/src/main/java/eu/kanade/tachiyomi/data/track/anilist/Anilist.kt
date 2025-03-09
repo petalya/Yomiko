@@ -43,6 +43,8 @@ class Anilist(id: Long) : BaseTracker(id, "AniList"), DeletableTracker {
 
     override val supportsReadingDates: Boolean = true
 
+    override val supportsPrivateTracking: Boolean = true
+
     private val scorePreference = trackPreferences.anilistScoreType()
 
     init {
@@ -184,7 +186,7 @@ class Anilist(id: Long) : BaseTracker(id, "AniList"), DeletableTracker {
     override suspend fun bind(track: Track, hasReadChapters: Boolean): Track {
         val remoteTrack = api.findLibManga(track, getUsername().toInt())
         return if (remoteTrack != null) {
-            track.copyPersonalFrom(remoteTrack)
+            track.copyPersonalFrom(remoteTrack, copyRemotePrivate = false)
             track.library_id = remoteTrack.library_id
 
             if (track.status != COMPLETED) {
@@ -237,6 +239,12 @@ class Anilist(id: Long) : BaseTracker(id, "AniList"), DeletableTracker {
     override suspend fun getMangaMetadata(track: DomainTrack): TrackMangaMetadata? {
         return api.getMangaMetadata(track)
     }
+
+    // SY -->
+    override suspend fun searchById(id: String): TrackSearch {
+        return api.searchById(id)
+    }
+    // SY <--
 
     fun saveOAuth(alOAuth: ALOAuth?) {
         trackPreferences.trackToken(this).set(json.encodeToString(alOAuth))

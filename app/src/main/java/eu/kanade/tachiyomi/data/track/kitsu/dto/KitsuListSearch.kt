@@ -44,6 +44,7 @@ data class KitsuListSearchResult(
             score = userDataAttrs.ratingTwenty?.let { it / 2.0 } ?: 0.0
             last_volume_read = userDataAttrs.volumesOwned.toDouble()
             last_chapter_read = userDataAttrs.progress.toDouble()
+            private = userDataAttrs.private
         }
     }
 }
@@ -62,6 +63,7 @@ data class KitsuListSearchItemDataAttributes(
     val ratingTwenty: Int?,
     val volumesOwned: Int,
     val progress: Int,
+    val private: Boolean,
 )
 
 @Serializable

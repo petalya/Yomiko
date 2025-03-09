@@ -60,6 +60,7 @@ fun HistoryScreen(
     onClickCover: (mangaId: Long) -> Unit,
     onClickResume: (chapter: Chapter?) -> Unit,
     onClickExpand: (historyItem: HistoryWithRelations) -> Unit,
+    onClickFavorite: (mangaId: Long) -> Unit,
     onDialogChange: (HistoryScreenModel.Dialog?) -> Unit,
 ) {
     BackHandler(!state.searchQuery.isNullOrEmpty()) {
@@ -112,6 +113,7 @@ fun HistoryScreen(
                     onClickResume = { history -> onClickResume(history.chapter) },
                     onClickExpand = { history -> onClickExpand(history) },
                     onClickDelete = { item -> onDialogChange(HistoryScreenModel.Dialog.Delete(item)) },
+                    onClickFavorite = { history -> onClickFavorite(history.mangaId) },
                 )
             }
         }
@@ -127,6 +129,7 @@ private fun HistoryScreenContent(
     onClickResume: (HistoryWithRelations) -> Unit,
     onClickExpand: (HistoryWithRelations) -> Unit,
     onClickDelete: (HistoryWithRelations) -> Unit,
+    onClickFavorite: (HistoryWithRelations) -> Unit,
 ) {
     FastScrollLazyColumn(
         contentPadding = contentPadding,
@@ -163,6 +166,7 @@ private fun HistoryScreenContent(
                             onClickExpand = { onClickExpand(mainItem) },
                             onClickResume = { onClickResume(mainItem) },
                             onClickDelete = { onClickDelete(mainItem) },
+                            onClickFavorite = { onClickFavorite(mainItem) },
                         )
 
                         AnimatedVisibility(
@@ -216,6 +220,7 @@ private fun HistoryScreenContent(
                                             onClickExpand = { onClickExpand(previous) },
                                             onClickResume = { onClickResume(previous) },
                                             onClickDelete = { onClickDelete(previous) },
+                                            onClickFavorite = { onClickFavorite(previous) },
                                         )
                                     }
                                 }
@@ -251,6 +256,7 @@ internal fun HistoryScreenPreviews(
             onClickResume = { _ -> run {} },
             onClickExpand = {},
             onDialogChange = {},
+            onClickFavorite = {},
         )
     }
 }

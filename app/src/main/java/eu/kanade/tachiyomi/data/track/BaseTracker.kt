@@ -7,6 +7,7 @@ import eu.kanade.domain.track.model.toDomainTrack
 import eu.kanade.domain.track.service.TrackPreferences
 import eu.kanade.tachiyomi.data.database.models.Track
 import eu.kanade.tachiyomi.data.track.model.TrackMangaMetadata
+import eu.kanade.tachiyomi.data.track.model.TrackSearch
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +38,8 @@ abstract class BaseTracker(
 
     // Application and remote support for reading dates
     override val supportsReadingDates: Boolean = false
+
+    override val supportsPrivateTracking: Boolean = false
 
     // TODO: Store all scores as 10 point in the future maybe?
     override fun get10PointScore(track: DomainTrack): Double {
@@ -126,9 +129,20 @@ abstract class BaseTracker(
         updateRemote(track)
     }
 
+    override suspend fun setRemotePrivate(track: Track, private: Boolean) {
+        track.private = private
+        updateRemote(track)
+    }
+
+    // SY -->
     override suspend fun getMangaMetadata(track: DomainTrack): TrackMangaMetadata? {
         throw NotImplementedError("Not implemented.")
     }
+
+    override suspend fun searchById(id: String): TrackSearch? {
+        throw NotImplementedError("Not implemented.")
+    }
+    // SY <--
 
     private suspend fun updateRemote(track: Track): Unit = withIOContext {
         try {

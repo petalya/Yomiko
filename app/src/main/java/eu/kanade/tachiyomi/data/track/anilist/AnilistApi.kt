@@ -5,6 +5,7 @@ import androidx.core.net.toUri
 import eu.kanade.tachiyomi.data.database.models.Track
 import eu.kanade.tachiyomi.data.track.anilist.dto.ALAddMangaResult
 import eu.kanade.tachiyomi.data.track.anilist.dto.ALCurrentUserResult
+import eu.kanade.tachiyomi.data.track.anilist.dto.ALIdSearchResult
 import eu.kanade.tachiyomi.data.track.anilist.dto.ALMangaMetadata
 import eu.kanade.tachiyomi.data.track.anilist.dto.ALOAuth
 import eu.kanade.tachiyomi.data.track.anilist.dto.ALSearchResult
@@ -45,8 +46,8 @@ class AnilistApi(val client: OkHttpClient, interceptor: AnilistInterceptor) {
     suspend fun addLibManga(track: Track): Track {
         return withIOContext {
             val query = """
-            |mutation AddManga(${'$'}mangaId: Int, ${'$'}progressVolumes: Int, ${'$'}progress: Int, ${'$'}status: MediaListStatus) {
-                |SaveMediaListEntry (mediaId: ${'$'}mangaId, progressVolumes: ${'$'}progressVolumes, progress: ${'$'}progress, status: ${'$'}status) {
+            |mutation AddManga(${'$'}mangaId: Int, ${'$'}progressVolumes: Int, ${'$'}progress: Int, ${'$'}status: MediaListStatus, ${'$'}private: Boolean) {
+                |SaveMediaListEntry (mediaId: ${'$'}mangaId, progressVolumes: ${'$'}progressVolumes, progress: ${'$'}progress, status: ${'$'}status, private: ${'$'}private) {
                 |   id
                 |   status
                 |}
@@ -60,6 +61,7 @@ class AnilistApi(val client: OkHttpClient, interceptor: AnilistInterceptor) {
                     put("progressVolumes", track.last_volume_read.toInt())
                     put("progress", track.last_chapter_read.toInt())
                     put("status", track.toApiStatus())
+                    put("private", track.private)
                 }
             }
             with(json) {
@@ -83,11 +85,11 @@ suspend fun updateLibManga(track: Track): Track {
         return withIOContext {
             val query = """
             |mutation UpdateManga(
-                |${'$'}listId: Int, ${'$'}progressVolumes: Int, ${'$'}progress: Int, ${'$'}status: MediaListStatus,
+                |${'$'}listId: Int, ${'$'}progressVolumes: Int, ${'$'}progress: Int, ${'$'}status: MediaListStatus, ${'$'}private: Boolean,
                 |${'$'}score: Int, ${'$'}startedAt: FuzzyDateInput, ${'$'}completedAt: FuzzyDateInput
             |) {
                 |SaveMediaListEntry(
-                    |id: ${'$'}listId, progressVolumes: ${'$'}progressVolumes, progress: ${'$'}progress, status: ${'$'}status,
+                    |id: ${'$'}listId, progressVolumes: ${'$'}progressVolumes, progress: ${'$'}progress, status: ${'$'}status, private: ${'$'}private,
                     |scoreRaw: ${'$'}score, startedAt: ${'$'}startedAt, completedAt: ${'$'}completedAt
                 |) {
                     |id
@@ -107,6 +109,7 @@ suspend fun updateLibManga(track: Track): Track {
                     put("score", track.score.toInt())
                     put("startedAt", createDate(track.started_reading_date))
                     put("completedAt", createDate(track.finished_reading_date))
+                    put("private", track.private)
                 }
             }
             authClient.newCall(POST(API_URL, body = payload.toString().toRequestBody(jsonMime)))
@@ -114,6 +117,7 @@ suspend fun updateLibManga(track: Track): Track {
             track
         }
     }
+
     suspend fun deleteLibManga(track: DomainTrack) {
         withIOContext {
             val query = """
@@ -195,6 +199,7 @@ suspend fun updateLibManga(track: Track): Track {
                         |scoreRaw: score(format: POINT_100)
                         |progressVolumes
                         |progress
+                        |private
                         |startedAt {
                             |year
                             |month
@@ -244,7 +249,6 @@ suspend fun updateLibManga(track: Track): Track {
                     ),
                 )
                     .awaitSuccess()
-                    .let { response -> println(response); response}
                     .parseAs<ALUserListMangaQueryResult>()
                     .data.page.mediaList
                     .map { it.toALUserManga() }
@@ -359,6 +363,56 @@ suspend fun updateLibManga(track: Track): Track {
             }
         }
     }
+
+    // SY -->
+    suspend fun searchById(id: String): TrackSearch {
+        return withIOContext {
+            val query = """
+            |query (${'$'}mangaId: Int!) {
+                |Media (id: ${'$'}mangaId) {
+                    |id
+                    |title {
+                        |userPreferred
+                    |}
+                    |coverImage {
+                        |large
+                    |}
+                    |format
+                    |status
+                    |chapters
+                    |description
+                    |startDate {
+                        |year
+                        |month
+                        |day
+                    |}
+                    |averageScore
+                |}
+            |}
+            |
+            """.trimMargin()
+            val payload = buildJsonObject {
+                put("query", query)
+                putJsonObject("variables") {
+                    put("mangaId", id)
+                }
+            }
+            with(json) {
+                authClient.newCall(
+                    POST(
+                        API_URL,
+                        body = payload.toString().toRequestBody(jsonMime),
+                    ),
+                )
+                    .awaitSuccess()
+                    .parseAs<ALIdSearchResult>()
+                    .data.media
+                    .toALManga()
+                    .toTrack()
+            }
+        }
+    }
+    // SY <--
 
     private fun createDate(dateValue: Long): JsonObject {
         if (dateValue == 0L) {

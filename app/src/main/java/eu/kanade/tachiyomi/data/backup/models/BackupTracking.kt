@@ -16,8 +16,6 @@ data class BackupTracking(
     // trackingUrl is called mediaUrl in 1.x
     @ProtoNumber(4) var trackingUrl: String = "",
     @ProtoNumber(5) var title: String = "",
-    @ProtoNumber(12) var lastVolumeRead: Float = 0F,
-    @ProtoNumber(13) var totalVolumes: Int = 0,
     // lastChapterRead is called last read, and it has been changed to a float in 1.x
     @ProtoNumber(6) var lastChapterRead: Float = 0F,
     @ProtoNumber(7) var totalChapters: Int = 0,
@@ -27,7 +25,11 @@ data class BackupTracking(
     @ProtoNumber(10) var startedReadingDate: Long = 0,
     // finishedReadingDate is called endReadTime in 1.x
     @ProtoNumber(11) var finishedReadingDate: Long = 0,
+    @ProtoNumber(12) var private: Boolean = false,
     @ProtoNumber(100) var mediaId: Long = 0,
+    // volume support is exclusive to this fork (for now), so im using a random starting range for proto number
+    @ProtoNumber(1780) var lastVolumeRead: Float = 0F,
+    @ProtoNumber(1781) var totalVolumes: Int = 0,
 ) {
 
     @Suppress("DEPRECATION")
@@ -52,6 +54,7 @@ data class BackupTracking(
             startDate = this@BackupTracking.startedReadingDate,
             finishDate = this@BackupTracking.finishedReadingDate,
             remoteUrl = this@BackupTracking.trackingUrl,
+            private = this@BackupTracking.private,
         )
     }
 }
@@ -72,6 +75,7 @@ val backupTrackMapper = {
         remoteUrl: String,
         startDate: Long,
         finishDate: Long,
+        private: Boolean,
     ->
     BackupTracking(
         syncId = syncId.toInt(),
@@ -88,5 +92,6 @@ val backupTrackMapper = {
         startedReadingDate = startDate,
         finishedReadingDate = finishDate,
         trackingUrl = remoteUrl,
+        private = private,
     )
 }

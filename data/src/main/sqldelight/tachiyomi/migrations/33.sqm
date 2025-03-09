@@ -1,3 +1,8 @@
- -- Add last_volume_read and total_volumes columns to manga_sync table --
+import kotlin.Boolean;
+
+-- Add private field for tracking
+ALTER TABLE manga_sync ADD COLUMN private INTEGER AS Boolean DEFAULT 0 NOT NULL;
+
+ -- Add last_volume_read and total_volumes columns to manga_sync table
  ALTER TABLE manga_sync ADD COLUMN last_volume_read REAL NOT NULL DEFAULT -1.0;
  ALTER TABLE manga_sync ADD COLUMN total_volumes INTEGER NOT NULL DEFAULT -1;

@@ -169,7 +169,7 @@ class MangaScreen(
             isTabletUi = isTabletUi(),
             chapterSwipeStartAction = screenModel.chapterSwipeStartAction,
             chapterSwipeEndAction = screenModel.chapterSwipeEndAction,
-            onBackClicked = navigator::pop,
+            navigateUp = navigator::pop,
             onChapterClicked = { openChapter(context, it) },
             onDownloadChapter = screenModel::runChapterDownloadActions.takeIf { !successState.source.isLocalOrStub() },
             onAddToLibraryClicked = {
@@ -576,7 +576,9 @@ class MangaScreen(
     // AZ -->
     private fun openRecommends(navigator: Navigator, source: Source?, manga: Manga) {
         source ?: return
-        navigator.push(RecommendsScreen(manga.id, source.id))
+        RecommendsScreen.Args.SingleSourceManga(manga.id, source.id)
+            .let(::RecommendsScreen)
+            .let(navigator::push)
     }
     // AZ <--
 }
