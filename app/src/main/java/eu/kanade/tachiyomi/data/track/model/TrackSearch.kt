@@ -38,6 +38,10 @@ class TrackSearch : Track {
 
     override lateinit var tracking_url: String
 
+    var authors: List<String> = emptyList()
+
+    var artists: List<String> = emptyList()
+
     var cover_url: String = ""
 
     var summary: String = ""

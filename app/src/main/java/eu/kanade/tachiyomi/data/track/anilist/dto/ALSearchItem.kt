@@ -14,6 +14,7 @@ data class ALSearchItem(
     val volumes: Long?,
     val chapters: Long?,
     val averageScore: Int?,
+    val staff: ALStaff,
 ) {
     fun toALManga(): ALManga = ALManga(
         remoteId = id,
@@ -26,6 +27,7 @@ data class ALSearchItem(
         totalVolumes = volumes ?: 0,
         totalChapters = chapters ?: 0,
         averageScore = averageScore ?: -1,
+        staff = staff,
     )
 }
 
@@ -38,3 +40,31 @@ data class ALItemTitle(
 data class ItemCover(
     val large: String,
 )
+
+@Serializable
+data class ALStaff(
+    val edges: List<ALEdge>,
+)
+
+@Serializable
+data class ALEdge(
+    val role: String,
+    val id: Int,
+    val node: ALStaffNode,
+)
+
+@Serializable
+data class ALStaffNode(
+    val name: ALStaffName,
+)
+
+@Serializable
+data class ALStaffName(
+    val userPreferred: String? = null,
+    val native: String? = null,
+    val full: String? = null,
+) {
+    operator fun invoke(): String? {
+        return userPreferred ?: full ?: native
+    }
+}
