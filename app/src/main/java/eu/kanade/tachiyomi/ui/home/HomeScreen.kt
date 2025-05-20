@@ -1,8 +1,10 @@
 package eu.kanade.tachiyomi.ui.home
 
-import androidx.activity.compose.BackHandler
+import android.annotation.SuppressLint
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -13,12 +15,10 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRailItem
@@ -28,17 +28,24 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastFilter
 import androidx.compose.ui.util.fastForEach
+import androidx.compose.ui.util.lerp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
@@ -60,14 +67,17 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import soup.compose.material.motion.MotionConstants
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.NavigationBar
 import tachiyomi.presentation.core.components.material.NavigationRail
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.pluralStringResource
+import tachiyomi.presentation.core.util.PredictiveBack
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import kotlin.coroutines.cancellation.CancellationException
 
 object HomeScreen : Screen() {
 
@@ -75,8 +85,14 @@ object HomeScreen : Screen() {
     private val openTabEvent = Channel<Tab>()
     private val showBottomNavEvent = Channel<Boolean>()
 
-    private const val TAB_FADE_DURATION = 600
-    private const val TAB_NAVIGATOR_KEY = "HomeTabs"
+    @Suppress("ConstPropertyName")
+    private const val TabFadeDuration = 600
+
+    @Suppress("ConstPropertyName")
+    private const val TabNavigatorKey = "HomeTabs"
+
+    @SuppressLint("ComposeCompositionLocalUsage")
+    val LocalHomeScreenInsetsProvider = staticCompositionLocalOf { WindowInsets(0.dp) }
 
     private val TABS = listOf(
         LibraryTab,
@@ -89,6 +105,7 @@ object HomeScreen : Screen() {
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
+        var scale by remember { mutableFloatStateOf(1f) }
 
         // SY -->
         val scope = rememberCoroutineScope()
@@ -99,7 +116,7 @@ object HomeScreen : Screen() {
 
         TabNavigator(
             tab = LibraryTab,
-            key = TAB_NAVIGATOR_KEY,
+            key = TabNavigatorKey,
         ) { tabNavigator ->
             // Provide usable navigator to content screen
             CompositionLocalProvider(LocalNavigator provides navigator) {
@@ -163,23 +180,62 @@ object HomeScreen : Screen() {
                             }
                         }
                     },
-                    contentWindowInsets = WindowInsets(0),
                 ) { contentPadding ->
                     Box(
                         modifier = Modifier
-                            .padding(contentPadding)
-                            .consumeWindowInsets(contentPadding),
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            }
+                            .windowInsetsPadding(
+                                remember {
+                                    object : WindowInsets {
+                                        override fun getLeft(density: Density, layoutDirection: LayoutDirection): Int {
+                                            return with(density) {
+                                                contentPadding.calculateLeftPadding(layoutDirection).roundToPx()
+                                            }
+                                        }
+
+                                        override fun getRight(density: Density, layoutDirection: LayoutDirection): Int {
+                                            return with(density) {
+                                                contentPadding.calculateRightPadding(layoutDirection).roundToPx()
+                                            }
+                                        }
+
+                                        override fun getBottom(density: Density): Int = 0
+
+                                        override fun getTop(density: Density): Int = 0
+                                    }
+                                },
+                            ),
                     ) {
+                        val insets = remember {
+                            object : WindowInsets {
+                                override fun getBottom(density: Density): Int {
+                                    return with(density) { contentPadding.calculateBottomPadding().roundToPx() }
+                                }
+
+                                override fun getTop(density: Density): Int {
+                                    return with(density) { contentPadding.calculateTopPadding().roundToPx() }
+                                }
+
+                                override fun getLeft(density: Density, layoutDirection: LayoutDirection): Int = 0
+
+                                override fun getRight(density: Density, layoutDirection: LayoutDirection): Int = 0
+                            }
+                        }
                         AnimatedContent(
                             targetState = tabNavigator.current,
                             transitionSpec = {
-                                fadeIn(animationSpec = tween(durationMillis = TAB_FADE_DURATION)) togetherWith
-                                fadeOut(animationSpec = tween(durationMillis = TAB_FADE_DURATION))
+                                fadeIn(animationSpec = tween(durationMillis = TabFadeDuration)) togetherWith
+                                fadeOut(animationSpec = tween(durationMillis = TabFadeDuration))
                             },
                             label = "tabContent",
                         ) {
-                            tabNavigator.saveableState(key = "currentTab", it) {
-                                it.Content()
+                            CompositionLocalProvider(LocalHomeScreenInsetsProvider provides insets) {
+                                tabNavigator.saveableState(key = "currentTab", it) {
+                                    it.Content()
+                                }
                             }
                         }
                     }
@@ -187,10 +243,32 @@ object HomeScreen : Screen() {
             }
 
             val goToLibraryTab = { tabNavigator.current = LibraryTab }
-            BackHandler(
-                enabled = tabNavigator.current != LibraryTab,
-                onBack = goToLibraryTab,
-            )
+
+            var handlingBack by remember { mutableStateOf(false) }
+            PredictiveBackHandler(
+                enabled = handlingBack || tabNavigator.current::class != LibraryTab::class,
+            ) { progress ->
+                handlingBack = true
+                val currentTab = tabNavigator.current
+                try {
+                    progress.collect { backEvent ->
+                        scale = lerp(1f, 0.92f, PredictiveBack.transform(backEvent.progress))
+                        tabNavigator.current = if (backEvent.progress > 0.25f) TABS[0] else currentTab
+                    }
+                    goToLibraryTab()
+                } catch (e: CancellationException) {
+                    tabNavigator.current = currentTab
+                } finally {
+                    animate(
+                        initialValue = scale,
+                        targetValue = 1f,
+                        animationSpec = tween(durationMillis = MotionConstants.DefaultMotionDuration),
+                    ) { value, _ ->
+                        scale = value
+                    }
+                    handlingBack = false
+                }
+            }
 
             LaunchedEffect(Unit) {
                 launch {
@@ -338,8 +416,6 @@ object HomeScreen : Screen() {
             Icon(
                 painter = tab.options.icon!!,
                 contentDescription = tab.options.title,
-                // TODO: https://issuetracker.google.com/u/0/issues/316327367
-                tint = LocalContentColor.current,
             )
         }
     }

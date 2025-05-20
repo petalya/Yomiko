@@ -27,6 +27,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import eu.kanade.domain.manga.model.hasCustomCover
 import eu.kanade.domain.manga.model.toSManga
+import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.source.interactor.GetIncognitoState
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.components.NavigatorAdaptiveSheet
@@ -58,6 +59,7 @@ import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchScreen
 import eu.kanade.tachiyomi.ui.category.CategoryScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.manga.merged.EditMergedSettingsDialog
+import eu.kanade.tachiyomi.ui.manga.notes.MangaNotesScreen
 import eu.kanade.tachiyomi.ui.manga.track.TrackInfoDialogHomeScreen
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.setting.SettingsScreen
@@ -84,7 +86,6 @@ import tachiyomi.core.common.util.lang.launchUI
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.lang.withNonCancellableContext
 import tachiyomi.core.common.util.system.logcat
-import tachiyomi.domain.UnsortedPreferences
 import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.service.SourceManager
@@ -222,6 +223,7 @@ class MangaScreen(
                 successState.manga.favorite
             },
             previewsRowCount = successState.previewsRowCount,
+            onEditNotesClicked = { navigator.push(MangaNotesScreen(manga = successState.manga)) },
             // SY -->
             onMigrateClicked = { migrateManga(navigator, screenModel.manga!!) }.takeIf { successState.manga.favorite },
             onMetadataViewerClicked = { openMetadataViewer(navigator, successState.manga) },
@@ -287,12 +289,13 @@ class MangaScreen(
 
             is MangaScreenModel.Dialog.DuplicateManga -> {
                 DuplicateMangaDialog(
+                    duplicates = dialog.duplicates,
                     onDismissRequest = onDismissRequest,
                     onConfirm = { screenModel.toggleFavorite(onRemoved = {}, checkDuplicate = false) },
-                    onOpenManga = { navigator.push(MangaScreen(dialog.duplicate.id)) },
+                    onOpenManga = { navigator.push(MangaScreen(it.id)) },
                     onMigrate = {
                         // SY -->
-                        migrateManga(navigator, dialog.duplicate, screenModel.manga!!.id)
+                        migrateManga(navigator, it, screenModel.manga!!.id)
                         // SY <--
                     },
                 )
@@ -501,7 +504,7 @@ class MangaScreen(
     private fun migrateManga(navigator: Navigator, manga: Manga, toMangaId: Long? = null) {
         // SY -->
         PreMigrationScreen.navigateToMigration(
-            Injekt.get<UnsortedPreferences>().skipPreMigration().get(),
+            Injekt.get<SourcePreferences>().skipPreMigration().get(),
             navigator,
             manga.id,
             toMangaId,

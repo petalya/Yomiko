@@ -128,6 +128,7 @@ import tachiyomi.domain.manga.interactor.UpdateMergedSettings
 import tachiyomi.domain.manga.model.CustomMangaInfo
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.manga.model.MangaUpdate
+import tachiyomi.domain.manga.model.MangaWithChapterCount
 import tachiyomi.domain.manga.model.MergeMangaSettingsUpdate
 import tachiyomi.domain.manga.model.MergedMangaReference
 import tachiyomi.domain.manga.model.applyFilter
@@ -665,7 +666,7 @@ class MangaScreenModel(
                 existingManga = getManga.await(mergedManga.url, mergedManga.source)
             }
 
-            mergedManga = networkToLocalManga.await(mergedManga)
+            mergedManga = networkToLocalManga(mergedManga)
 
             getCategories.await(originalMangaId)
                 .let {
@@ -790,10 +791,10 @@ class MangaScreenModel(
                 // Add to library
                 // First, check if duplicate exists if callback is provided
                 if (checkDuplicate) {
-                    val duplicate = getDuplicateLibraryManga.await(manga).getOrNull(0)
+                    val duplicates = getDuplicateLibraryManga(manga)
 
-                    if (duplicate != null) {
-                        updateSuccessState { it.copy(dialog = Dialog.DuplicateManga(manga, duplicate)) }
+                    if (duplicates.isNotEmpty()) {
+                        updateSuccessState { it.copy(dialog = Dialog.DuplicateManga(manga, duplicates)) }
                         return@launchIO
                     }
                 }
@@ -1660,7 +1661,7 @@ class MangaScreenModel(
             val initialSelection: ImmutableList<CheckboxState<Category>>,
         ) : Dialog
         data class DeleteChapters(val chapters: List<Chapter>) : Dialog
-        data class DuplicateManga(val manga: Manga, val duplicate: Manga) : Dialog
+        data class DuplicateManga(val manga: Manga, val duplicates: List<MangaWithChapterCount>) : Dialog
 
         /* SY -->
         data class Migrate(val newManga: Manga, val oldManga: Manga) : Dialog

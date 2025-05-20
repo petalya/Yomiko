@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.presentation.browse.BrowseSourceContent
 import eu.kanade.presentation.browse.components.BrowseSourceSimpleToolbar
 import eu.kanade.presentation.browse.components.RemoveMangaDialog
@@ -26,7 +27,6 @@ import eu.kanade.tachiyomi.ui.manga.MangaScreen
 import exh.ui.ifSourcesLoaded
 import mihon.presentation.core.util.collectAsLazyPagingItems
 import tachiyomi.core.common.util.lang.launchIO
-import tachiyomi.domain.UnsortedPreferences
 import tachiyomi.i18n.sy.SYMR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
@@ -84,7 +84,7 @@ class MangaDexFollowsScreen(private val sourceId: Long) : Screen() {
                         val duplicateManga = screenModel.getDuplicateLibraryManga(manga)
                         when {
                             manga.favorite -> screenModel.setDialog(BrowseSourceScreenModel.Dialog.RemoveManga(manga))
-                            duplicateManga != null -> screenModel.setDialog(
+                            duplicateManga.isNotEmpty() -> screenModel.setDialog(
                                 BrowseSourceScreenModel.Dialog.AddDuplicateManga(
                                     manga,
                                     duplicateManga,
@@ -103,14 +103,15 @@ class MangaDexFollowsScreen(private val sourceId: Long) : Screen() {
             is BrowseSourceScreenModel.Dialog.Migrate -> {}
             is BrowseSourceScreenModel.Dialog.AddDuplicateManga -> {
                 DuplicateMangaDialog(
+                    duplicates = dialog.duplicates,
                     onDismissRequest = onDismissRequest,
                     onConfirm = { screenModel.addFavorite(dialog.manga) },
-                    onOpenManga = { navigator.push(MangaScreen(dialog.duplicate.id)) },
+                    onOpenManga = { navigator.push(MangaScreen(it.id)) },
                     onMigrate = {
                         PreMigrationScreen.navigateToMigration(
-                            Injekt.get<UnsortedPreferences>().skipPreMigration().get(),
+                            Injekt.get<SourcePreferences>().skipPreMigration().get(),
                             navigator,
-                            dialog.duplicate.id,
+                            it.id,
                             dialog.manga.id,
                         )
                     },

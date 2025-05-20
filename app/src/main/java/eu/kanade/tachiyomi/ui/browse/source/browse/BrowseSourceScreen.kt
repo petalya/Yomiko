@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -35,6 +36,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.presentation.browse.BrowseSourceContent
 import eu.kanade.presentation.browse.MissingSourceScreen
 import eu.kanade.presentation.browse.components.BrowseSourceToolbar
@@ -63,7 +65,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import mihon.presentation.core.util.collectAsLazyPagingItems
 import tachiyomi.core.common.Constants
 import tachiyomi.core.common.util.lang.launchIO
-import tachiyomi.domain.UnsortedPreferences
 import tachiyomi.domain.source.model.StubSource
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
@@ -150,7 +151,11 @@ data class BrowseSourceScreen(
 
         Scaffold(
             topBar = {
-                Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+                Column(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.surface)
+                        .pointerInput(Unit) {},
+                ) {
                     BrowseSourceToolbar(
                         searchQuery = state.toolbarQuery,
                         onSearchQueryChange = screenModel::setToolbarQuery,
@@ -256,14 +261,11 @@ data class BrowseSourceScreen(
                 onMangaClick = { navigator.push(MangaScreen(it.id, true, smartSearchConfig)) },
                 onMangaLongClick = { manga ->
                     scope.launchIO {
-                        val duplicateManga = screenModel.getDuplicateLibraryManga(manga)
+                        val duplicates = screenModel.getDuplicateLibraryManga(manga)
                         when {
                             manga.favorite -> screenModel.setDialog(BrowseSourceScreenModel.Dialog.RemoveManga(manga))
-                            duplicateManga != null -> screenModel.setDialog(
-                                BrowseSourceScreenModel.Dialog.AddDuplicateManga(
-                                    manga,
-                                    duplicateManga,
-                                ),
+                            duplicates.isNotEmpty() -> screenModel.setDialog(
+                                BrowseSourceScreenModel.Dialog.AddDuplicateManga(manga, duplicates),
                             )
                             else -> screenModel.addFavorite(manga)
                         }
@@ -320,15 +322,16 @@ data class BrowseSourceScreen(
             }
             is BrowseSourceScreenModel.Dialog.AddDuplicateManga -> {
                 DuplicateMangaDialog(
+                    duplicates = dialog.duplicates,
                     onDismissRequest = onDismissRequest,
                     onConfirm = { screenModel.addFavorite(dialog.manga) },
-                    onOpenManga = { navigator.push(MangaScreen(dialog.duplicate.id)) },
+                    onOpenManga = { navigator.push(MangaScreen(it.id)) },
                     onMigrate = {
                         // SY -->
                         PreMigrationScreen.navigateToMigration(
-                            Injekt.get<UnsortedPreferences>().skipPreMigration().get(),
+                            Injekt.get<SourcePreferences>().skipPreMigration().get(),
                             navigator,
-                            dialog.duplicate.id,
+                            it.id,
                             dialog.manga.id,
                         )
                         // SY <--

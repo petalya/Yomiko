@@ -3,6 +3,7 @@ package tachiyomi.data.manga
 import eu.kanade.tachiyomi.source.model.UpdateStrategy
 import tachiyomi.domain.library.model.LibraryManga
 import tachiyomi.domain.manga.model.Manga
+import tachiyomi.domain.manga.model.MangaWithChapterCount
 import tachiyomi.view.LibraryView
 
 object MangaMapper {
@@ -36,6 +37,7 @@ object MangaMapper {
         version: Long,
         @Suppress("UNUSED_PARAMETER")
         isSyncing: Long,
+        notes: String,
     ): Manga = Manga(
         id = id,
         source = source,
@@ -62,6 +64,7 @@ object MangaMapper {
         lastModifiedAt = lastModifiedAt,
         favoriteModifiedAt = favoriteModifiedAt,
         version = version,
+        notes = notes,
     )
 
     fun mapLibraryManga(
@@ -93,6 +96,7 @@ object MangaMapper {
         favoriteModifiedAt: Long?,
         version: Long,
         isSyncing: Long,
+        notes: String,
         totalCount: Long,
         readCount: Double,
         latestUpload: Long,
@@ -129,6 +133,7 @@ object MangaMapper {
             favoriteModifiedAt,
             version,
             isSyncing,
+            notes,
         ),
         category = category,
         totalChapters = totalCount,
@@ -137,6 +142,71 @@ object MangaMapper {
         latestUpload = latestUpload,
         chapterFetchedAt = chapterFetchedAt,
         lastRead = lastRead,
+    )
+
+    fun mapMangaWithChapterCount(
+        id: Long,
+        source: Long,
+        url: String,
+        artist: String?,
+        author: String?,
+        description: String?,
+        genre: List<String>?,
+        title: String,
+        status: Long,
+        thumbnailUrl: String?,
+        favorite: Boolean,
+        lastUpdate: Long?,
+        nextUpdate: Long?,
+        initialized: Boolean,
+        viewerFlags: Long,
+        chapterFlags: Long,
+        coverLastModified: Long,
+        dateAdded: Long,
+        // SY -->
+        @Suppress("UNUSED_PARAMETER")
+        filteredScanlators: String?,
+        // SY <--
+        updateStrategy: UpdateStrategy,
+        calculateInterval: Long,
+        lastModifiedAt: Long,
+        favoriteModifiedAt: Long?,
+        version: Long,
+        isSyncing: Long,
+        notes: String,
+        totalCount: Long,
+    ): MangaWithChapterCount = MangaWithChapterCount(
+        manga = mapManga(
+            id,
+            source,
+            url,
+            artist,
+            author,
+            description,
+            genre,
+            title,
+            status,
+            thumbnailUrl,
+            favorite,
+            lastUpdate,
+            nextUpdate,
+            initialized,
+            viewerFlags,
+            chapterFlags,
+            coverLastModified,
+            dateAdded,
+            // SY -->
+            null,
+            // SY <--
+            updateStrategy,
+            calculateInterval,
+            lastModifiedAt,
+            favoriteModifiedAt,
+            version,
+            isSyncing,
+            notes,
+        ),
+        chapterCount = totalCount,
     )
 
     fun mapLibraryView(libraryView: LibraryView): LibraryManga {
@@ -165,6 +235,7 @@ object MangaMapper {
                 lastModifiedAt = libraryView.last_modified_at,
                 favoriteModifiedAt = libraryView.favorite_modified_at,
                 version = libraryView.version,
+                notes = libraryView.notes,
             ),
             category = libraryView.category,
             totalChapters = libraryView.totalCount,
