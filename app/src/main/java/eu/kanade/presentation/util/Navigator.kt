@@ -46,7 +46,7 @@ import cafe.adriel.voyager.core.model.ScreenModelStore
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.core.screen.ScreenKey
 import cafe.adriel.voyager.core.screen.uniqueScreenKey
-import cafe.adriel.voyager.core.stack.StackEvent.Push
+import cafe.adriel.voyager.core.stack.StackEvent
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.transitions.ScreenTransitionContent
 import eu.kanade.tachiyomi.util.view.getWindowRadius
@@ -62,6 +62,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import soup.compose.material.motion.animation.materialSharedAxisXIn
 import soup.compose.material.motion.animation.materialSharedAxisXOut
+import soup.compose.material.motion.animation.materialSharedAxisZIn
+import soup.compose.material.motion.animation.materialSharedAxisZOut
 import soup.compose.material.motion.animation.rememberSlideDistance
 import tachiyomi.presentation.core.util.PredictiveBack
 import kotlin.coroutines.cancellation.CancellationException
@@ -125,31 +127,35 @@ fun DefaultNavigatorScreenTransition(
         navigator = navigator,
         modifier = modifier,
         enterTransition = {
-            if (it == SwipeEdge.Right) {
-                materialSharedAxisXIn(forward = false, slideDistance = slideDistance)
+            val forward = it != SwipeEdge.Right
+            if (navigator.level >= 1) {
+                materialSharedAxisXIn(forward, slideDistance)
             } else {
-                materialSharedAxisXIn(forward = true, slideDistance = slideDistance)
+                materialSharedAxisZIn(forward = true)
             }
         },
         exitTransition = {
-            if (it == SwipeEdge.Right) {
-                materialSharedAxisXOut(forward = false, slideDistance = slideDistance)
+            val forward = it != SwipeEdge.Right
+            if (navigator.level >= 1) {
+                materialSharedAxisXOut(forward, slideDistance)
             } else {
-                materialSharedAxisXOut(forward = true, slideDistance = slideDistance)
+                materialSharedAxisZOut(forward = true)
             }
         },
         popEnterTransition = {
-            if (it == SwipeEdge.Right) {
-                materialSharedAxisXIn(forward = true, slideDistance = slideDistance)
+            val forward = it == SwipeEdge.Right
+            if (navigator.level >= 1) {
+                materialSharedAxisXIn(forward, slideDistance)
             } else {
-                materialSharedAxisXIn(forward = false, slideDistance = slideDistance)
+                materialSharedAxisZIn(forward = false)
             }
         },
         popExitTransition = {
-            if (it == SwipeEdge.Right) {
-                materialSharedAxisXOut(forward = true, slideDistance = slideDistance)
+            val forward = it == SwipeEdge.Right
+            if (navigator.level >= 1) {
+                materialSharedAxisXOut(forward, slideDistance)
             } else {
-                materialSharedAxisXOut(forward = false, slideDistance = slideDistance)
+                materialSharedAxisZOut(forward = false)
             }
         },
         content = { screen ->
