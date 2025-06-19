@@ -341,6 +341,7 @@ suspend fun updateLibManga(track: Track): Track {
                     |staff {
                         |edges {
                             |role
+                            |id
                             |node {
                                 |name {
                                     |userPreferred
