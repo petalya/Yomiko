@@ -132,6 +132,7 @@ fun MangaScreen(
 
     onMangaIncognitoToggled: () -> Unit,
     onFilterButtonClicked: () -> Unit,
+    onFilterLongClicked: () -> Unit,
     onRefresh: () -> Unit,
     onContinueReading: () -> Unit,
     onSearch: (query: String, global: Boolean) -> Unit,
@@ -199,6 +200,7 @@ fun MangaScreen(
             onCopyTagToClipboard = onCopyTagToClipboard,
             onMangaIncognitoToggled = onMangaIncognitoToggled,
             onFilterClicked = onFilterButtonClicked,
+            onFilterLongClicked = onFilterLongClicked,
             onRefresh = onRefresh,
             onContinueReading = onContinueReading,
             onSearch = onSearch,
@@ -249,6 +251,7 @@ fun MangaScreen(
             onCopyTagToClipboard = onCopyTagToClipboard,
             onMangaIncognitoToggled = onMangaIncognitoToggled,
             onFilterButtonClicked = onFilterButtonClicked,
+            onFilterLongClicked = onFilterLongClicked,
             onRefresh = onRefresh,
             onContinueReading = onContinueReading,
             onSearch = onSearch,
@@ -305,6 +308,7 @@ private fun MangaScreenSmallImpl(
 
     onMangaIncognitoToggled: () -> Unit,
     onFilterClicked: () -> Unit,
+    onFilterLongClicked: () -> Unit,
     onRefresh: () -> Unit,
     onContinueReading: () -> Unit,
     onSearch: (query: String, global: Boolean) -> Unit,
@@ -590,6 +594,7 @@ private fun MangaScreenSmallImpl(
                             chapterCount = chapters.size,
                             missingChapterCount = missingChapterCount,
                             onClick = onFilterClicked,
+                            onLongClick = onFilterLongClicked,
                         )
                     }
 
@@ -636,6 +641,7 @@ fun MangaScreenLargeImpl(
 
     onMangaIncognitoToggled: () -> Unit,
     onFilterButtonClicked: () -> Unit,
+    onFilterLongClicked: () -> Unit,
     onRefresh: () -> Unit,
     onContinueReading: () -> Unit,
     onSearch: (query: String, global: Boolean) -> Unit,
@@ -897,6 +903,7 @@ fun MangaScreenLargeImpl(
                                     chapterCount = chapters.size,
                                     missingChapterCount = missingChapterCount,
                                     onClick = onFilterButtonClicked,
+                                    onLongClick = onFilterLongClicked,
                                 )
                             }
 

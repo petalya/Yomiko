@@ -212,6 +212,7 @@ class MangaScreen(
             onTagSearch = { scope.launch { performGenreSearch(navigator, it, screenModel.source!!) } },
             onMangaIncognitoToggled = screenModel::toggleMangaIncognitoMode,
             onFilterButtonClicked = screenModel::showSettingsDialog,
+            onFilterLongClicked = screenModel::resetToDefaultSettings,
             onRefresh = screenModel::fetchAllFromSource,
             onContinueReading = { continueReading(context, screenModel.getNextUnreadChapter()) },
             onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
