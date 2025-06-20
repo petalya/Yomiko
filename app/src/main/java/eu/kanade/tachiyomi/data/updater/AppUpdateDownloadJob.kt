@@ -88,6 +88,8 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
                     savedProgress = progress
                     lastTick = currentTime
                     notifier.onProgressChange(progress)
+                    // Report progress to WorkManager for download progress in about screen.
+                    setProgressAsync(workDataOf("progress" to progress))
                 }
             }
         }
@@ -120,8 +122,7 @@ class AppUpdateDownloadJob(private val context: Context, workerParams: WorkerPar
     }
 
     companion object {
-        private const val TAG = "AppUpdateDownload"
-
+        const val TAG = "AppUpdateDownload"
         const val EXTRA_DOWNLOAD_URL = "DOWNLOAD_URL"
         const val EXTRA_DOWNLOAD_TITLE = "DOWNLOAD_TITLE"
 
