@@ -157,8 +157,8 @@ object AboutScreen : Screen() {
                             TextPreferenceWidget(
                                 title = stringResource(
                                     when (updateCheckState) {
-                                        UpdateCheckState.Downloaded -> MR.strings.update_check_notification_download_complete
                                         UpdateCheckState.Downloading -> MR.strings.update_check_notification_download_in_progress
+                                        UpdateCheckState.Downloaded -> MR.strings.update_check_notification_download_complete
                                         UpdateCheckState.Error -> MR.strings.update_check_notification_download_error
                                         else -> MR.strings.check_for_updates
                                     },
@@ -179,7 +179,6 @@ object AboutScreen : Screen() {
                                                 File(context.externalCacheDir, "update.apk").getUriCompat(context)
                                             NotificationHandler.installApkPendingActivity(context, apkFileUri).send()
                                         }
-
                                         UpdateCheckState.Checking, UpdateCheckState.Downloading -> Unit // No action needed
                                         else -> {
                                             scope.launch {
@@ -195,8 +194,9 @@ object AboutScreen : Screen() {
                                                         )
                                                         navigator.push(updateScreen)
                                                     },
-                                                    onFinish = {
-                                                        updateCheckState = UpdateCheckState.Checked
+                                                    onFinish = { hasUpdate ->
+                                                        // reset state if no update is available
+                                                        updateCheckState = if (hasUpdate) UpdateCheckState.Checked else UpdateCheckState.NotChecked
                                                     },
                                                 )
                                             }
@@ -307,14 +307,16 @@ object AboutScreen : Screen() {
     private suspend fun checkVersion(
         context: Context,
         onAvailableUpdate: (GetApplicationRelease.Result.NewUpdate) -> Unit,
-        onFinish: () -> Unit,
+        onFinish: (Boolean) -> Unit,
     ) {
+        val hasUpdate = mutableStateOf(false)
         val updateChecker = AppUpdateChecker()
         withUIContext {
             try {
                 when (val result = withIOContext { updateChecker.checkForUpdate(context, forceCheck = true  ) }) {
                     is GetApplicationRelease.Result.NewUpdate -> {
                         onAvailableUpdate(result)
+                        hasUpdate.value = true
                     }
                     is GetApplicationRelease.Result.NoNewUpdate -> {
                         context.toast(MR.strings.update_check_no_new_updates)
@@ -328,7 +330,7 @@ object AboutScreen : Screen() {
                 context.toast(e.message)
                 logcat(LogPriority.ERROR, e)
             } finally {
-                onFinish()
+                onFinish(hasUpdate.value)
             }
         }
     }
