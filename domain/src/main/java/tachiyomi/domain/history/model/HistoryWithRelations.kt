@@ -38,7 +38,7 @@ data class HistoryWithRelations(
                 chapterNumber = chapter?.chapterNumber ?: -1.0,
                 readAt = history.readAt,
                 readDuration = history.readDuration,
-                coverData = related.coverData
+                coverData = related.coverData,
             )
         }
     }

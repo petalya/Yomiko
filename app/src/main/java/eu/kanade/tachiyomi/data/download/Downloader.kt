@@ -288,7 +288,7 @@ class Downloader(
                 provider.findChapterDir(it.name, it.scanlator, /* SY --> */ manga.ogTitle /* SY <-- */, source) == null
             }
             // Add chapters to queue from the start.
-            .sortedByDescending { it.sourceOrder }
+            .sortedBy { it.sourceOrder }
             // Filter out those already enqueued.
             .filter { chapter -> queueState.value.none { it.chapter.id == chapter.id } }
             // Create a download for each one.
@@ -347,6 +347,41 @@ class Downloader(
 
         val chapterDirname = provider.getChapterDirName(download.chapter.name, download.chapter.scanlator)
         val tmpDir = mangaDir.createDirectory(chapterDirname + TMP_DIR_SUFFIX)!!
+
+        // Generic novel/text download support for extensions
+                val pages = download.pages ?: run {
+                    val p = download.source.getPageList(download.chapter.toSChapter())
+                        .mapIndexed { idx, page -> Page(idx, page.url, page.imageUrl, page.uri) }
+                    download.pages = p
+                    p
+                }
+        if (pages.size == 1 && isHtmlOrTextContent(pages[0].imageUrl)) {
+            try {
+                download.status = Download.State.DOWNLOADING
+                val textContent: String = pages[0].imageUrl ?: pages[0].url ?: ""
+                // Save as HTML file
+                val htmlFile = tmpDir.createFile("index.html")!!
+                htmlFile.openOutputStream().use { output ->
+                    output.write(textContent.toByteArray())
+                }
+                // Mark page as downloaded
+                pages[0].apply {
+                    progress = 100
+                    status = Page.State.Ready
+                }
+                // Finalize download (rename tmp dir -> chapter dir)
+                tmpDir.renameTo(chapterDirname)
+                cache.addChapter(chapterDirname, mangaDir, download.manga)
+                DiskUtil.createNoMediaFile(tmpDir, context)
+                download.status = Download.State.DOWNLOADED
+            } catch (e: Throwable) {
+                if (e is CancellationException) throw e
+                logcat(LogPriority.ERROR, e)
+                download.status = Download.State.ERROR
+                notifier.onError(e.message, download.chapter.name, download.manga.title, download.manga.id)
+            }
+            return
+        }
 
         try {
             // If the page list already exists, start from the file
@@ -746,6 +781,15 @@ class Downloader(
         if (wasRunning) {
             start()
         }
+    }
+
+    private fun isHtmlOrTextContent(content: String?): Boolean {
+        if (content == null) return false
+        val trimmed = content.trim()
+        return trimmed.startsWith("<html", ignoreCase = true) ||
+               trimmed.startsWith("<!DOCTYPE html", ignoreCase = true) ||
+               // Optionally, treat as text if it's not a URL (doesn't start with http)
+               (!trimmed.startsWith("http://") && !trimmed.startsWith("https://"))
     }
 
     companion object {

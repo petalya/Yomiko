@@ -96,10 +96,6 @@ class AndroidSourceManager(
                         ),
                     ).apply {
                         // SY -->
-                        put(EH_SOURCE_ID, EHentai(EH_SOURCE_ID, false, context))
-                        if (enableExhentai) {
-                            put(EXH_SOURCE_ID, EHentai(EXH_SOURCE_ID, true, context))
-                        }
                         put(MERGED_SOURCE_ID, MergedSource())
                         // SY <--
                     }

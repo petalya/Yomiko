@@ -40,7 +40,7 @@ data class Activity(
         @SerialName("small_image")
         val smallImage: String? = null,
         @SerialName("small_text")
-        val smallText: String? = "TachiyomiSY",
+        val smallText: String? = "Yomiko",
     )
 
     @Serializable
@@ -178,11 +178,11 @@ enum class DiscordScreen(
 }
 
 // Constants for standard Rich Presence image urls
-private const val tachiyomiImageUrl = "emojis/1229456525026787409.webp?quality=lossless"
-private const val libraryImageUrl = "emojis/1229715147250077736.webp?size=128&quality=lossless"
-private const val updatesImageUrl = "emojis/1216122475688231003.webp?quality=lossless"
-private const val historyImageUrl = "emojis/1216122387515310170.webp?quality=lossless"
-private const val browseImageUrl = "emojis/1216122371501723718.webp?quality=lossless"
-private const val moreImageUrl = "emojis/1216122403219050536.webp?quality=lossless"
-private const val webviewImageUrl = "emojis/1216122455618490509.webp?quality=lossless"
-private const val mangaImageUrl = "emojis/1216122415751626782.webp?quality=lossless"
+private const val tachiyomiImageUrl = "emojis/1391938380727713842.webp?quality=lossless"
+private const val libraryImageUrl = "emojis/1391940601015959714.webp?quality=lossless"
+private const val updatesImageUrl = "emojis/1391945005194674237.webp?quality=lossless"
+private const val historyImageUrl = "emojis/1391945005194674237.webp?quality=lossless"
+private const val browseImageUrl = "emojis/1391945777517166804.webp?quality=lossless"
+private const val moreImageUrl = "emojis/1391947518224371772.webp?quality=lossless"
+private const val webviewImageUrl = "emojis/1391952048223817791.webp?quality=lossless"
+private const val mangaImageUrl = "emojis/1391953132329898124.webp?quality=lossless"
