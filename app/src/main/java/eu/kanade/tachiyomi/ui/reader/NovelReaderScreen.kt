@@ -236,7 +236,7 @@ class NovelReaderViewModel(
             updateDiscordRPC()
         }
     }
-    
+
     fun prevChapter() {
         // For novels (source ID 10001L), we want to go to the previous chapter in the sorted list
         // which should be the previous lower chapter number
@@ -529,7 +529,30 @@ class NovelReaderScreen(
                         val cleanedHtml = s.content
                             .replace(Regex("text-align\\s*:\\s*[^;\"']*;?", RegexOption.IGNORE_CASE), "")
                             .replace(Regex("align\\s*=\\s*\"[^\"]*\"", RegexOption.IGNORE_CASE), "")
-                        val alignedHtml = "<div style=\"text-align:$htmlAlign;\">$cleanedHtml</div>"
+                        
+                        // Create a complete HTML document with CSS for paragraph indentation
+                        val alignedHtml = """
+                            <!DOCTYPE html>
+                            <html>
+                                <head>
+                                    <style>
+                                        body { 
+                                            text-align: $htmlAlign;
+                                            margin: 0;
+                                            padding: 0;
+                                        }
+                                        p {
+                                            text-indent: 1.2em;
+                                            margin-top: 0.5em;
+                                            margin-bottom: 0.5em;
+                                        }
+                                    </style>
+                                </head>
+                                <body>
+                                    $cleanedHtml
+                                </body>
+                            </html>
+                        """.trimIndent()
 
                         var contentReady by remember { mutableStateOf(false) }
                         var currentChapterId by remember { mutableStateOf(viewModel.currentChapterId) }
@@ -539,16 +562,16 @@ class NovelReaderScreen(
                         LaunchedEffect(s.content, textAlignment, viewModel.currentChapterId) {
                             val chapterChanged = currentChapterId != viewModel.currentChapterId
                             currentChapterId = viewModel.currentChapterId
-                            
+
                             // Reset content ready state when chapter changes
                             if (chapterChanged) {
                                 contentReady = false
                             }
-                            
+
                             // Set HTML content
                             richTextState.setHtml(alignedHtml)
                             contentReady = true
-                            
+
                             // After content is loaded, restore scroll position
                             // Only restore scroll if we have saved progress and either:
                             // 1. This is the initial load (savedProgress > 0)
@@ -556,13 +579,13 @@ class NovelReaderScreen(
                             if (savedProgress > 0) {
                                 // Wait for layout to be complete
                                 delay(50)
-                                
+
                                 // Calculate target position based on saved progress
                                 val targetPosition = (scrollState.maxValue * savedProgress).toInt()
                                 if (targetPosition > 0) {
                                     // Scroll to position
                                     scrollState.scrollTo(targetPosition)
-                                    
+
                                     // Smooth scroll to ensure we're at the exact position
                                     delay(50)
                                     scrollState.animateScrollTo(targetPosition)
@@ -585,9 +608,9 @@ class NovelReaderScreen(
                                         .fillMaxSize()
                                         .verticalScroll(scrollState)
                                         .padding(
-                                            top = 115.dp, 
-                                            start = 16.dp,
-                                            end = 16.dp,
+                                            top = 115.dp,
+                                            start = 20.dp,
+                                            end = 20.dp,
                                             bottom = 16.dp
                                         )
                                         .pointerInput(barsVisible) {
@@ -603,6 +626,7 @@ class NovelReaderScreen(
                                         else -> TextAlign.Left // fallback for safety
                                     }
                                     val resolvedLineHeight = (lineSpacing / 100f) * fontSize.sp.value
+
                                     CompositionLocalProvider(LocalContentColor provides presetColorScheme.text) {
                                         RichText(
                                             modifier = Modifier.fillMaxWidth(),
@@ -611,7 +635,10 @@ class NovelReaderScreen(
                                                 fontSize = fontSize.sp,
                                                 fontFamily = fontFamily,
                                                 textAlign = resolvedTextAlign,
-                                                lineHeight = resolvedLineHeight.sp
+                                                lineHeight = resolvedLineHeight.sp,
+                                                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                                                    includeFontPadding = false
+                                                )
                                             )
                                         )
                                     }
@@ -758,7 +785,7 @@ class NovelReaderScreen(
                             modifier = Modifier.graphicsLayer { alpha = if (hasPrevChapter) 1f else 0.5f }
                         ) {
                             Icon(
-                                Icons.Filled.SkipPrevious, 
+                                Icons.Filled.SkipPrevious,
                                 contentDescription = "Previous chapter",
                                 tint = if (hasPrevChapter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
@@ -778,14 +805,14 @@ class NovelReaderScreen(
                                             context.toast("Source not found")
                                             return@IconButton
                                         }
-                                        
+
                                         // For online sources, use the chapter URL directly
                                         val chapterUrl = getChapterWebUrl(manga, chapter, source)
                                         if (chapterUrl.isNullOrBlank()) {
                                             context.toast("No URL available for this chapter")
                                             return@IconButton
                                         }
-                                        
+
                                         // Use the in-app WebViewActivity
                                         val intent = WebViewActivity.newIntent(
                                             context,
@@ -822,7 +849,7 @@ class NovelReaderScreen(
                             modifier = Modifier.graphicsLayer { alpha = if (hasNextChapter) 1f else 0.5f }
                         ) {
                             Icon(
-                                Icons.Filled.SkipNext, 
+                                Icons.Filled.SkipNext,
                                 contentDescription = "Next chapter",
                                 tint = if (hasNextChapter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
@@ -836,14 +863,14 @@ class NovelReaderScreen(
                     val downloadManager: DownloadManager = Injekt.get()
                     val downloadQueue by downloadManager.queueState.collectAsState()
                     val downloadProgressMap = remember { mutableStateMapOf<Long, Int>() }
-                    
+
                     // Collect download progress
                     LaunchedEffect(Unit) {
                         downloadManager.progressFlow().collect { download ->
                             downloadProgressMap[download.chapter.id] = download.progress
                         }
                     }
-                    
+
                     // Create a derived state for the current download states
                     val downloadStates by remember(downloadQueue) {
                         derivedStateOf {
@@ -856,7 +883,7 @@ class NovelReaderScreen(
                     if (manga != null) {
                         // Build ReaderChapterItem list
                         val currentChapterId = viewModel.currentChapterId
-                        
+
                         // Create a list of chapter items that will update when any dependency changes
                         val chapterItems = remember(
                             chapters,
@@ -921,7 +948,7 @@ class NovelReaderScreen(
                                             manga.ogTitle,
                                             manga.source,
                                         )
-                                        
+
                                         when {
                                             state != null -> state.first to state.second
                                             isDownloaded -> Download.State.DOWNLOADED to 0
@@ -1006,16 +1033,16 @@ class NovelReaderScreen(
                     }
                 }
             }
-            
+
             // Loading state handling
             val isLoading = state is NovelReaderState.Loading
-            
+
             // Always hide bars when loading
             LaunchedEffect(isLoading) {
                 if (isLoading) barsVisible = false
                 else barsVisible = true
             }
-            
+
             // Hide system UI during loading, restore after
             LaunchedEffect(isLoading) {
                 val activity = context as? Activity ?: return@LaunchedEffect
@@ -1040,7 +1067,7 @@ class NovelReaderScreen(
                     }
                 }
             }
-            
+
             // Observe download queue and update downloadedChapterIds in ViewModel
             LaunchedEffect(downloadQueue) {
                 downloadQueue.forEach { download ->
@@ -1050,7 +1077,7 @@ class NovelReaderScreen(
                 }
             }
         }
-        
+
         // Settings bottom sheet (outside of main Box)
         if (showSettingsSheet) {
             NovelReaderSettingsBottomSheet(

@@ -218,7 +218,7 @@ class EpubReaderScreen(
                                 append("body{")
                                 append("color:${colorScheme.text.toCssColor()}!important;")
                                 append("background:${colorScheme.background.toCssColor()}!important;")
-                                append("margin:0;padding:120px 16px 32px 16px;") // Top: 120px, Right/Left: 16px, Bottom: 32px
+                                append("margin:0;padding:120px 20px 32px 20px;") // Top: 120px, Right/Left: 20px, Bottom: 32px
                                 append("font-size:${fontSize}px!important;")
                                 append("line-height:${lineSpacing / 100f}!important;")
                                 append("max-width:800px;")
