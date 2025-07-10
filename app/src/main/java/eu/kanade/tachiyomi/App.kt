@@ -64,7 +64,6 @@ import eu.kanade.tachiyomi.util.system.WebViewUtil
 import eu.kanade.tachiyomi.util.system.animatorDurationScale
 import eu.kanade.tachiyomi.util.system.cancelNotification
 import eu.kanade.tachiyomi.util.system.notify
-import exh.log.CrashlyticsPrinter
 import exh.log.EHLogLevel
 import exh.log.EnhancedFilePrinter
 import exh.log.XLogLogcatLogger
@@ -75,7 +74,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import logcat.LogPriority
 import logcat.LogcatLogger
-import mihon.core.firebase.FirebaseConfig
 import mihon.core.migration.Migrator
 import mihon.core.migration.migrations.migrations
 import org.conscrypt.Conscrypt
@@ -105,7 +103,6 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
     @SuppressLint("LaunchActivityFromNotification")
     override fun onCreate() {
         super<Application>.onCreate()
-        FirebaseConfig.init(applicationContext)
 
         GlobalExceptionHandler.initialize(applicationContext, CrashActivity::class.java)
 
@@ -168,16 +165,6 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
             }
             .launchIn(scope)
 
-        privacyPreferences.analytics()
-            .changes()
-            .onEach(FirebaseConfig::setAnalyticsEnabled)
-            .launchIn(scope)
-
-        privacyPreferences.crashlytics()
-            .changes()
-            .onEach(FirebaseConfig::setCrashlyticsEnabled)
-            .launchIn(scope)
-
         basePreferences.hardwareBitmapThreshold().let { preference ->
             if (!preference.isSet()) preference.set(GLUtil.DEVICE_TEXTURE_LIMIT)
         }
@@ -190,10 +177,6 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
         // Updates widget update
         WidgetManager(Injekt.get(), Injekt.get()).apply { init(scope) }
-
-        /*if (!LogcatLogger.isInstalled && networkPreferences.verboseLogging().get()) {
-            LogcatLogger.install(AndroidLogcatLogger(LogPriority.VERBOSE))
-        }*/
 
         if (!WorkManager.isInitialized()) {
             WorkManager.initialize(this, Configuration.Builder().build())
@@ -339,11 +322,6 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
                     }
                     backupStrategy = NeverBackupStrategy()
                 }
-        }
-
-        // Install Crashlytics in prod
-        if (!BuildConfig.DEBUG) {
-            printers += CrashlyticsPrinter(LogLevel.ERROR)
         }
 
         XLog.init(

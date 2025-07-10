@@ -26,6 +26,7 @@ import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.AndroidSourceManager
 import eu.kanade.tachiyomi.util.storage.CbzCrypto
 import exh.eh.EHentaiUpdateHelper
+import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderPreferences
 import io.requery.android.database.sqlite.RequerySQLiteOpenHelperFactory
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -148,6 +149,9 @@ class AppModule(val app: Application) : InjektModule {
         addSingletonFactory { NetworkHelper(app, get(), BuildConfig.DEBUG) }
         addSingletonFactory { JavaScriptEngine(app) }
 
+        // Register OkHttpClient for DI
+        addSingletonFactory<okhttp3.OkHttpClient> { get<NetworkHelper>().client }
+
         addSingletonFactory<SourceManager> { AndroidSourceManager(app, get(), get()) }
         addSingletonFactory { ExtensionManager(app) }
 
@@ -174,6 +178,7 @@ class AppModule(val app: Application) : InjektModule {
         // SY <--
 
         addSingletonFactory { ConnectionsManager() }
+        addSingletonFactory { NovelReaderPreferences(get()) }
     }
 }
 
