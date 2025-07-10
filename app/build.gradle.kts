@@ -13,13 +13,10 @@ plugins {
     alias(libs.plugins.aboutLibraries)
     id("com.github.ben-manes.versions")
     id("com.android.application")
-    // id("com.google.gms.google-services")
 }
 
 if (gradle.startParameter.taskRequests.toString().contains("Standard")) {
     pluginManager.apply {
-        // apply(libs.plugins.google.services.get().pluginId)
-        // apply(libs.plugins.firebase.crashlytics.get().pluginId)
     }
 }
 
@@ -277,11 +274,6 @@ dependencies {
     // Logging
     implementation(libs.logcat)
 
-    // Crash reports/analytics
-    // REMOVE: "standardImplementation"(platform(libs.firebase.bom))
-    // REMOVE: "standardImplementation"(libs.firebase.analytics)
-    // REMOVE: "standardImplementation"(libs.firebase.crashlytics)
-
     // Shizuku
     implementation(libs.bundles.shizuku)
 
@@ -297,11 +289,6 @@ dependencies {
     // SY -->
     // Text distance (EH)
     implementation(sylibs.simularity)
-
-    // Firebase (EH)
-    // REMOVE: implementation(platform(libs.firebase.bom))
-    // REMOVE: implementation(libs.firebase.analytics)
-    // REMOVE: implementation(libs.firebase.crashlytics)
 
     // Better logging (EH)
     implementation(sylibs.xlog)
