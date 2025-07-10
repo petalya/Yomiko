@@ -12,12 +12,14 @@ plugins {
     // id("com.github.zellius.shortcut-helper")
     alias(libs.plugins.aboutLibraries)
     id("com.github.ben-manes.versions")
+    id("com.android.application")
+    // id("com.google.gms.google-services")
 }
 
 if (gradle.startParameter.taskRequests.toString().contains("Standard")) {
     pluginManager.apply {
-        apply(libs.plugins.google.services.get().pluginId)
-        apply(libs.plugins.firebase.crashlytics.get().pluginId)
+        // apply(libs.plugins.google.services.get().pluginId)
+        // apply(libs.plugins.firebase.crashlytics.get().pluginId)
     }
 }
 
@@ -26,13 +28,22 @@ if (gradle.startParameter.taskRequests.toString().contains("Standard")) {
 val supportedAbis = setOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
 
 android {
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("../release-key.jks")
+            storePassword = project.findProperty("RELEASE_STORE_PASSWORD") as String? ?: ""
+            keyAlias = "releasekey"
+            keyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as String? ?: ""
+        }
+    }
     namespace = "eu.kanade.tachiyomi"
 
     defaultConfig {
-        applicationId = "eu.kanade.tachiyomi.sy"
+        applicationId = "eu.kanade.Yomiko"
 
         versionCode = 75
-        versionName = "1.12.0"
+        versionName = "1.0"
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getCommitCount()}\"")
         buildConfigField("String", "COMMIT_SHA", "\"${getGitSha()}\"")
@@ -71,13 +82,12 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             setProguardFiles(listOf(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"))
-
+            signingConfig = signingConfigs.getByName("release")
             buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLastCommitTime = true)}\"")
         }
         create("benchmark") {
             initWith(getByName("release"))
-
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             matchingFallbacks.add("release")
             isDebuggable = false
             isProfileable = true
@@ -95,9 +105,6 @@ android {
     productFlavors {
         create("standard") {
             buildConfigField("boolean", "INCLUDE_UPDATER", "true")
-            dimension = "default"
-        }
-        create("fdroid") {
             dimension = "default"
         }
         create("dev") {
@@ -271,9 +278,9 @@ dependencies {
     implementation(libs.logcat)
 
     // Crash reports/analytics
-//    "standardImplementation"(platform(libs.firebase.bom))
-//    "standardImplementation"(libs.firebase.analytics)
-//    "standardImplementation"(libs.firebase.crashlytics)
+    // REMOVE: "standardImplementation"(platform(libs.firebase.bom))
+    // REMOVE: "standardImplementation"(libs.firebase.analytics)
+    // REMOVE: "standardImplementation"(libs.firebase.crashlytics)
 
     // Shizuku
     implementation(libs.bundles.shizuku)
@@ -292,9 +299,9 @@ dependencies {
     implementation(sylibs.simularity)
 
     // Firebase (EH)
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.analytics)
-    implementation(libs.firebase.crashlytics)
+    // REMOVE: implementation(platform(libs.firebase.bom))
+    // REMOVE: implementation(libs.firebase.analytics)
+    // REMOVE: implementation(libs.firebase.crashlytics)
 
     // Better logging (EH)
     implementation(sylibs.xlog)
@@ -313,6 +320,11 @@ dependencies {
 
     // ZXing Android Embedded
     implementation(sylibs.zxing.android.embedded)
+
+    implementation("nl.siegmann.epublib:epublib-core:3.1") {
+        exclude(group = "xmlpull", module = "xmlpull")
+        exclude(group = "net.sf.kxml", module = "kxml2")
+    }
 }
 
 androidComponents {

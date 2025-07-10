@@ -35,6 +35,9 @@ dependencyResolutionManagement {
         mavenCentral()
         google()
         maven(url = "https://www.jitpack.io")
+        maven {
+            url = uri("https://github.com/psiegman/mvn-repo/raw/master/releases")
+        }
     }
 }
 
@@ -44,7 +47,7 @@ plugins {
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
-rootProject.name = "TachiyomiSY"
+rootProject.name = "Yomiko"
 include(":app")
 include(":core-metadata")
 include(":core:common")

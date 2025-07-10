@@ -17,6 +17,10 @@ kotlin {
                 // SY <--
 
                 implementation(libs.unifile)
+                implementation("nl.siegmann.epublib:epublib-core:3.1") {
+                    exclude(group = "xmlpull", module = "xmlpull")
+                    exclude(group = "net.sf.kxml", module = "kxml2")
+                }
             }
         }
         val androidMain by getting {

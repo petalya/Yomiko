@@ -60,4 +60,8 @@ dependencies {
     implementation(libs.injekt)
     implementation(sylibs.exifinterface)
     // SY <--
+    implementation("nl.siegmann.epublib:epublib-core:3.1") {
+        exclude(group = "xmlpull", module = "xmlpull")
+        exclude(group = "net.sf.kxml", module = "kxml2")
+    }
 }
