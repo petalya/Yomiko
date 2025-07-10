@@ -392,7 +392,7 @@
     <!-- Sort by tags -->
     <string name="pref_tag_sorting">標籤排序標籤</string>
     <string name="tag_sorting">標籤排序</string>
-    <string name="action_add_tags_message">看這裡！標籤必須是完整的，不能是部分相符，您不能用類似 netorare 過濾 female:netorare！\n命名空間標籤的樣式是\n“female: sole female”\n不需要引號！\n支援新增同一標籤的多個變體，所以隨意為 NHentai 新增 \"tag: netorare\" 或者為 E-Hentai 新增 \"female: netorare\" ！</string>
+    <string name="action_add_tags_message">看這裡！標籤必須是完整的，不能是部分相符，您不能用類似 netorare 過濾 female:netorare！\n命名空間標籤的樣式是\n"female: sole female"\n不需要引號！\n支援新增同一標籤的多個變體，所以隨意為 NHentai 新增 \"tag: netorare\" 或者為 E-Hentai 新增 \"female: netorare\" ！</string>
     <string name="action_edit_tags">編輯標籤</string>
     <string name="information_empty_tags">您沒有標籤。點按+按鈕以建立一個標籤用來將書櫃排序</string>
     <string name="error_tag_exists">此標籤已存在！</string>
@@ -400,7 +400,7 @@
     <string name="delete_tag_confirmation">您想要刪除標籤 %s 嗎？</string>
     <!-- Extension section -->
     <string name="ext_redundant">廢棄</string>
-    <string name="redundant_extension_message">此擴充套件已廢棄，將不會在此版本的 TachiyomiSY 上執行。</string>
+    <string name="redundant_extension_message">此擴充套件已廢棄，將不會在此版本的 Yomiko 上執行。</string>
     <!-- Migration -->
     <string name="select_sources">選擇來源</string>
     <string name="select_none">未選擇</string>

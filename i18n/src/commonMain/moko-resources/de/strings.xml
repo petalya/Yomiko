@@ -76,7 +76,7 @@
     <string name="all">Alle</string>
     <string name="pref_library_update_restriction">Geräteeinschränkungen für automatische Aktualisierungen</string>
     <string name="charging">Beim Laden</string>
-    <string name="pref_update_only_non_completed">Einträge mit dem Status „Abgeschlossen“ überspringen</string>
+    <string name="pref_update_only_non_completed">Einträge mit dem Status „Abgeschlossen" überspringen</string>
     <string name="pref_auto_update_manga_sync">Fortschritt nach dem Lesen aktualisieren</string>
     <string name="default_category">Standardkategorie</string>
     <string name="default_category_summary">Immer fragen</string>
@@ -397,7 +397,7 @@
     <string name="updated_version">Auf v%1$s aktualisiert</string>
     <string name="whats_new">Was ist neu</string>
     <string name="download_insufficient_space">Herunterladen von Kapiteln aufgrund von zu wenig Speicherplatz nicht möglich</string>
-    <string name="action_global_search_query">Überall nach „%1$s“ suchen</string>
+    <string name="action_global_search_query">Überall nach „%1$s" suchen</string>
     <string name="action_sort_date_added">Hinzufügedatum</string>
     <string name="pref_category_reading_mode">Lesemodus</string>
     <string name="pref_category_theme">Thema</string>
@@ -603,7 +603,7 @@
     <string name="pref_app_language">App-Sprache</string>
     <string name="theme_lavender">Lavendel</string>
     <string name="description_placeholder">Keine Beschreibung</string>
-    <string name="delete_category_confirmation">Möchtest du die Kategorie „%s“ löschen?</string>
+    <string name="delete_category_confirmation">Möchtest du die Kategorie „%s" löschen?</string>
     <string name="delete_category">Kategorie löschen</string>
     <string name="internal_error">InternalError: Überprüfe die Absturzprotokolle für mehr Infos</string>
     <string name="pref_user_agent_string">Standard-User-Agent-Text</string>
@@ -618,7 +618,7 @@
     <string name="auto_download_while_reading">Automatisch während des Lesens herunterladen</string>
     <string name="download_ahead_info">Funktioniert nur, wenn das aktuelle Kapitel sowie das darauf folgende bereits heruntergeladen sind.</string>
     <string name="are_you_sure">Bist du dir sicher?</string>
-    <string name="remove_manga">Du bist gerade dabei, „%s“ aus deiner Bibliothek zu entfernen</string>
+    <string name="remove_manga">Du bist gerade dabei, „%s" aus deiner Bibliothek zu entfernen</string>
     <string name="multi_lang">Mehrere Sprachen</string>
     <string name="updates_last_update_info">Bibliothek zuletzt aktualisiert: %s</string>
     <string name="popular">Beliebt</string>
@@ -674,7 +674,7 @@
     <string name="seconds_short">%d s</string>
     <string name="action_not_now">Nicht jetzt</string>
     <string name="information_no_manga_category">Kategorie ist leer</string>
-    <string name="pref_library_update_show_tab_badge">Anzahl an Ungelesenem auf dem „Neues“-Symbol anzeigen</string>
+    <string name="pref_library_update_show_tab_badge">Anzahl an Ungelesenem auf dem „Neues"-Symbol anzeigen</string>
     <string name="copied_to_clipboard_plain">In die Zwischenablage kopiert</string>
     <string name="enhanced_services_not_installed">Verfügbar, aber Quelle ist nicht installiert: %s</string>
     <string name="pref_skip_dupe_chapters">Doppelte Kapitel überspringen</string>
@@ -720,7 +720,7 @@
     <string name="unlock_app_title">%s entsperren</string>
     <string name="action_move_to_bottom_all_for_series">Serie nach unten verschieben</string>
     <string name="pref_relative_format">Relative Zeitstempel</string>
-    <string name="pref_relative_format_summary">„%1$s“ anstelle von „%2$s“</string>
+    <string name="pref_relative_format_summary">„%1$s" anstelle von „%2$s"</string>
     <string name="app_settings">App-Einstellungen</string>
     <string name="source_settings">Quelleneinstellungen</string>
     <string name="notification_updating_progress">Bibliothek wird aktualisiert… (%s)</string>
@@ -777,12 +777,12 @@
     <string name="action_add_repo">Repository hinzufügen</string>
     <string name="error_repo_exists">Dieses Repository existiert bereits!</string>
     <string name="action_delete_repo">Repository löschen</string>
-    <string name="delete_repo_confirmation">Möchtest du das Repository „%s“ löschen?</string>
+    <string name="delete_repo_confirmation">Möchtest du das Repository „%s" löschen?</string>
     <string name="onboarding_storage_help_info">Du aktualisierst von einer älteren Version und bist dir nicht sicher, was du auswählen sollst? Schau dir den Speicherleitfaden für mehr Informationen an.</string>
     <string name="onboarding_storage_help_action">Speicherleitfaden</string>
     <string name="pref_library_update_smart_update">Intelligentes Aktualisieren</string>
     <string name="label_add_repo_input">Repository-URL</string>
-    <string name="action_add_repo_message">Füge zusätzliche Repositorys zu TachiyomiSY hinzu. Deren URLs sollten mit „index.min.json“ enden.</string>
+    <string name="action_add_repo_message">Füge zusätzliche Repositorys zu Yomiko hinzu. Deren URLs sollten mit „index.min.json" enden.</string>
     <string name="invalid_repo_name">Ungültige Repository-URL</string>
     <string name="manga_interval_expected_update">Ca. %1$s bis zur Veröffentlichung neuer Kapitel, wird ca. alle %2$s überprüft.</string>
     <string name="theme_nord">Nord</string>
@@ -816,7 +816,7 @@
     <string name="invalid_backup_file_unknown">Sicherungsdatei ist beschädigt</string>
     <string name="invalid_backup_file_json">JSON-Sicherung wird nicht unterstützt</string>
     <string name="pref_download_new_unread_chapters_only">Herunterladen von doppelten gelesenen Kapiteln überspringen</string>
-    <string name="add_repo_confirmation">Möchtest du das Repository \"%s\" hinzufügen?</string>
+    <string name="add_repo_confirmation">Möchtest du das Repository \"%s" hinzufügen?</string>
     <string name="confirm_tracker_update">Tracker auf Kapitel %d aktualisieren?</string>
     <string name="pref_firebase">Datenerhebung und Absturzprotokolle</string>
     <string name="onboarding_permission_analytics_description">Sende anonymisierte Nutzungsdaten, um App-Funktionen zu verbessern.</string>
@@ -828,7 +828,7 @@
     <string name="firebase_summary">Das Übermitteln von Absturzprotokollen und erhobenen Daten ermöglicht es uns, Probleme zu erkennen und zu beheben, die Leistung zu verbessern und künftige Updates besser auf deine Bedürfnisse abzustimmen</string>
     <string name="ext_remove">Entfernen</string>
     <string name="ext_confirm_remove">Erweiterung entfernen?</string>
-    <string name="remove_private_extension_message">Möchtest du die Erweiterung „%s“ wirklich entfernen?</string>
+    <string name="remove_private_extension_message">Möchtest du die Erweiterung „%s" wirklich entfernen?</string>
     <string name="non_library_settings">Alle gelesenen Einträge</string>
     <string name="pref_auto_update_manga_on_mark_read">Fortschritt aktualisieren, wenn als gelesen markiert wird</string>
     <string name="trackers_updated_summary">Tracker auf Kapitel %d aktualisiert</string>

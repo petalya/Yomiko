@@ -113,7 +113,7 @@ fun getComicInfo(
     categories = categories?.let { ComicInfo.CategoriesTachiyomi(it.joinToString()) },
     source = ComicInfo.SourceMihon(sourceName),
     // SY -->
-    padding = CbzCrypto.createComicInfoPadding()?.let { ComicInfo.PaddingTachiyomiSY(it) },
+    padding = CbzCrypto.createComicInfoPadding()?.let { ComicInfo.PaddingYomiko(it) },
     // SY <--
     inker = null,
     colorist = null,

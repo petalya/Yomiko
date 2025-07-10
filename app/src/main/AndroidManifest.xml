@@ -436,7 +436,7 @@
 
                 <data
                     android:host="mangadex-auth"
-                    android:scheme="tachiyomisy" />
+                    android:scheme="yomiko" />
             </intent-filter>
         </activity>
 

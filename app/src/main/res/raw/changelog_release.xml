@@ -353,7 +353,7 @@
         <changelogtext>Fix source category deletion crash</changelogtext>
     </changelogversion>
     <changelogversion versionName="1.0.0" changeDate="July 9,2020">
-        <changelogtext>Welcome to my first full release of TachiyomiSY!</changelogtext>
+        <changelogtext>Welcome to my first full release of Yomiko!</changelogtext>
         <changelogtext>I hope you enjoy your stay, many improvements are planned!</changelogtext>
     </changelogversion>
 </changelog>

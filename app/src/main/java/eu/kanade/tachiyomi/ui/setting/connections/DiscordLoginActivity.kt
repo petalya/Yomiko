@@ -55,7 +55,7 @@ class DiscordLoginActivity : BaseActivity() {
             connectionsPreferences.connectionsToken(connectionsManager.discord).set(token)
             connectionsPreferences.setConnectionsCredentials(connectionsManager.discord, "Discord", "Logged In")
             toast(MR.strings.login_success)
-            Log.d("discord_login_tachiyomisy", "Logged in with token: ${token.take(6)}...${token.takeLast(6)}")
+            Log.d("discord_login_yomiko", "Logged in with token: ${token.take(6)}...${token.takeLast(6)}")
         }
         applicationInfo.dataDir.let { File("$it/app_webview/").deleteRecursively() }
         finish()

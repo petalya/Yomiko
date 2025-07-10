@@ -286,7 +286,7 @@ object AboutScreen : Screen() {
                             label = "GitHub",
                             icon = CustomIcons.Github,
                             // SY -->
-                            url = "https://github.com/jeryjs/TachiyomiSY-with-discord-RPC",
+                            url = "https://github.com/petalya/yomiko",
                             // SY <--
                         )
                     }
