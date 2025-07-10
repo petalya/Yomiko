@@ -4,6 +4,5 @@ import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
 
 class NovelSourceFactory : SourceFactory {
-    override fun createSources(): List<Source> = listOf(
-    )
+    override fun createSources(): List<Source> = listOf()
 }
