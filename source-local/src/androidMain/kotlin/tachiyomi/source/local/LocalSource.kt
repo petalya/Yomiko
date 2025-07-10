@@ -41,7 +41,8 @@ import tachiyomi.source.local.image.LocalCoverManager
 import tachiyomi.source.local.io.Archive
 import tachiyomi.source.local.io.Format
 import tachiyomi.source.local.io.LocalSourceFileSystem
-import tachiyomi.source.local.metadata.fillMetadata
+import tachiyomi.source.local.metadata.fillMangaMetadata
+import tachiyomi.source.local.metadata.fillChapterMetadata
 import uy.kohesive.injekt.injectLazy
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
@@ -326,12 +327,42 @@ actual class LocalSource(
 
     // Chapters
     override suspend fun getChapterList(manga: SManga): List<SChapter> = withIOContext {
-        val chapters = fileSystem.getFilesInMangaDirectory(manga.url)
-            // Only keep supported formats
+        val chapters = mutableListOf<SChapter>()
+        val files = fileSystem.getFilesInMangaDirectory(manga.url)
             .filterNot { it.name.orEmpty().startsWith('.') }
             .filter { it.isDirectory || Archive.isSupported(it) || it.extension.equals("epub", true) }
-            .map { chapterFile ->
-                SChapter.create().apply {
+
+        for (chapterFile in files) {
+            val format = Format.valueOf(chapterFile)
+            if (format is Format.Epub) {
+                // Extract chapters from EPUB TOC (Table of Contents)
+                val epubInputStream = format.file.openInputStream()!!
+                val epub = eu.kanade.tachiyomi.util.storage.EpubFile(epubInputStream)
+                val book = epub.book
+                fillMangaMetadata(book, manga)
+                val tocRefs = book.tableOfContents.tocReferences
+                val seenNames = mutableSetOf<String>()
+                var index = 0
+                for (tocRef in tocRefs) {
+                    val chapterName = tocRef.title?.takeIf { it.isNotBlank() } ?: continue
+                    if (!seenNames.add(chapterName)) continue // skip duplicates
+                    val href = tocRef.resource?.href ?: continue
+                    val sChapter = SChapter.create().apply {
+                        url = "${manga.url}/${chapterFile.name}::${href}"
+                        name = chapterName
+                        date_upload = chapterFile.lastModified()
+                        chapter_number = index.toFloat() + 1f
+                        scanlator = null
+                    }
+                    android.util.Log.d("LocalSource", "Adding TOC chapter: name=$chapterName, url=${sChapter.url}")
+                    fillChapterMetadata(book, sChapter)
+                    chapters.add(sChapter)
+                    index++
+                }
+                epub.close()
+            } else {
+                // Default: one chapter per file/dir/archive
+                val sChapter = SChapter.create().apply {
                     url = "${manga.url}/${chapterFile.name}"
                     name = if (chapterFile.isDirectory) {
                         chapterFile.name
@@ -339,31 +370,23 @@ actual class LocalSource(
                         chapterFile.nameWithoutExtension
                     }.orEmpty()
                     date_upload = chapterFile.lastModified()
-                    chapter_number = ChapterRecognition
+                    chapter_number = tachiyomi.domain.chapter.service.ChapterRecognition
                         .parseChapterNumber(manga.title, this.name, this.chapter_number.toDouble())
                         .toFloat()
-
-                    val format = Format.valueOf(chapterFile)
-                    if (format is Format.Epub) {
-                        EpubFile(format.file.archiveReader(context)).use { epub ->
-                            epub.fillMetadata(manga, this)
-                        }
-                    }
                 }
+                chapters.add(sChapter)
             }
-            .sortedWith { c1, c2 ->
-                val c = c2.chapter_number.compareTo(c1.chapter_number)
-                if (c == 0) c2.name.compareToCaseInsensitiveNaturalOrder(c1.name) else c
-            }
-
+        }
         // Copy the cover from the first chapter found if not available
         if (manga.thumbnail_url.isNullOrBlank()) {
             chapters.lastOrNull()?.let { chapter ->
                 updateCover(chapter, manga)
             }
         }
-
-        chapters
+        chapters.sortedWith { c1, c2 ->
+            val c = c2.chapter_number.compareTo(c1.chapter_number)
+            if (c == 0) c2.name.compareToCaseInsensitiveNaturalOrder(c1.name) else c
+        }
     }
 
     // Filters
@@ -415,9 +438,8 @@ actual class LocalSource(
                     }
                 }
                 is Format.Epub -> {
-                    EpubFile(format.file.archiveReader(context)).use { epub ->
+                    EpubFile(format.file.openInputStream()!!).use { epub ->
                         val entry = epub.getImagesFromPages().firstOrNull()
-
                         entry?.let { coverManager.update(manga, epub.getInputStream(it)!!) }
                     }
                 }
