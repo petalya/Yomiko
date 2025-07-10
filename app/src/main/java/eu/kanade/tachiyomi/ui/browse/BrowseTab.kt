@@ -80,22 +80,19 @@ data object BrowseTab : Tab {
         val tabs = if (hideFeedTab) {
             persistentListOf(
                 sourcesTab(),
-                extensionsTab(extensionsScreenModel),
-                migrateSourceTab(),
+                extensionsTab(extensionsScreenModel)
             )
         } else if (feedTabInFront) {
             persistentListOf(
                 feedTab(),
                 sourcesTab(),
-                extensionsTab(extensionsScreenModel),
-                migrateSourceTab(),
+                extensionsTab(extensionsScreenModel)
             )
         } else {
             persistentListOf(
                 sourcesTab(),
                 feedTab(),
-                extensionsTab(extensionsScreenModel),
-                migrateSourceTab(),
+                extensionsTab(extensionsScreenModel)
             )
         }
         // SY <--

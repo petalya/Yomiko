@@ -107,6 +107,7 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.time.Instant
 import java.util.Date
+import eu.kanade.tachiyomi.ui.reader.model.getChapterWebUrl
 
 /**
  * Presenter used by the activity to perform background operations.
@@ -434,12 +435,35 @@ class ReaderViewModel @JvmOverloads constructor(
     fun getChapters(): List<ReaderChapterItem> {
         val currentChapter = getCurrentChapter()
 
-        return chapterList.map {
+        return chapterList.map { chapter ->
+            val activeDownload = if (manga?.isLocal() == true) {
+                null
+            } else {
+                downloadManager.getQueuedDownloadOrNull(chapter.chapter.id!!)
+            }
+            val downloaded = if (manga?.isLocal() == true) {
+                true
+            } else {
+                downloadManager.isChapterDownloaded(
+                    chapterName = chapter.chapter.name,
+                    chapterScanlator = chapter.chapter.scanlator,
+                    mangaTitle = manga!!.ogTitle,
+                    sourceId = manga!!.source,
+                )
+            }
+            val downloadState = when {
+                activeDownload != null -> activeDownload.status
+                downloaded -> Download.State.DOWNLOADED
+                else -> Download.State.NOT_DOWNLOADED
+            }
+            val downloadProgress = activeDownload?.progress ?: 0
             ReaderChapterItem(
-                chapter = it.chapter.toDomainChapter()!!,
+                chapter = chapter.chapter.toDomainChapter()!!,
                 manga = manga!!,
-                isCurrent = it.chapter.id == currentChapter?.chapter?.id,
+                isCurrent = chapter.chapter.id == currentChapter?.chapter?.id,
                 dateFormat = UiPreferences.dateFormat(uiPreferences.dateFormat().get()),
+                downloadState = downloadState,
+                downloadProgress = downloadProgress,
             )
         }
     }
@@ -658,7 +682,7 @@ class ReaderViewModel @JvmOverloads constructor(
      * if setting is enabled and [currentChapter] is queued for download
      */
     private fun cancelQueuedDownloads(currentChapter: ReaderChapter): Download? {
-        return downloadManager.getQueuedDownloadOrNull(currentChapter.chapter.id!!.toLong())?.also {
+        return downloadManager.getQueuedDownloadOrNull(currentChapter.chapter.id!!)?.also {
             downloadManager.cancelQueuedDownloads(listOf(it))
         }
     }
@@ -833,14 +857,10 @@ class ReaderViewModel @JvmOverloads constructor(
 
     fun getChapterUrl(): String? {
         val sChapter = getCurrentChapter()?.chapter ?: return null
-        val source = getSource() ?: return null
-
-        return try {
-            source.getChapterUrl(sChapter)
-        } catch (e: Exception) {
-            logcat(LogPriority.ERROR, e)
-            null
-        }
+        val manga = manga ?: return null
+        val source = sourceManager.getOrStub(manga.source)
+        val domainChapter = sChapter.toDomainChapter() ?: return null
+        return getChapterWebUrl(manga, domainChapter, source)
     }
 
     /**

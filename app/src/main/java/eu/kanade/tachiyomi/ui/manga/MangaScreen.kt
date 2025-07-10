@@ -39,7 +39,6 @@ import eu.kanade.presentation.manga.components.DeleteChaptersDialog
 import eu.kanade.presentation.manga.components.MangaCoverDialog
 import eu.kanade.presentation.manga.components.ScanlatorFilterDialog
 import eu.kanade.presentation.manga.components.SetIntervalDialog
-import eu.kanade.presentation.more.settings.screen.SettingsEhScreen
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
@@ -61,6 +60,7 @@ import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.manga.merged.EditMergedSettingsDialog
 import eu.kanade.tachiyomi.ui.manga.notes.MangaNotesScreen
 import eu.kanade.tachiyomi.ui.manga.track.TrackInfoDialogHomeScreen
+
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.ui.setting.SettingsScreen
 import eu.kanade.tachiyomi.ui.webview.WebViewScreen
@@ -171,7 +171,20 @@ class MangaScreen(
             chapterSwipeStartAction = screenModel.chapterSwipeStartAction,
             chapterSwipeEndAction = screenModel.chapterSwipeEndAction,
             navigateUp = navigator::pop,
-            onChapterClicked = { openChapter(context, it) },
+            onChapterClicked = { chapter ->
+                val manga = successState.manga
+                val source = successState.source
+                val isEpub = chapter.url.contains(".epub") || chapter.url.contains("::")
+                if (isEpub) {
+                    navigator.push(eu.kanade.tachiyomi.ui.reader.epub.EpubReaderScreen(manga.id, chapter.id, chapter.url))
+                } else if (source.id == 0L) {
+                    navigator.push(eu.kanade.tachiyomi.ui.reader.NovelReaderScreen(manga.id, chapter.id))
+                } else if (source.id == 10001L) {
+                    navigator.push(eu.kanade.tachiyomi.ui.reader.NovelReaderScreen(manga.id, chapter.id))
+                } else {
+                    openChapter(context, chapter)
+                }
+            },
             onDownloadChapter = screenModel::runChapterDownloadActions.takeIf { !successState.source.isLocalOrStub() },
             onAddToLibraryClicked = {
                 screenModel.toggleFavorite()
@@ -193,74 +206,58 @@ class MangaScreen(
                         successState.mergedData,
                     )
                 }
-            }.takeIf { isHttpSource },
-            // SY <--
-            onWebViewLongClicked = {
-                copyMangaUrl(
-                    context,
-                    screenModel.manga,
-                    screenModel.source,
-                )
-            }.takeIf { isHttpSource },
-            onTrackingClicked = {
-                if (!successState.hasLoggedInTrackers) {
-                    navigator.push(SettingsScreen(SettingsScreen.Destination.Tracking))
-                } else {
-                    screenModel.showTrackDialog()
-                }
             },
-            onTagSearch = { scope.launch { performGenreSearch(navigator, it, screenModel.source!!) } },
+            onWebViewLongClicked = null,
+            onTrackingClicked = screenModel::showTrackDialog,
+            onTagSearch = {}, // If you want tag search, implement or connect to the correct function
             onMangaIncognitoToggled = screenModel::toggleMangaIncognitoMode,
             onFilterButtonClicked = screenModel::showSettingsDialog,
-            onFilterLongClicked = screenModel::resetToDefaultSettings,
+            onFilterLongClicked = {}, // If you want scanlator dialog, implement or connect to the correct function
             onRefresh = screenModel::fetchAllFromSource,
-            onContinueReading = { continueReading(context, screenModel.getNextUnreadChapter()) },
-            onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
-            onCoverClicked = screenModel::showCoverDialog,
-            onShareClicked = { shareManga(context, screenModel.manga, screenModel.source) }.takeIf { isHttpSource },
-            onDownloadActionClicked = screenModel::runDownloadAction.takeIf { !successState.source.isLocalOrStub() },
-            onEditCategoryClicked = screenModel::showChangeCategoryDialog.takeIf { successState.manga.favorite },
-            onEditFetchIntervalClicked = screenModel::showSetFetchIntervalDialog.takeIf {
-                successState.manga.favorite
+            onContinueReading = {
+                continueReading(
+                    navigator,
+                    context,
+                    successState.manga,
+                    successState.source,
+                    screenModel.getNextUnreadChapter(),
+                    successState.chapters.map { it.chapter }
+                )
             },
-            previewsRowCount = successState.previewsRowCount,
-            onEditNotesClicked = { navigator.push(MangaNotesScreen(manga = successState.manga)) },
+            onSearch = { query, global ->
+                scope.launch {
+                    performSearch(navigator, query, global)
+                }
+            },
+            onCoverClicked = screenModel::showCoverDialog,
+            onShareClicked = { shareManga(context, screenModel.manga, screenModel.source) },
+            onDownloadActionClicked = screenModel::runDownloadAction,
+            onEditCategoryClicked = screenModel::showChangeCategoryDialog,
+            onEditFetchIntervalClicked = screenModel::showSetFetchIntervalDialog,
+            onMigrateClicked = { migrateManga(navigator, successState.manga) },
+            onEditNotesClicked = { navigator.push(eu.kanade.tachiyomi.ui.manga.notes.MangaNotesScreen(successState.manga)) },
             // SY -->
-            onMigrateClicked = { migrateManga(navigator, screenModel.manga!!) }.takeIf { successState.manga.favorite },
             onMetadataViewerClicked = { openMetadataViewer(navigator, successState.manga) },
             onEditInfoClicked = screenModel::showEditMangaInfoDialog,
-            onRecommendClicked = {
-                openRecommends(navigator, screenModel.source?.getMainSource(), successState.manga)
-            },
+            onRecommendClicked = { openRecommends(navigator, successState.source, successState.manga) },
             onMergedSettingsClicked = screenModel::showEditMergedSettingsDialog,
             onMergeClicked = { openSmartSearch(navigator, successState.manga) },
-            onMergeWithAnotherClicked = {
-                mergeWithAnother(navigator, context, successState.manga, screenModel::smartSearchMerge)
-            },
-            onOpenPagePreview = {
-                openPagePreview(context, successState.chapters.minByOrNull { it.chapter.sourceOrder }?.chapter, it)
-            },
+            onMergeWithAnotherClicked = { mergeWithAnother(navigator, context, successState.manga, screenModel::smartSearchMerge) },
+            onOpenPagePreview = { page -> openPagePreview(context, screenModel.getNextUnreadChapter(), page) },
             onMorePreviewsClicked = { openMorePagePreviews(navigator, successState.manga) },
+            previewsRowCount = successState.previewsRowCount,
             // SY <--
             onMultiBookmarkClicked = screenModel::bookmarkChapters,
             onMultiMarkAsReadClicked = screenModel::markChaptersRead,
             onMarkPreviousAsReadClicked = screenModel::markPreviousChapterRead,
             onMultiDeleteClicked = screenModel::showDeleteChapterDialog,
             onChapterSwipe = screenModel::chapterSwipe,
-            onChapterSelected = screenModel::toggleSelection,
+            onChapterSelected = { item, selected, userSelected, fromLongPress ->
+                screenModel.toggleSelection(item, selected, userSelected, fromLongPress)
+            },
             onAllChapterSelected = screenModel::toggleAllSelection,
             onInvertSelection = screenModel::invertSelection,
-            onClickSourceSettingsClicked = {
-                when {
-                    successState.source.isLocalOrStub() -> null
-                    successState.source.isEhBasedSource() -> navigator.push(SettingsEhScreen)
-                    else -> {
-                        val extensionManager = Injekt.get<ExtensionManager>()
-                        val pkgName = extensionManager.getExtensionPackage(successState.manga.source)
-                        pkgName?.let { navigator.push(ExtensionDetailsScreen(it)) }
-                    }
-                }
-            },
+            onClickSourceSettingsClicked = null,
         )
 
         var showScanlatorsDialog by remember { mutableStateOf(false) }
@@ -280,6 +277,7 @@ class MangaScreen(
             }
             is MangaScreenModel.Dialog.DeleteChapters -> {
                 DeleteChaptersDialog(
+                    chapterCount = dialog.chapters.size,
                     onDismissRequest = onDismissRequest,
                     onConfirm = {
                         screenModel.toggleAllSelection(false)
@@ -389,8 +387,28 @@ class MangaScreen(
         }
     }
 
-    private fun continueReading(context: Context, unreadChapter: Chapter?) {
-        if (unreadChapter != null) openChapter(context, unreadChapter)
+    private fun continueReading(navigator: Navigator, context: Context, manga: Manga, source: Source, unreadChapter: Chapter?, chapters: List<Chapter>) {
+        val isEpub = unreadChapter?.url?.contains(".epub") == true || unreadChapter?.url?.contains("::") == true
+        if (isEpub) {
+            if (unreadChapter != null) {
+                navigator.push(eu.kanade.tachiyomi.ui.reader.epub.EpubReaderScreen(manga.id, unreadChapter.id, unreadChapter.url))
+            }
+        } else if (source.id == 0L || source.id == 10001L) {
+            // Find the chapter after the last read
+            val lastReadIndex = chapters.indexOfLast { it.read }
+            val nextChapter = when {
+                chapters.isEmpty() -> null
+                lastReadIndex == -1 -> chapters.first() // No chapters read, start from first
+                lastReadIndex + 1 < chapters.size -> chapters[lastReadIndex + 1] // Next after last read
+                else -> chapters.last() // All read, open last
+            }
+            if (nextChapter != null) {
+                navigator.push(eu.kanade.tachiyomi.ui.reader.NovelReaderScreen(manga.id, nextChapter.id))
+            }
+        } else {
+            if (unreadChapter == null) return
+            openChapter(context, unreadChapter)
+        }
     }
 
     private fun openChapter(context: Context, chapter: Chapter) {

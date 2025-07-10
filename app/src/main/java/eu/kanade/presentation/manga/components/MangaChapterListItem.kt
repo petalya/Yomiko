@@ -4,6 +4,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
@@ -36,6 +37,8 @@ import tachiyomi.presentation.core.components.material.DISABLED_ALPHA
 import tachiyomi.presentation.core.components.material.SECONDARY_ALPHA
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.selectedBackground
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.MutableState
 
 @Composable
 fun MangaChapterListItem(
@@ -59,6 +62,7 @@ fun MangaChapterListItem(
     onDownloadClick: ((ChapterDownloadAction) -> Unit)?,
     onChapterSwipe: (ChapterSwipeAction) -> Unit,
     modifier: Modifier = Modifier,
+    isMorphing: MutableState<Boolean>? = null,
 ) {
     val start = getSwipeAction(
         action = chapterSwipeStartAction,
@@ -107,8 +111,8 @@ fun MangaChapterListItem(
                             imageVector = Icons.Filled.Circle,
                             contentDescription = stringResource(MR.strings.unread),
                             modifier = Modifier
-                                .height(8.dp)
-                                .padding(end = 4.dp),
+                                .size(16.dp)
+                                .padding(top = 10.dp, end = 4.dp),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -128,6 +132,7 @@ fun MangaChapterListItem(
                         overflow = TextOverflow.Ellipsis,
                         onTextLayout = { textHeight = it.size.height },
                         color = LocalContentColor.current.copy(alpha = if (read) DISABLED_ALPHA else 1f),
+                        modifier = Modifier.padding(top = 10.dp),
                     )
                 }
 
@@ -183,10 +188,11 @@ fun MangaChapterListItem(
 
             ChapterDownloadIndicator(
                 enabled = downloadIndicatorEnabled,
-                modifier = Modifier.padding(start = 4.dp),
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
                 downloadStateProvider = downloadStateProvider,
                 downloadProgressProvider = downloadProgressProvider,
                 onClick = { onDownloadClick?.invoke(it) },
+                isMorphing = isMorphing,
             )
         }
     }

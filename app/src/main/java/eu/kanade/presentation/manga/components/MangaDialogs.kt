@@ -19,8 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import eu.kanade.tachiyomi.util.system.isDevFlavor
-import eu.kanade.tachiyomi.util.system.isPreviewBuildType
 import kotlinx.collections.immutable.toImmutableList
 import tachiyomi.domain.manga.interactor.FetchInterval
 import tachiyomi.i18n.MR
@@ -34,6 +32,7 @@ import kotlin.math.absoluteValue
 
 @Composable
 fun DeleteChaptersDialog(
+    chapterCount: Int,
     onDismissRequest: () -> Unit,
     onConfirm: () -> Unit,
 ) {
@@ -58,7 +57,12 @@ fun DeleteChaptersDialog(
             Text(text = stringResource(MR.strings.are_you_sure))
         },
         text = {
-            Text(text = stringResource(MR.strings.confirm_delete_chapters))
+            val message = if (chapterCount == 1) {
+                "Are you sure you want to delete the selected chapter?"
+            } else {
+                "Are you sure you want to delete the selected chapters?"
+            }
+            Text(text = message)
         },
     )
 }
@@ -109,7 +113,7 @@ fun SetIntervalDialog(
                 }
                 Spacer(Modifier.height(MaterialTheme.padding.small))
 
-                if (onValueChanged != null && (isDevFlavor || isPreviewBuildType)) {
+                if (onValueChanged != null) {
                     Text(stringResource(MR.strings.manga_interval_custom_amount))
 
                     BoxWithConstraints(

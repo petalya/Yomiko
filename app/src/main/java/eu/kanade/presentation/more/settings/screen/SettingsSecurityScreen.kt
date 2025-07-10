@@ -72,10 +72,8 @@ object SettingsSecurityScreen : SearchableSettings {
     @Composable
     override fun getPreferences(): List<Preference> {
         val securityPreferences = remember { Injekt.get<SecurityPreferences>() }
-        val privacyPreferences = remember { Injekt.get<PrivacyPreferences>() }
         return listOf(
-            getSecurityGroup(securityPreferences),
-            getFirebaseGroup(privacyPreferences),
+            getSecurityGroup(securityPreferences)
         )
     }
 
@@ -375,28 +373,6 @@ object SettingsSecurityScreen : SearchableSettings {
         )
     }
     // SY <--
-
-    @Composable
-    private fun getFirebaseGroup(
-        privacyPreferences: PrivacyPreferences,
-    ): Preference.PreferenceGroup {
-        return Preference.PreferenceGroup(
-            title = stringResource(MR.strings.pref_firebase),
-            preferenceItems = persistentListOf(
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = privacyPreferences.crashlytics(),
-                    title = stringResource(MR.strings.onboarding_permission_crashlytics),
-                    subtitle = stringResource(MR.strings.onboarding_permission_crashlytics_description),
-                ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = privacyPreferences.analytics(),
-                    title = stringResource(MR.strings.onboarding_permission_analytics),
-                    subtitle = stringResource(MR.strings.onboarding_permission_analytics_description),
-                ),
-                Preference.PreferenceItem.InfoPreference(stringResource(MR.strings.firebase_summary)),
-            ),
-        )
-    }
 }
 
 private val LockAfterValues = persistentListOf(

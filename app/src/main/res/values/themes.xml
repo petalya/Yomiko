@@ -508,4 +508,37 @@
         <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
     </style>
 
+    <!--== Yomiko Theme ==-->
+    <style name="Theme.Tachiyomi.Yomiko" parent="Base.Theme.Tachiyomi">
+        <!-- Theme Colors -->
+        <item name="colorPrimary">@color/yomiko_primary</item>
+        <item name="colorOnPrimary">@color/yomiko_onPrimary</item>
+        <item name="colorPrimaryContainer">@color/yomiko_primaryContainer</item>
+        <item name="colorOnPrimaryContainer">@color/yomiko_onPrimaryContainer</item>
+        <item name="colorPrimaryInverse">@color/yomiko_inversePrimary</item>
+        <item name="colorSecondary">@color/yomiko_secondary</item>
+        <item name="colorOnSecondary">@color/yomiko_onSecondary</item>
+        <item name="colorSecondaryContainer">@color/yomiko_secondaryContainer</item>
+        <item name="colorOnSecondaryContainer">@color/yomiko_onSecondaryContainer</item>
+        <item name="colorTertiary">@color/yomiko_tertiary</item>
+        <item name="colorOnTertiary">@color/yomiko_onTertiary</item>
+        <item name="colorTertiaryContainer">@color/yomiko_tertiaryContainer</item>
+        <item name="colorOnTertiaryContainer">@color/yomiko_onTertiaryContainer</item>
+        <item name="android:colorBackground">@color/yomiko_background</item>
+        <item name="colorOnBackground">@color/yomiko_onBackground</item>
+        <item name="colorSurface">@color/yomiko_surface</item>
+        <item name="colorOnSurface">@color/yomiko_onSurface</item>
+        <item name="colorSurfaceVariant">@color/yomiko_surfaceVariant</item>
+        <item name="colorOnSurfaceVariant">@color/yomiko_onSurfaceVariant</item>
+        <item name="elevationOverlayColor">@color/yomiko_surfaceTint</item>
+        <item name="colorSurfaceInverse">@color/yomiko_inverseSurface</item>
+        <item name="colorOnSurfaceInverse">@color/yomiko_inverseOnSurface</item>
+        <item name="colorOutline">@color/yomiko_outline</item>
+        <item name="colorSurfaceContainer">@color/yomiko_surfaceContainer</item>
+        <item name="colorSurfaceContainerHigh">@color/yomiko_surfaceContainerHigh</item>
+        <item name="colorSurfaceContainerHighest">@color/yomiko_surfaceContainerHighest</item>
+        <item name="colorSurfaceContainerLow">@color/yomiko_surfaceContainerLow</item>
+        <item name="colorSurfaceContainerLowest">@color/yomiko_surfaceContainerLowest</item>
+    </style>
+
 </resources>

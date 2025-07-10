@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.FormatListNumbered
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.OpenInBrowser
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -82,7 +83,7 @@ fun BottomReaderBar(
         if (ReaderBottomButton.Browser.isIn(enabledButtons) && onClickBrowser != null) {
             IconButton(onClick = onClickBrowser) {
                 Icon(
-                    imageVector = Icons.Outlined.Public,
+                    imageVector = Icons.Outlined.OpenInBrowser,
                     contentDescription = stringResource(MR.strings.action_open_in_browser),
                 )
             }

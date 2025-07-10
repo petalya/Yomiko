@@ -8,6 +8,7 @@ import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.source.online.all.MergedSource
 import eu.kanade.tachiyomi.ui.reader.model.ReaderChapter
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
+import com.hippo.unifile.UniFile
 import mihon.core.common.archive.archiveReader
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.withIOContext
@@ -127,7 +128,20 @@ class ChapterLoader(
                         when (format) {
                             is Format.Directory -> DirectoryPageLoader(format.file)
                             is Format.Archive -> ArchivePageLoader(format.file.archiveReader(context))
-                            is Format.Epub -> EpubPageLoader(format.file.archiveReader(context))
+                            is Format.Epub -> {
+                                val file = (format.file as? UniFile)?.filePath?.let { java.io.File(it) }
+                                if (file != null && file.exists()) {
+                                    val url = dbChapter.url
+                                    if ("::" in url) {
+                                        val (filePart, spineHref) = url.split("::", limit = 2)
+                                        EpubPageLoader(file, spineHref)
+                                    } else {
+                                        EpubPageLoader(file)
+                                    }
+                                } else {
+                                    error("EPUB file not found or not accessible")
+                                }
+                            }
                         }
                     }
                     else -> error(context.stringResource(MR.strings.loader_not_implemented_error))
@@ -145,7 +159,20 @@ class ChapterLoader(
                 when (format) {
                     is Format.Directory -> DirectoryPageLoader(format.file)
                     is Format.Archive -> ArchivePageLoader(format.file.archiveReader(context))
-                    is Format.Epub -> EpubPageLoader(format.file.archiveReader(context))
+                    is Format.Epub -> {
+                        val file = (format.file as? UniFile)?.filePath?.let { java.io.File(it) }
+                        if (file != null && file.exists()) {
+                            val url = dbChapter.url
+                            if ("::" in url) {
+                                val (filePart, spineHref) = url.split("::", limit = 2)
+                                EpubPageLoader(file, spineHref)
+                            } else {
+                                EpubPageLoader(file)
+                            }
+                        } else {
+                            error("EPUB file not found or not accessible")
+                        }
+                    }
                 }
             }
             source is HttpSource -> HttpPageLoader(chapter, source)

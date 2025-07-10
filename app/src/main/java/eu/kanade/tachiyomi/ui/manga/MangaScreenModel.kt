@@ -54,9 +54,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.chapter.getNextUnread
 import eu.kanade.tachiyomi.util.removeCovers
 import eu.kanade.tachiyomi.util.system.toast
-import exh.debug.DebugToggles
 import exh.eh.EHentaiUpdateHelper
-import exh.log.xLogD
 import exh.md.utils.FollowStatus
 import exh.metadata.metadata.RaisedSearchMetadata
 import exh.metadata.metadata.base.FlatMetadata
@@ -283,7 +281,7 @@ class MangaScreenModel(
                 .onEach { (manga, chapters) ->
                     if (chapters.isNotEmpty() &&
                         manga.isEhBasedManga() &&
-                        DebugToggles.ENABLE_EXH_ROOT_REDIRECT.enabled
+                        false // DebugToggles.ENABLE_EXH_ROOT_REDIRECT.enabled
                     ) {
                         // Check for gallery in library and accept manga with lowest id
                         // Find chapters sharing same root
@@ -293,7 +291,7 @@ class MangaScreenModel(
                                 // Redirect if we are not the accepted root
                                 if (manga.id != acceptedChain.manga.id && acceptedChain.manga.favorite) {
                                     // Update if any of our chapters are not in accepted manga's chapters
-                                    xLogD("Found accepted manga %s", manga.url)
+                                    logcat(LogPriority.ERROR, Exception("Found accepted manga ${manga.url}")) { "Error loading accepted chapter chain" }
                                     redirectFlow.emit(
                                         EXHRedirect(acceptedChain.manga.id),
                                     )
@@ -1176,13 +1174,20 @@ class MangaScreenModel(
 
     private fun getUnreadChaptersSorted(): List<Chapter> {
         val manga = successState?.manga ?: return emptyList()
-        val chaptersSorted = getUnreadChapters().sortedWith(getChapterSort(manga))
-            // SY -->
-            .let {
-                if (manga.isEhBasedManga()) it.reversed() else it
-            }
-        // SY <--
-        return if (manga.sortDescending()) chaptersSorted.reversed() else chaptersSorted
+        val chapters = getUnreadChapters()
+        
+        // For novels (source ID 10001L), always sort by chapter number in ascending order
+        return if (manga.source == 10001L) {
+            chapters.sortedBy { it.chapterNumber }
+        } else {
+            val chaptersSorted = chapters.sortedWith(getChapterSort(manga))
+                // SY -->
+                .let {
+                    if (manga.isEhBasedManga()) it.reversed() else it
+                }
+            // SY <--
+            if (manga.sortDescending()) chaptersSorted.reversed() else chaptersSorted
+        }
     }
 
     private fun startDownload(
@@ -1822,7 +1827,13 @@ class MangaScreenModel(
                     .filter { (chapter) -> applyFilter(unreadFilter) { !chapter.read } }
                     .filter { (chapter) -> applyFilter(bookmarkedFilter) { chapter.bookmark } }
                     .filter { applyFilter(downloadedFilter) { it.isDownloaded || isLocalManga } }
-                    .sortedWith { (chapter1), (chapter2) -> getChapterSort(manga).invoke(chapter1, chapter2) }
+                    .let { seq ->
+                        if (manga.source == 10001L) {
+                            seq.sortedByDescending { it.chapter.chapterNumber }
+                        } else {
+                            seq.sortedWith { (chapter1), (chapter2) -> getChapterSort(manga).invoke(chapter1, chapter2) }
+                        }
+                    }
             }
         }
     }

@@ -5,6 +5,7 @@ import eu.kanade.tachiyomi.data.database.models.Chapter
 import eu.kanade.tachiyomi.ui.reader.loader.PageLoader
 import kotlinx.coroutines.flow.MutableStateFlow
 import tachiyomi.core.common.util.system.logcat
+import eu.kanade.domain.chapter.model.toSChapter
 
 data class ReaderChapter(val chapter: Chapter) {
 
@@ -47,5 +48,19 @@ data class ReaderChapter(val chapter: Chapter) {
         data object Loading : State
         data class Error(val error: Throwable) : State
         data class Loaded(val pages: List<ReaderPage>) : State
+    }
+}
+
+// Shared utility to get the web URL for a chapter (for both manga and novel readers)
+fun getChapterWebUrl(manga: tachiyomi.domain.manga.model.Manga, chapter: tachiyomi.domain.chapter.model.Chapter, source: eu.kanade.tachiyomi.source.Source?): String? {
+    return when (source) {
+        is eu.kanade.tachiyomi.source.online.HttpSource -> {
+            try {
+                source.getChapterUrl(chapter.toSChapter())
+            } catch (e: Exception) {
+                null
+            }
+        }
+        else -> chapter.url
     }
 }

@@ -236,12 +236,6 @@ object SettingsMainScreen : Screen() {
         ),
         // SY -->
         Item(
-            titleRes = SYMR.strings.pref_category_eh,
-            subtitleRes = SYMR.strings.pref_ehentai_summary,
-            icon = EhAssets.EhLogo,
-            screen = SettingsEhScreen,
-        ),
-        Item(
             titleRes = SYMR.strings.pref_category_mangadex,
             subtitleRes = SYMR.strings.pref_mangadex_summary,
             icon = EhAssets.MangadexLogo,

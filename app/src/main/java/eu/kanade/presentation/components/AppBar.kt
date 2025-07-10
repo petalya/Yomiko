@@ -58,6 +58,7 @@ import tachiyomi.presentation.core.util.clearFocusOnSoftKeyboardHide
 import tachiyomi.presentation.core.util.runOnEnterKeyPressed
 import tachiyomi.presentation.core.util.secondaryItemAlpha
 import tachiyomi.presentation.core.util.showSoftKeyboard
+import androidx.compose.foundation.clickable
 
 const val SEARCH_DEBOUNCE_MILLIS = 250L
 
@@ -166,7 +167,13 @@ fun AppBarTitle(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
 ) {
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) { /* absorb click, do nothing */ }
+    ) {
         title?.let {
             Text(
                 text = it,

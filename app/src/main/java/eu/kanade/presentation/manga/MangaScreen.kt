@@ -31,6 +31,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -366,6 +367,11 @@ private fun MangaScreenSmallImpl(
     }
     // SY <--
 
+    // Add state for the jump dialog
+    var showJumpDialog by remember { mutableStateOf(false) }
+    var jumpChapterInput by remember { mutableStateOf("") }
+    var jumpToChapterIndex by remember { mutableStateOf<Int?>(null) }
+
     BackHandler(enabled = isAnySelected) {
         onAllChapterSelected(false)
     }
@@ -514,6 +520,11 @@ private fun MangaScreenSmallImpl(
                             // SY -->
                             onMergeClicked = onMergeClicked.takeUnless { state.showMergeInOverflow },
                             // SY <--
+                            showTrackingButton = true,
+                            showNextUpdateTimer = state.source.id != 10001L,
+                            onJumpToChapter = if (state.source.id == 10001L) {
+                                { showJumpDialog = true }
+                            } else null,
                         )
                     }
 
@@ -538,7 +549,7 @@ private fun MangaScreenSmallImpl(
                         contentType = MangaScreenItem.DESCRIPTION_WITH_TAG,
                     ) {
                         ExpandableMangaDescription(
-                            defaultExpandState = state.isFromSource,
+                            defaultExpandState = false,
                             description = state.manga.description,
                             tagsProvider = { state.manga.genre },
                             notes = state.manga.notes,
@@ -612,8 +623,57 @@ private fun MangaScreenSmallImpl(
                         onDownloadChapter = onDownloadChapter,
                         onChapterSelected = onChapterSelected,
                         onChapterSwipe = onChapterSwipe,
+                        sourceId = state.source.id,
                     )
                 }
+            }
+        }
+
+        if (showJumpDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showJumpDialog = false },
+                title = { Text("Jump to Chapter") },
+                text = {
+                    Column {
+                        Text("Enter chapter number:")
+                        androidx.compose.material3.OutlinedTextField(
+                            value = jumpChapterInput,
+                            onValueChange = { newValue ->
+                                // Only allow numbers
+                                if (newValue.all { it.isDigit() }) jumpChapterInput = newValue
+                            },
+                            singleLine = true,
+                            placeholder = { Text("e.g. 123") }
+                        )
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            val chapterNum = jumpChapterInput.toIntOrNull()
+                            if (chapterNum != null && chapterNum > 0) {
+                                val idx = chapters.indexOfFirst { it.chapter.chapterNumber.toInt() == chapterNum }
+                                if (idx >= 0) {
+                                    jumpToChapterIndex = idx
+                                }
+                            }
+                            showJumpDialog = false
+                            jumpChapterInput = ""
+                        }
+                    ) { Text("Jump") }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { showJumpDialog = false }) { Text("Cancel") }
+                }
+            )
+        }
+
+        jumpToChapterIndex?.let { idx ->
+            val visibleCount = chapterListState.layoutInfo.visibleItemsInfo.size
+            val centerIdx = (idx - visibleCount / 8).coerceAtLeast(0)
+            LaunchedEffect(idx) {
+                chapterListState.animateScrollToItem(centerIdx)
+                jumpToChapterIndex = null
             }
         }
     }
@@ -702,6 +762,11 @@ fun MangaScreenLargeImpl(
     var topBarHeight by remember { mutableIntStateOf(0) }
 
     val chapterListState = rememberLazyListState()
+
+    // Add state for the jump dialog
+    var showJumpDialog by remember { mutableStateOf(false) }
+    var jumpChapterInput by remember { mutableStateOf("") }
+    var jumpToChapterIndex by remember { mutableStateOf<Int?>(null) }
 
     BackHandler(enabled = isAnySelected) {
         onAllChapterSelected(false)
@@ -833,6 +898,11 @@ fun MangaScreenLargeImpl(
                             // SY -->
                             onMergeClicked = onMergeClicked.takeUnless { state.showMergeInOverflow },
                             // SY <--
+                            showTrackingButton = true,
+                            showNextUpdateTimer = state.source.id != 10001L,
+                            onJumpToChapter = if (state.source.id == 10001L) {
+                                { showJumpDialog = true }
+                            } else null,
                         )
                         // SY -->
                         metadataDescription?.invoke(
@@ -843,7 +913,7 @@ fun MangaScreenLargeImpl(
                         }
                         // SY <--
                         ExpandableMangaDescription(
-                            defaultExpandState = true,
+                            defaultExpandState = false,
                             description = state.manga.description,
                             tagsProvider = { state.manga.genre },
                             notes = state.manga.notes,
@@ -921,11 +991,60 @@ fun MangaScreenLargeImpl(
                                 onDownloadChapter = onDownloadChapter,
                                 onChapterSelected = onChapterSelected,
                                 onChapterSwipe = onChapterSwipe,
+                                sourceId = state.source.id,
                             )
                         }
                     }
                 },
             )
+        }
+
+        if (showJumpDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showJumpDialog = false },
+                title = { Text("Jump to Chapter") },
+                text = {
+                    Column {
+                        Text("Enter chapter number:")
+                        androidx.compose.material3.OutlinedTextField(
+                            value = jumpChapterInput,
+                            onValueChange = { newValue ->
+                                // Only allow numbers
+                                if (newValue.all { it.isDigit() }) jumpChapterInput = newValue
+                            },
+                            singleLine = true,
+                            placeholder = { Text("e.g. 123") }
+                        )
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            val chapterNum = jumpChapterInput.toIntOrNull()
+                            if (chapterNum != null && chapterNum > 0) {
+                                val idx = chapters.indexOfFirst { it.chapter.chapterNumber.toInt() == chapterNum }
+                                if (idx >= 0) {
+                                    jumpToChapterIndex = idx
+                                }
+                            }
+                            showJumpDialog = false
+                            jumpChapterInput = ""
+                        }
+                    ) { Text("Jump") }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { showJumpDialog = false }) { Text("Cancel") }
+                }
+            )
+        }
+
+        jumpToChapterIndex?.let { idx ->
+            val visibleCount = chapterListState.layoutInfo.visibleItemsInfo.size
+            val centerIdx = (idx - visibleCount / 8).coerceAtLeast(0)
+            LaunchedEffect(idx) {
+                chapterListState.animateScrollToItem(centerIdx)
+                jumpToChapterIndex = null
+            }
         }
     }
 }
@@ -986,6 +1105,7 @@ private fun LazyListScope.sharedChapterItems(
     onDownloadChapter: ((List<ChapterList.Item>, ChapterDownloadAction) -> Unit)?,
     onChapterSelected: (ChapterList.Item, Boolean, Boolean, Boolean) -> Unit,
     onChapterSwipe: (ChapterList.Item, ChapterSwipeAction) -> Unit,
+    sourceId: Long,
 ) {
     items(
         items = chapters,
@@ -1013,28 +1133,35 @@ private fun LazyListScope.sharedChapterItems(
                     } else {
                         item.chapter.name
                     },
-                    date = item.chapter.dateUpload
-                        .takeIf { it > 0L }
-                        ?.let {
-                            // SY -->
-                            if (manga.isEhBasedManga()) {
-                                MetadataUtil.EX_DATE_FORMAT
-                                    .format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault()))
-                            } else {
-                                relativeDateText(item.chapter.dateUpload)
-                            }
-                            // SY <--
-                        },
-                    readProgress = item.chapter.lastPageRead
-                        .takeIf {
-                            /* SY --> */(!item.chapter.read || alwaysShowReadingProgress)/* SY <-- */ && it > 0L
+                    date = if (sourceId == 10001L) null else item.chapter.dateUpload.takeIf { it > 0L }?.let {
+                        if (manga.isEhBasedManga()) {
+                            MetadataUtil.EX_DATE_FORMAT.format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault()))
+                        } else {
+                            relativeDateText(item.chapter.dateUpload)
                         }
-                        ?.let {
-                            stringResource(
-                                MR.strings.chapter_progress,
-                                it + 1,
-                            )
-                        },
+                    },
+                    readProgress = when {
+                        item.chapter.lastPageRead > 0L && item.chapter.mangaId != null && item.chapter.mangaId != -1L -> {
+                            val isNovel = manga.source == 10001L
+                            val isEpub = item.chapter.url.contains(".epub") || item.chapter.url.contains("::")
+                            if (isNovel || isEpub) {
+                                val percent = (item.chapter.lastPageRead / 10).toInt().coerceIn(0, 100)
+                                if ((!item.chapter.read || alwaysShowReadingProgress) && percent > 0) {
+                                    "Progress ${percent}%"
+                                } else null
+                            } else {
+                                item.chapter.lastPageRead
+                                    .takeIf { (!item.chapter.read || alwaysShowReadingProgress) && it > 0L }
+                                    ?.let {
+                                        stringResource(
+                                            MR.strings.chapter_progress,
+                                            it + 1,
+                                        )
+                                    }
+                            }
+                        }
+                        else -> null
+                    },
                     scanlator = item.chapter.scanlator.takeIf {
                         !it.isNullOrBlank() /* SY --> */ && item.showScanlator /* SY <-- */
                     },

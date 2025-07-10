@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.PersonOutline
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.AttachMoney
 import androidx.compose.material.icons.outlined.Block
@@ -177,10 +178,12 @@ fun MangaActionRow(
     onMergeClicked: (() -> Unit)?,
     // SY <--
     modifier: Modifier = Modifier,
+    showTrackingButton: Boolean = true,
+    showNextUpdateTimer: Boolean = true,
+    onJumpToChapter: (() -> Unit)? = null,
 ) {
     val defaultActionButtonColor = MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_ALPHA)
 
-    // TODO: show something better when using custom interval
     val nextUpdateDays = remember(nextUpdate) {
         return@remember if (nextUpdate != null) {
             val now = Instant.now()
@@ -202,6 +205,7 @@ fun MangaActionRow(
             onClick = onAddToLibraryClicked,
             onLongClick = onEditCategory,
         )
+        if (showNextUpdateTimer) {
         MangaActionButton(
             title = when (nextUpdateDays) {
                 null -> stringResource(MR.strings.not_applicable)
@@ -212,10 +216,20 @@ fun MangaActionRow(
                     nextUpdateDays,
                 )
             },
-            icon = Icons.Default.HourglassEmpty,
+                icon = Icons.Filled.HourglassEmpty,
             color = if (isUserIntervalMode) MaterialTheme.colorScheme.primary else defaultActionButtonColor,
             onClick = { onEditIntervalClicked?.invoke() },
         )
+        }
+        if (onJumpToChapter != null) {
+            MangaActionButton(
+                title = "Jump to",
+                icon = Icons.Filled.PushPin,
+                color = defaultActionButtonColor,
+                onClick = onJumpToChapter,
+            )
+        }
+        if (showTrackingButton) {
         MangaActionButton(
             title = if (trackingCount == 0) {
                 stringResource(MR.strings.manga_tracking_tab)
@@ -226,6 +240,7 @@ fun MangaActionRow(
             color = if (trackingCount == 0) defaultActionButtonColor else MaterialTheme.colorScheme.primary,
             onClick = onTrackingClicked,
         )
+        }
         if (onWebViewClicked != null) {
             MangaActionButton(
                 title = stringResource(MR.strings.action_web_view),

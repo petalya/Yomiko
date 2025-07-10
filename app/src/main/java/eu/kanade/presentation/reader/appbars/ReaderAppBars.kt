@@ -120,7 +120,7 @@ fun ReaderAppBars(
     val isRtl = viewer is R2LPagerViewer
     val backgroundColor = MaterialTheme.colorScheme
         .surfaceColorAtElevation(3.dp)
-        .copy(alpha = if (isSystemInDarkTheme()) 0.9f else 0.95f)
+        .copy(alpha = 1f)
 
     val modifierWithInsetsPadding = if (fullscreen) {
         Modifier.systemBarsPadding()
@@ -207,37 +207,10 @@ fun ReaderAppBars(
                 Column(modifierWithInsetsPadding) {
                     // SY <--
                     AppBar(
-                        modifier = /*SY --> */ Modifier /*SY <-- */
-                            .clickable(onClick = onClickTopAppBar),
                         backgroundColor = backgroundColor,
                         title = mangaTitle,
                         subtitle = chapterTitle,
                         navigateUp = navigateUp,
-                        /* SY --> actions = {
-                            AppBarActions(
-                                listOfNotNull(
-                                    AppBar.Action(
-                                        title = stringResource(
-                                            if (bookmarked) MR.strings.action_remove_bookmark else MR.strings.action_bookmark
-                                        ),
-                                        icon = if (bookmarked) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
-                                        onClick = onToggleBookmarked,
-                                    ),
-                                    onOpenInWebView?.let {
-                                        AppBar.OverflowAction(
-                                            title = stringResource(MR.strings.action_open_in_web_view),
-                                            onClick = it,
-                                        )
-                                    },
-                                    onShare?.let {
-                                        AppBar.OverflowAction(
-                                            title = stringResource(MR.strings.action_share),
-                                            onClick = it,
-                                        )
-                                    },
-                                ),
-                            )
-                        }, SY <-- */
                     )
                     // SY -->
                     ExhUtils(
