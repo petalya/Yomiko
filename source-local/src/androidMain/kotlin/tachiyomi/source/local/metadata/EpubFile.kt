@@ -3,46 +3,74 @@ package tachiyomi.source.local.metadata
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.util.storage.EpubFile
+import java.io.Closeable
+import java.io.InputStream
 import java.text.ParseException
 import java.text.SimpleDateFormat
 import java.util.Locale
+import nl.siegmann.epublib.domain.Book
 
 /**
  * Fills manga and chapter metadata using this epub file's metadata.
  */
-fun EpubFile.fillMetadata(manga: SManga, chapter: SChapter) {
-    val ref = getPackageHref()
-    val doc = getPackageDocument(ref)
-
-    val title = doc.getElementsByTag("dc:title").first()
-    val publisher = doc.getElementsByTag("dc:publisher").first()
-    val creator = doc.getElementsByTag("dc:creator").first()
-    val description = doc.getElementsByTag("dc:description").first()
-    var date = doc.getElementsByTag("dc:date").first()
-    if (date == null) {
-        date = doc.select("meta[property=dcterms:modified]").first()
+fun fillMetadata(book: Book, manga: SManga, chapter: SChapter) {
+    // Title
+    book.title?.let { title ->
+        manga.title = title
+        chapter.name = title
     }
-
-    creator?.text()?.let { manga.author = it }
-    description?.text()?.let { manga.description = it }
-
-    title?.text()?.let { chapter.name = it }
-
-    if (publisher != null) {
-        chapter.scanlator = publisher.text()
-    } else if (creator != null) {
-        chapter.scanlator = creator.text()
+    // Author(s)
+    val authors = book.metadata.authors
+    if (authors.isNotEmpty()) {
+        manga.author = authors.joinToString(", ") { it.firstname + " " + it.lastname }.trim()
     }
+    // Description
+    book.metadata.descriptions.firstOrNull()?.let { desc ->
+        manga.description = desc
+    }
+    // Publisher as scanlator
+    book.metadata.publishers.firstOrNull()?.let { publisher ->
+        chapter.scanlator = publisher
+    }
+    // Date
+    book.metadata.dates.firstOrNull()?.let { date ->
+        val dateValue = date.value
+        if (dateValue is java.util.Date) {
+            chapter.date_upload = dateValue.time
+        } else {
+            chapter.date_upload = 0L
+        }
+    }
+}
 
-    if (date != null) {
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.getDefault())
-        try {
-            val parsedDate = dateFormat.parse(date.text())
-            if (parsedDate != null) {
-                chapter.date_upload = parsedDate.time
-            }
-        } catch (e: ParseException) {
-            // Empty
+fun fillMangaMetadata(book: Book, manga: SManga) {
+    // Title
+    book.title?.let { title ->
+        manga.title = title
+    }
+    // Author(s)
+    val authors = book.metadata.authors
+    if (authors.isNotEmpty()) {
+        manga.author = authors.joinToString(", ") { it.firstname + " " + it.lastname }.trim()
+    }
+    // Description
+    book.metadata.descriptions.firstOrNull()?.let { desc ->
+        manga.description = desc
+    }
+}
+
+fun fillChapterMetadata(book: Book, chapter: SChapter) {
+    // Publisher as scanlator
+    book.metadata.publishers.firstOrNull()?.let { publisher ->
+        chapter.scanlator = publisher
+    }
+    // Date
+    book.metadata.dates.firstOrNull()?.let { date ->
+        val dateValue = date.value
+        if (dateValue is java.util.Date) {
+            chapter.date_upload = dateValue.time
+        } else {
+            chapter.date_upload = 0L
         }
     }
 }
