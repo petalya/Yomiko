@@ -1,13 +1,13 @@
 name: Release Builder
 on:
   push:
-   branches: 
+   branches:
     - 'release'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
- 
+
 jobs:
   build:
     name: Build release app
@@ -29,22 +29,6 @@ jobs:
 
       - name: Set up gradle
         uses: gradle/actions/setup-gradle@v4
-
-      # SY -->
-      - name: Write google-services.json
-        uses: DamianReeves/write-file-action@v1.3
-        with:
-          path: app/google-services.json
-          contents: ${{ secrets.GOOGLE_SERVICES_TEXT }}
-          write-mode: overwrite
-
-      - name: Write client_secrets.json
-        uses: DamianReeves/write-file-action@v1.3
-        with:
-          path: app/src/main/assets/client_secrets.json
-          contents: ${{ secrets.CLIENT_SECRETS_TEXT }}
-          write-mode: overwrite
-      # SY <--
 
       - name: Check code format
         run: ./gradlew spotlessCheck
@@ -85,7 +69,7 @@ jobs:
           mv app/build/outputs/apk/standard/release/app-standard-x86-release-unsigned-signed.apk Yomiko-x86.apk
           sha=`sha256sum Yomiko-x86.apk | awk '{ print $1 }'`
           echo "APK_X86_SHA=$sha" >> $GITHUB_ENV
-          
+
           mv app/build/outputs/apk/standard/release/app-standard-x86_64-release-unsigned-signed.apk Yomiko-x86_64.apk
           sha=`sha256sum Yomiko-x86_64.apk | awk '{ print $1 }'`
           echo "APK_X86_64_SHA=$sha" >> $GITHUB_ENV
@@ -107,7 +91,7 @@ jobs:
             | armeabi-v7a | ${{ env.APK_ARMEABI_V7A_SHA }} |
             | x86 | ${{ env.APK_X86_SHA }} |
             | x86_64 | ${{ env.APK_X86_64_SHA }} |
-            
+
             ## If you are unsure which version to choose then go with Yomiko.apk
           files: |
             Yomiko.apk
