@@ -76,6 +76,9 @@ import androidx.compose.ui.text.style.TextAlign
 import android.view.MotionEvent
 import android.view.View
 import android.webkit.WebSettings
+import android.util.Base64
+import androidx.core.content.res.ResourcesCompat
+import java.io.ByteArrayOutputStream
 
 class EpubReaderScreen(
     private val mangaId: Long,
@@ -521,6 +524,44 @@ private fun isColorLight(color: Color): Boolean {
 @Composable
 private fun WebContent(html: String, onTap: () -> Unit) {
     val context = LocalContext.current
+    
+    // Load font files as base64 strings
+    val loraFontBase64 = remember { context.loadFontAsBase64(R.font.lora) }
+    val openSansFontBase64 = remember { context.loadFontAsBase64(R.font.open_sans) }
+    val arbutusFontBase64 = remember { context.loadFontAsBase64(R.font.arbutus_slab) }
+    val latoFontBase64 = remember { context.loadFontAsBase64(R.font.lato) }
+    
+    // Create font face definitions
+    val fontFaceStyles = """
+        @font-face {
+            font-family: 'Lora';
+            src: url('data:font/ttf;base64,$loraFontBase64') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Open Sans';
+            src: url('data:font/ttf;base64,$openSansFontBase64') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Arbutus Slab';
+            src: url('data:font/ttf;base64,$arbutusFontBase64') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Lato';
+            src: url('data:font/ttf;base64,$latoFontBase64') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+    """.trimIndent()
+    
+    // Add font faces to the HTML
+    val htmlWithFonts = html.replace("<style>", "<style>\n$fontFaceStyles\n")
+    
     AndroidView(
         factory = {
             WebView(context).apply {
@@ -565,14 +606,40 @@ private fun WebContent(html: String, onTap: () -> Unit) {
                     }
                 }
                 
-                loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+                loadDataWithBaseURL(null, htmlWithFonts, "text/html", "UTF-8", null)
             }
         }, 
         update = {
-            it.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+            it.loadDataWithBaseURL(null, htmlWithFonts, "text/html", "UTF-8", null)
         },
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+// Helper function to load a font resource as base64 string
+private fun android.content.Context.loadFontAsBase64(fontResId: Int): String {
+    return try {
+        val typeface = ResourcesCompat.getFont(this, fontResId)
+        val file = ResourcesCompat.getFont(this, fontResId)?.let {
+            resources.openRawResource(fontResId)
+        }
+        
+        file?.use { inputStream ->
+            val buffer = ByteArrayOutputStream()
+            val data = ByteArray(1024)
+            var count: Int
+            
+            while (inputStream.read(data).also { count = it } != -1) {
+                buffer.write(data, 0, count)
+            }
+            
+            buffer.flush()
+            Base64.encodeToString(buffer.toByteArray(), Base64.NO_WRAP)
+        } ?: ""
+    } catch (e: Exception) {
+        e.printStackTrace()
+        ""
+    }
 }
 
 // Extension function to convert Color to CSS color string
