@@ -2,7 +2,7 @@ name: Release Builder
 on:
   push:
    branches:
-    - 'release'
+    - 'yomikofeat'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
