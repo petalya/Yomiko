@@ -17,10 +17,13 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -46,10 +49,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -89,6 +95,7 @@ import tachiyomi.presentation.core.util.plus
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.ByteArrayOutputStream
+import java.time.format.DateTimeFormatter
 
 class EpubReaderScreen(
     private val mangaId: Long,
@@ -157,8 +164,8 @@ class EpubReaderScreen(
         }
 
         // Hide-on-scroll state
-        var lastScrollOffset by remember { mutableStateOf(0) }
-        var accumulatedScroll by remember { mutableStateOf(0) }
+        var lastScrollOffset = remember { 0 }
+        var accumulatedScroll = remember { 0 }
         val hideThresholdPx = with(LocalDensity.current) { 24.dp.roundToPx() }
         LaunchedEffect(scrollState.value) {
             val delta = scrollState.value - lastScrollOffset
@@ -180,10 +187,10 @@ class EpubReaderScreen(
         }
 
         // derived slider progress
-        var sliderProgress by remember { mutableStateOf(0f) }
+        var sliderProgress = remember { mutableStateOf(0f) }
         LaunchedEffect(scrollState.value) {
             if (scrollState.maxValue > 0) {
-                sliderProgress = scrollState.value.toFloat() / scrollState.maxValue
+                sliderProgress.value = scrollState.value.toFloat() / scrollState.maxValue
             }
         }
         // save progress debounced
@@ -195,8 +202,8 @@ class EpubReaderScreen(
         }
 
         // Chapter list and settings bottom sheet state
-        var showChapterListSheet by remember { mutableStateOf(false) }
-        var showSettingsSheet by remember { mutableStateOf(false) }
+        var showChapterListSheet = remember { mutableStateOf(false) }
+        var showSettingsSheet = remember { mutableStateOf(false) }
 
         Box(modifier = Modifier.fillMaxSize()) {
             when (val s = state) {
@@ -337,15 +344,15 @@ class EpubReaderScreen(
                         .padding(bottom = 90.dp, start = 16.dp, end = 16.dp, top = 8.dp), // above bottom bar
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val percent = (sliderProgress * 100).toInt()
+                    val percent = (sliderProgress.value * 100).toInt()
                     Text("$percent%", modifier = Modifier.padding(end = 8.dp))
                     Slider(
-                        value = sliderProgress,
+                        value = sliderProgress.value,
                         onValueChange = { newProgress ->
                             sliderInUse = true
-                            sliderProgress = newProgress
+                            sliderProgress.value = newProgress
                             if (maxScroll > 0) {
-                                val target = (sliderProgress * maxScroll).toInt()
+                                val target = (sliderProgress.value * maxScroll).toInt()
                                 coroutineScope.launch { scrollState.scrollTo(target) }
                             }
                         },
@@ -392,7 +399,7 @@ class EpubReaderScreen(
                                 tint = if (s.hasPrev) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             )
                         }
-                        IconButton(onClick = { showChapterListSheet = true }) {
+                        IconButton(onClick = { showChapterListSheet.value = true }) {
                             Icon(Icons.Filled.FormatListNumbered, contentDescription = "Chapter list")
                         }
                         IconButton(
@@ -403,7 +410,7 @@ class EpubReaderScreen(
                         ) {
                             Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Scroll to top")
                         }
-                        IconButton(onClick = { showSettingsSheet = true }) {
+                        IconButton(onClick = { showSettingsSheet.value = true }) {
                             Icon(Icons.Filled.Settings, contentDescription = "Settings")
                         }
                         // Next chapter button
@@ -423,7 +430,7 @@ class EpubReaderScreen(
             }
 
             // Chapter list bottom sheet
-            if (showChapterListSheet) {
+            if (showChapterListSheet.value) {
                 val downloadManager: DownloadManager = Injekt.get()
                 val downloadQueue by downloadManager.queueState.collectAsState()
                 val downloadProgressMap = remember { mutableStateMapOf<Long, Int>() }
@@ -436,7 +443,7 @@ class EpubReaderScreen(
                 }
 
                 // Create a derived state for the current download states
-                val downloadStates by remember(downloadQueue) {
+                val downloadStates = remember(downloadQueue) {
                     derivedStateOf {
                         downloadQueue.associate { download ->
                             download.chapter.id to (download.status to (download.progress ?: 0))
@@ -446,8 +453,8 @@ class EpubReaderScreen(
 
                 val chapterItems = chapters.mapIndexed { _, chapter ->
                     val isCurrent = chapter.id == viewModel.currentChapterId
-                    val downloadState = downloadStates[chapter.id]?.first ?: Download.State.NOT_DOWNLOADED
-                    val progress = downloadStates[chapter.id]?.second ?: 0
+                    val downloadState = downloadStates.value[chapter.id]?.first ?: Download.State.NOT_DOWNLOADED
+                    val progress = downloadStates.value[chapter.id]?.second ?: 0
 
                     ChapterItem(
                         chapter = chapter,
@@ -458,7 +465,7 @@ class EpubReaderScreen(
                 }
 
                 AdaptiveSheet(
-                    onDismissRequest = { showChapterListSheet = false },
+                    onDismissRequest = { showChapterListSheet.value = false },
                 ) {
                     val state = rememberLazyListState(chapterItems.indexOfFirst { it.isCurrent }.coerceAtLeast(0))
                     LazyColumn(
@@ -470,8 +477,31 @@ class EpubReaderScreen(
                             items = chapterItems,
                             key = { "chapter-${it.chapter.id}" },
                         ) { chapterItem ->
-                            val downloadState = downloadStates[chapterItem.chapter.id]?.first ?: Download.State.NOT_DOWNLOADED
-                            val downloadProgress = downloadStates[chapterItem.chapter.id]?.second ?: 0
+                            val progress = downloadProgressMap[chapterItem.chapter.id] ?: 0
+
+                            // Get the current download state for this chapter
+                            val (downloadState, downloadProgress) = remember(
+                                chapterItem.chapter.id,
+                                downloadStates.value[chapterItem.chapter.id],
+                                downloadProgressMap[chapterItem.chapter.id],
+                            ) {
+                                val state = downloadStates.value[chapterItem.chapter.id]
+                                val progress = downloadProgressMap[chapterItem.chapter.id] ?: 0
+                                val isDownloaded = viewModel.manga?.let { manga ->
+                                    downloadManager.isChapterDownloaded(
+                                        chapterItem.chapter.name,
+                                        chapterItem.chapter.scanlator,
+                                        manga.ogTitle,
+                                        manga.source,
+                                    )
+                                } ?: false
+
+                                when {
+                                    state != null -> state.first to state.second
+                                    isDownloaded -> Download.State.DOWNLOADED to 0
+                                    else -> Download.State.NOT_DOWNLOADED to 0
+                                }
+                            }
 
                             MangaChapterListItem(
                                 title = chapterItem.chapter.name,
@@ -494,7 +524,7 @@ class EpubReaderScreen(
                                 onLongClick = {},
                                 onClick = {
                                     viewModel.jumpToChapter(chapters.indexOf(chapterItem.chapter))
-                                    showChapterListSheet = false
+                                    showChapterListSheet.value = false
                                 },
                                 onDownloadClick = {},
                                 onChapterSwipe = { action ->
@@ -512,10 +542,10 @@ class EpubReaderScreen(
         }
 
         // Settings bottom sheet (outside of main Box)
-        if (showSettingsSheet) {
+        if (showSettingsSheet.value) {
             NovelReaderSettingsBottomSheet(
                 model = settingsModel,
-                onDismiss = { showSettingsSheet = false },
+                onDismiss = { showSettingsSheet.value = false },
             )
         }
     }
