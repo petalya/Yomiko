@@ -46,6 +46,19 @@ class EpubFile(epubInputStream: InputStream) : Closeable {
     }
 
     /**
+     * Returns the plain text content from a specific XHTML page in the epub file.
+     * This is more efficient than loading all pages when only one is needed.
+     * 
+     * @param href The href of the resource to extract text from
+     * @return The plain text content of the specified resource
+     */
+    fun getTextFromPage(href: String): String? {
+        val resource = book.resources.getByHref(href) ?: return null
+        val html = resource.reader.readText()
+        return Jsoup.parse(html).body().text()
+    }
+
+    /**
      * Returns an input stream for reading the contents of the specified resource.
      */
     fun getInputStream(entryName: String): InputStream? {
@@ -61,27 +74,45 @@ class EpubFile(epubInputStream: InputStream) : Closeable {
      */
     fun extractAndSaveCoverImage(outputDir: java.io.File): Boolean {
         try {
-            // 1. Try to get the cover image using the public property
+            // 1. Try to get the cover image using the public property - use direct data access when possible
             val coverResource: Resource? = book.coverImage
-                ?: book.resources.all.firstOrNull {
-                    val isImage = it.mediaType?.name?.startsWith("image/") == true
-                    val idMatch = it.id?.contains("cover", ignoreCase = true) == true
-                    val hrefMatch = it.href?.contains("cover", ignoreCase = true) == true
-                    isImage && (idMatch || hrefMatch)
-                }
+                ?: findCoverImageResource()
 
             if (coverResource == null) return false
 
-            // 2. Read image bytes
+            // 2. Read image bytes - avoid unnecessary operations
             val imageBytes = coverResource.data ?: return false
 
-            // 3. Prepare output file
+            // 3. Prepare output file - use direct file operations for better performance
             val outputFile = java.io.File(outputDir, "cover.jpg")
             outputFile.writeBytes(imageBytes)
             return true
         } catch (e: Exception) {
             e.printStackTrace()
             return false
+        }
+    }
+
+    /**
+     * Finds the cover image resource in the EPUB.
+     * Uses optimized search criteria to find the cover image faster.
+     */
+    private fun findCoverImageResource(): Resource? {
+        // First check resources with "cover" in the ID (most reliable)
+        book.resources.all.firstOrNull { 
+            it.id?.contains("cover", ignoreCase = true) == true && 
+            it.mediaType?.name?.startsWith("image/") == true
+        }?.let { return it }
+
+        // Then check resources with "cover" in the href
+        book.resources.all.firstOrNull {
+            it.href?.contains("cover", ignoreCase = true) == true && 
+            it.mediaType?.name?.startsWith("image/") == true
+        }?.let { return it }
+
+        // Finally, just return the first image if nothing else found
+        return book.resources.all.firstOrNull {
+            it.mediaType?.name?.startsWith("image/") == true
         }
     }
 }

@@ -84,6 +84,13 @@ open class SourceFeedScreenModel(
         if (source is CatalogueSource) {
             setFilters(source.getFilterList())
 
+            // Preload EPUB covers if this is the local source
+            if (source.id == 0L) {
+                screenModelScope.launchIO {
+                    (source as? tachiyomi.source.local.LocalSource)?.preloadEpubCovers()
+                }
+            }
+
             screenModelScope.launchIO {
                 val searches = loadSearches()
                 mutableState.update { it.copy(savedSearches = searches) }
