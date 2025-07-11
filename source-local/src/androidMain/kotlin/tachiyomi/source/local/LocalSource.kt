@@ -48,6 +48,11 @@ import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import kotlin.time.Duration.Companion.days
 import tachiyomi.domain.source.model.Source as DomainSource
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
+import java.time.Instant
 
 actual class LocalSource(
     private val context: Context,
@@ -141,9 +146,23 @@ actual class LocalSource(
                         title = mangaDir.name.orEmpty()
                         url = mangaDir.name.orEmpty()
 
-                        // Try to find the cover
+                        // Try to find the cover immediately
                         coverManager.find(mangaDir.name.orEmpty())?.let {
                             thumbnail_url = it.uri.toString()
+                        }
+                        // Launch cover extraction in the background if not present
+                        if (thumbnail_url == null) {
+                            // Launch in background, do not block
+                            GlobalScope.launch {
+                                val mangaDirFiles = mangaDir.listFiles().orEmpty()
+                                extractCoversFromEpubs(mangaDirFiles.toList(), this@apply)
+                                
+                                // Just update the in-memory thumbnail_url
+                                coverManager.find(mangaDir.name.orEmpty())?.let { coverFile ->
+                                    thumbnail_url = coverFile.uri.toString()
+                                    logcat(LogPriority.INFO) { "Cover extracted for ${mangaDir.name}" }
+                                }
+                            }
                         }
                     }
                 }
@@ -332,6 +351,11 @@ actual class LocalSource(
             .filterNot { it.name.orEmpty().startsWith('.') }
             .filter { it.isDirectory || Archive.isSupported(it) || it.extension.equals("epub", true) }
 
+        // First, try to extract covers from any EPUB files
+        if (manga.thumbnail_url.isNullOrBlank()) {
+            extractCoversFromEpubs(files, manga)
+        }
+
         for (chapterFile in files) {
             val format = Format.valueOf(chapterFile)
             if (format is Format.Epub) {
@@ -377,16 +401,61 @@ actual class LocalSource(
                 chapters.add(sChapter)
             }
         }
-        // Copy the cover from the first chapter found if not available
+        
+        // Copy the cover from the first chapter found if still not available
         if (manga.thumbnail_url.isNullOrBlank()) {
             chapters.lastOrNull()?.let { chapter ->
-                updateCover(chapter, manga)
+                try {
+                    updateCover(chapter, manga)
+                } catch (e: Exception) {
+                    logcat(LogPriority.ERROR, e) { "Error updating cover for ${manga.title}" }
+                }
             }
         }
+        
         chapters.sortedWith { c1, c2 ->
             val c = c2.chapter_number.compareTo(c1.chapter_number)
             if (c == 0) c2.name.compareToCaseInsensitiveNaturalOrder(c1.name) else c
         }
+    }
+
+    /**
+     * Extracts covers from EPUB files in the manga directory
+     */
+    private fun extractCoversFromEpubs(files: List<UniFile>, manga: SManga): Boolean {
+        val epubFiles = files.filter { it.extension.equals("epub", true) }
+        if (epubFiles.isEmpty()) return false
+        
+        val mangaDir = fileSystem.getMangaDirectory(manga.url) ?: return false
+        val mangaDirPath = mangaDir.filePath ?: return false
+        
+        for (epubFile in epubFiles) {
+            try {
+                epubFile.openInputStream()?.use { inputStream ->
+                    val epub = EpubFile(inputStream)
+                    val coverResource = epub.book.coverImage
+                        ?: epub.book.resources.all.firstOrNull {
+                            val isImage = it.mediaType?.name?.startsWith("image/") == true
+                            val idMatch = it.id?.contains("cover", ignoreCase = true) == true
+                            val hrefMatch = it.href?.contains("cover", ignoreCase = true) == true
+                            isImage && (idMatch || hrefMatch)
+                        }
+                    if (coverResource != null) {
+                        coverResource.inputStream.use { coverStream ->
+                            // Use the same process as other covers
+                            val coverFile = coverManager.update(manga, coverStream)
+                            if (coverFile != null) {
+                                manga.thumbnail_url = coverFile.uri.toString()
+                                return true
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                logcat(LogPriority.ERROR, e) { "Error extracting cover from EPUB ${epubFile.name}" }
+            }
+        }
+        return false
     }
 
     // Filters

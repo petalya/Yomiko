@@ -52,4 +52,36 @@ class EpubFile(epubInputStream: InputStream) : Closeable {
         val resource: Resource? = book.resources.getByHref(entryName)
         return resource?.inputStream
     }
+
+    /**
+     * Extracts the cover image from the EPUB and saves it as 'cover.jpg' in the given directory.
+     * Returns true if successful, false otherwise.
+     *
+     * @param outputDir The directory where 'cover.jpg' should be saved.
+     */
+    fun extractAndSaveCoverImage(outputDir: java.io.File): Boolean {
+        try {
+            // 1. Try to get the cover image using the public property
+            val coverResource: Resource? = book.coverImage
+                ?: book.resources.all.firstOrNull {
+                    val isImage = it.mediaType?.name?.startsWith("image/") == true
+                    val idMatch = it.id?.contains("cover", ignoreCase = true) == true
+                    val hrefMatch = it.href?.contains("cover", ignoreCase = true) == true
+                    isImage && (idMatch || hrefMatch)
+                }
+
+            if (coverResource == null) return false
+
+            // 2. Read image bytes
+            val imageBytes = coverResource.data ?: return false
+
+            // 3. Prepare output file
+            val outputFile = java.io.File(outputDir, "cover.jpg")
+            outputFile.writeBytes(imageBytes)
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+    }
 }
