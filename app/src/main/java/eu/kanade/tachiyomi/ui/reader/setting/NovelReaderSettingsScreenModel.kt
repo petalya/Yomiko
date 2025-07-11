@@ -1,12 +1,11 @@
 package eu.kanade.tachiyomi.ui.reader.setting
 
-import androidx.compose.ui.graphics.Color
 import cafe.adriel.voyager.core.model.ScreenModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -23,7 +22,7 @@ class NovelReaderSettingsScreenModel(
     val colorSchemeIndex: StateFlow<Int> = _colorSchemeIndex.asStateFlow()
 
     private val _colorScheme = MutableStateFlow(
-        NovelReaderPreferences.PresetColorSchemes[preferences.colorSchemeIndex().get()]
+        NovelReaderPreferences.PresetColorSchemes[preferences.colorSchemeIndex().get()],
     )
     val colorScheme: StateFlow<NovelReaderPreferences.ReaderColorScheme> = _colorScheme.asStateFlow()
 
@@ -61,4 +60,4 @@ class NovelReaderSettingsScreenModel(
         _fontFamily.value = font
         scope.launch { preferences.fontFamily().set(font) }
     }
-} 
+}

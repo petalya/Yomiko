@@ -106,7 +106,7 @@ class UpdatesScreenModel(
                         it.copy(
                             isLoading = false,
                             items = updateItems,
-                            expandedStates =  if (it.items.isEmpty() && updateItems.isNotEmpty()) { // Check if initial load
+                            expandedStates = if (it.items.isEmpty() && updateItems.isNotEmpty()) { // Check if initial load
                                 initializeExpandedStates(updateItems) // Initialize only on initial load
                             } else {
                                 it.expandedStates // Keep existing expandedStates for subsequent updates
@@ -150,7 +150,6 @@ class UpdatesScreenModel(
             .toPersistentList()
     }
 
-
     private fun initializeExpandedStates(items: PersistentList<UpdatesItem>): MutableMap<Pair<Long, LocalDate>, Boolean> {
         return mutableStateMapOf<Pair<Long, LocalDate>, Boolean>().apply {
             val groupedUiModels = State(items = items).uiModels // Use a temporary State to group
@@ -182,7 +181,7 @@ class UpdatesScreenModel(
             it.copy(
                 expandedStates = it.expandedStates.apply {
                     merge(Pair(mangaId, date), true, Boolean::xor)
-                }
+                },
             )
         }
     }
@@ -417,7 +416,7 @@ class UpdatesScreenModel(
     fun updateSwipe(update: UpdatesItem, action: ChapterSwipeAction) {
         screenModelScope.launch {
             val item = update.update
-            when(action) {
+            when (action) {
                 ChapterSwipeAction.ToggleRead -> {
                     markUpdatesRead(listOf(update), !item.read)
                 }
@@ -447,7 +446,8 @@ class UpdatesScreenModel(
         val selected = items.filter { it.selected }
         val selectionMode = selected.isNotEmpty()
 
-        val uiModels by derivedStateOf {    // use derivedStateOf to avoid recomputing on every recomposition
+        val uiModels by derivedStateOf {
+            // use derivedStateOf to avoid recomputing on every recomposition
             val uiModels = mutableListOf<UpdatesUiModel>()
             var currentMangaId: Long? = null
             var currentDate: LocalDate? = null
@@ -472,7 +472,9 @@ class UpdatesScreenModel(
                     if (nextItem.update.mangaId == mangaId && nextItem.update.dateFetch.toLocalDate() == currentDate) {
                         hasSubsequentItems = true
                         if (!nextItem.update.read) hasUnreadItemsInGroup = true
-                    } else break
+                    } else {
+                        break
+                    }
                 }
 
                 uiModels.add(

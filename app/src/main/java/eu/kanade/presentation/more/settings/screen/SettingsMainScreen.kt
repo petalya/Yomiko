@@ -46,7 +46,6 @@ import eu.kanade.presentation.more.settings.widget.TextPreferenceWidget
 import eu.kanade.presentation.util.LocalBackPress
 import eu.kanade.presentation.util.Screen
 import exh.assets.EhAssets
-import exh.assets.ehassets.EhLogo
 import exh.assets.ehassets.MangadexLogo
 import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.i18n.MR

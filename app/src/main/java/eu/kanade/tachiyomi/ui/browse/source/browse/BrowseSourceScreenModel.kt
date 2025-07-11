@@ -141,7 +141,7 @@ open class BrowseSourceScreenModel(
                     listing = listing,
                     filters = source.getFilterList(),
                     toolbarQuery = query,
-                    hideEntriesInLibraryState = sourcePreferences.hideInLibraryItems().get()
+                    hideEntriesInLibraryState = sourcePreferences.hideInLibraryItems().get(),
                 )
             }
         }
@@ -197,7 +197,7 @@ open class BrowseSourceScreenModel(
                         // SY <--
                         .stateIn(ioCoroutineScope)
                 }
-                    .filter { !(state.value.hideEntriesInLibraryState?:false) || !it.value.first.favorite }
+                    .filter { !(state.value.hideEntriesInLibraryState ?: false) || !it.value.first.favorite }
             }
                 .cachedIn(ioCoroutineScope)
         }
@@ -232,10 +232,12 @@ open class BrowseSourceScreenModel(
     fun resetFilters() {
         if (source !is CatalogueSource) return
 
-        mutableState.update { it.copy(
-            filters = source.getFilterList(),
-            hideEntriesInLibraryState = sourcePreferences.hideInLibraryItems().get()
-        ) }
+        mutableState.update {
+            it.copy(
+                filters = source.getFilterList(),
+                hideEntriesInLibraryState = sourcePreferences.hideInLibraryItems().get(),
+            )
+        }
     }
 
     fun setListing(listing: Listing) {

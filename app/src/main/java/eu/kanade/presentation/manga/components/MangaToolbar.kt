@@ -112,11 +112,11 @@ fun MangaToolbar(
                             AppBar.Action(
                                 title = stringResource(MR.strings.pref_incognito_mode),
                                 icon = null,
-                                            iconPainter = rememberAnimatedVectorPainter(
-                                                AnimatedImageVector.animatedVectorResource(R.drawable.anim_incognito),
-                                                incognitoMode==true,
-                                            ),
-                                            iconTint = if (incognitoMode==true) MaterialTheme.colorScheme.primary else null,
+                                iconPainter = rememberAnimatedVectorPainter(
+                                    AnimatedImageVector.animatedVectorResource(R.drawable.anim_incognito),
+                                    incognitoMode == true,
+                                ),
+                                iconTint = if (incognitoMode == true) MaterialTheme.colorScheme.primary else null,
                                 onClick = onToggleMangaIncognito,
                             ),
                         )

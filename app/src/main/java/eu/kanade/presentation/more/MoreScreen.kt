@@ -3,11 +3,6 @@ package eu.kanade.presentation.more
 import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
@@ -82,7 +77,7 @@ fun MoreScreen(
                     subtitle = stringResource(MR.strings.pref_incognito_mode_summary),
                     icon = rememberAnimatedVectorPainter(
                         AnimatedImageVector.animatedVectorResource(R.drawable.anim_incognito),
-                        incognitoMode
+                        incognitoMode,
                     ),
                     checked = incognitoMode,
                     onCheckedChanged = onIncognitoModeChange,

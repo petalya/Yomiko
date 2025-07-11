@@ -524,7 +524,9 @@ private fun MangaScreenSmallImpl(
                             showNextUpdateTimer = state.source.id != 10001L,
                             onJumpToChapter = if (state.source.id == 10001L) {
                                 { showJumpDialog = true }
-                            } else null,
+                            } else {
+                                null
+                            },
                         )
                     }
 
@@ -643,7 +645,7 @@ private fun MangaScreenSmallImpl(
                                 if (newValue.all { it.isDigit() }) jumpChapterInput = newValue
                             },
                             singleLine = true,
-                            placeholder = { Text("e.g. 123") }
+                            placeholder = { Text("e.g. 123") },
                         )
                     }
                 },
@@ -659,12 +661,12 @@ private fun MangaScreenSmallImpl(
                             }
                             showJumpDialog = false
                             jumpChapterInput = ""
-                        }
+                        },
                     ) { Text("Jump") }
                 },
                 dismissButton = {
                     androidx.compose.material3.TextButton(onClick = { showJumpDialog = false }) { Text("Cancel") }
-                }
+                },
             )
         }
 
@@ -902,7 +904,9 @@ fun MangaScreenLargeImpl(
                             showNextUpdateTimer = state.source.id != 10001L,
                             onJumpToChapter = if (state.source.id == 10001L) {
                                 { showJumpDialog = true }
-                            } else null,
+                            } else {
+                                null
+                            },
                         )
                         // SY -->
                         metadataDescription?.invoke(
@@ -1013,7 +1017,7 @@ fun MangaScreenLargeImpl(
                                 if (newValue.all { it.isDigit() }) jumpChapterInput = newValue
                             },
                             singleLine = true,
-                            placeholder = { Text("e.g. 123") }
+                            placeholder = { Text("e.g. 123") },
                         )
                     }
                 },
@@ -1029,12 +1033,12 @@ fun MangaScreenLargeImpl(
                             }
                             showJumpDialog = false
                             jumpChapterInput = ""
-                        }
+                        },
                     ) { Text("Jump") }
                 },
                 dismissButton = {
                     androidx.compose.material3.TextButton(onClick = { showJumpDialog = false }) { Text("Cancel") }
-                }
+                },
             )
         }
 
@@ -1133,11 +1137,15 @@ private fun LazyListScope.sharedChapterItems(
                     } else {
                         item.chapter.name
                     },
-                    date = if (sourceId == 10001L) null else item.chapter.dateUpload.takeIf { it > 0L }?.let {
-                        if (manga.isEhBasedManga()) {
-                            MetadataUtil.EX_DATE_FORMAT.format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault()))
-                        } else {
-                            relativeDateText(item.chapter.dateUpload)
+                    date = if (sourceId == 10001L) {
+                        null
+                    } else {
+                        item.chapter.dateUpload.takeIf { it > 0L }?.let {
+                            if (manga.isEhBasedManga()) {
+                                MetadataUtil.EX_DATE_FORMAT.format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault()))
+                            } else {
+                                relativeDateText(item.chapter.dateUpload)
+                            }
                         }
                     },
                     readProgress = when {
@@ -1147,8 +1155,10 @@ private fun LazyListScope.sharedChapterItems(
                             if (isNovel || isEpub) {
                                 val percent = (item.chapter.lastPageRead / 10).toInt().coerceIn(0, 100)
                                 if ((!item.chapter.read || alwaysShowReadingProgress) && percent > 0) {
-                                    "Progress ${percent}%"
-                                } else null
+                                    "Progress $percent%"
+                                } else {
+                                    null
+                                }
                             } else {
                                 item.chapter.lastPageRead
                                     .takeIf { (!item.chapter.read || alwaysShowReadingProgress) && it > 0L }

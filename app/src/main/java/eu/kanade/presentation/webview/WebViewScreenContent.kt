@@ -50,12 +50,10 @@ import eu.kanade.tachiyomi.util.system.setDefaultSettings
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import okhttp3.Request
 import kotlinx.coroutines.time.delay
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
-import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.time.Duration
 import kotlin.math.max
@@ -302,10 +300,11 @@ fun WebViewScreenContent(
                     contentColor = MaterialTheme.colorScheme.surfaceTint.copy(alpha = 0.5f),
                 ) {
                     Icon(
-                        imageVector = if (showScrollButtons == 1)
+                        imageVector = if (showScrollButtons == 1) {
                             Icons.Filled.ArrowDownward
-                        else
-                            Icons.Filled.ArrowUpward,
+                        } else {
+                            Icons.Filled.ArrowUpward
+                        },
                         contentDescription = null,
                     )
                 }

@@ -45,11 +45,9 @@ import eu.kanade.presentation.util.isTabletUi
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.data.connections.discord.ReaderData
-import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.isLocalOrStub
 import eu.kanade.tachiyomi.source.online.HttpSource
-import eu.kanade.tachiyomi.ui.browse.extension.details.ExtensionDetailsScreen
 import eu.kanade.tachiyomi.ui.browse.migration.advanced.design.PreMigrationScreen
 import eu.kanade.tachiyomi.ui.browse.source.SourcesScreen
 import eu.kanade.tachiyomi.ui.browse.source.browse.BrowseSourceScreen
@@ -60,9 +58,7 @@ import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.manga.merged.EditMergedSettingsDialog
 import eu.kanade.tachiyomi.ui.manga.notes.MangaNotesScreen
 import eu.kanade.tachiyomi.ui.manga.track.TrackInfoDialogHomeScreen
-
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
-import eu.kanade.tachiyomi.ui.setting.SettingsScreen
 import eu.kanade.tachiyomi.ui.webview.WebViewScreen
 import eu.kanade.tachiyomi.util.system.copyToClipboard
 import eu.kanade.tachiyomi.util.system.toShareIntent
@@ -70,8 +66,6 @@ import eu.kanade.tachiyomi.util.system.toast
 import exh.pagepreview.PagePreviewScreen
 import exh.recs.RecommendsScreen
 import exh.source.MERGED_SOURCE_ID
-import exh.source.getMainSource
-import exh.source.isEhBasedSource
 import exh.ui.ifSourcesLoaded
 import exh.ui.metadata.MetadataViewScreen
 import kotlinx.coroutines.CancellationException
@@ -154,11 +148,14 @@ class MangaScreen(
                 }
                 .launchIn(this)
 
-            DiscordRPCService.setScreen(context, DiscordScreen.LIBRARY, ReaderData(
-                incognitoMode = Injekt.get<GetIncognitoState>().await(successState.manga.source, successState.manga.id),
-                mangaId = successState.manga.id,
-                chapterTitle = successState.manga.title,
-            ))
+            DiscordRPCService.setScreen(
+                context, DiscordScreen.LIBRARY,
+                ReaderData(
+                    incognitoMode = Injekt.get<GetIncognitoState>().await(successState.manga.source, successState.manga.id),
+                    mangaId = successState.manga.id,
+                    chapterTitle = successState.manga.title,
+                ),
+            )
         }
         // SY <--
 
@@ -221,7 +218,7 @@ class MangaScreen(
                     successState.manga,
                     successState.source,
                     screenModel.getNextUnreadChapter(),
-                    successState.chapters.map { it.chapter }
+                    successState.chapters.map { it.chapter },
                 )
             },
             onSearch = { query, global ->

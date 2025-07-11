@@ -349,12 +349,12 @@ class Downloader(
         val tmpDir = mangaDir.createDirectory(chapterDirname + TMP_DIR_SUFFIX)!!
 
         // Generic novel/text download support for extensions
-                val pages = download.pages ?: run {
-                    val p = download.source.getPageList(download.chapter.toSChapter())
-                        .mapIndexed { idx, page -> Page(idx, page.url, page.imageUrl, page.uri) }
-                    download.pages = p
-                    p
-                }
+        val pages = download.pages ?: run {
+            val p = download.source.getPageList(download.chapter.toSChapter())
+                .mapIndexed { idx, page -> Page(idx, page.url, page.imageUrl, page.uri) }
+            download.pages = p
+            p
+        }
         if (pages.size == 1 && isHtmlOrTextContent(pages[0].imageUrl)) {
             try {
                 download.status = Download.State.DOWNLOADING
@@ -787,9 +787,9 @@ class Downloader(
         if (content == null) return false
         val trimmed = content.trim()
         return trimmed.startsWith("<html", ignoreCase = true) ||
-               trimmed.startsWith("<!DOCTYPE html", ignoreCase = true) ||
-               // Optionally, treat as text if it's not a URL (doesn't start with http)
-               (!trimmed.startsWith("http://") && !trimmed.startsWith("https://"))
+            trimmed.startsWith("<!DOCTYPE html", ignoreCase = true) ||
+            // Optionally, treat as text if it's not a URL (doesn't start with http)
+            (!trimmed.startsWith("http://") && !trimmed.startsWith("https://"))
     }
 
     companion object {

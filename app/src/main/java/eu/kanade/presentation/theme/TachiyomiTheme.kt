@@ -21,8 +21,8 @@ import eu.kanade.presentation.theme.colorscheme.TakoColorScheme
 import eu.kanade.presentation.theme.colorscheme.TealTurqoiseColorScheme
 import eu.kanade.presentation.theme.colorscheme.TidalWaveColorScheme
 import eu.kanade.presentation.theme.colorscheme.YinYangColorScheme
-import eu.kanade.presentation.theme.colorscheme.YotsubaColorScheme
 import eu.kanade.presentation.theme.colorscheme.YomikoColorScheme
+import eu.kanade.presentation.theme.colorscheme.YotsubaColorScheme
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 

@@ -206,20 +206,20 @@ fun MangaActionRow(
             onLongClick = onEditCategory,
         )
         if (showNextUpdateTimer) {
-        MangaActionButton(
-            title = when (nextUpdateDays) {
-                null -> stringResource(MR.strings.not_applicable)
-                0 -> stringResource(MR.strings.manga_interval_expected_update_soon)
-                else -> pluralStringResource(
-                    MR.plurals.day,
-                    count = nextUpdateDays,
-                    nextUpdateDays,
-                )
-            },
+            MangaActionButton(
+                title = when (nextUpdateDays) {
+                    null -> stringResource(MR.strings.not_applicable)
+                    0 -> stringResource(MR.strings.manga_interval_expected_update_soon)
+                    else -> pluralStringResource(
+                        MR.plurals.day,
+                        count = nextUpdateDays,
+                        nextUpdateDays,
+                    )
+                },
                 icon = Icons.Filled.HourglassEmpty,
-            color = if (isUserIntervalMode) MaterialTheme.colorScheme.primary else defaultActionButtonColor,
-            onClick = { onEditIntervalClicked?.invoke() },
-        )
+                color = if (isUserIntervalMode) MaterialTheme.colorScheme.primary else defaultActionButtonColor,
+                onClick = { onEditIntervalClicked?.invoke() },
+            )
         }
         if (onJumpToChapter != null) {
             MangaActionButton(
@@ -230,16 +230,16 @@ fun MangaActionRow(
             )
         }
         if (showTrackingButton) {
-        MangaActionButton(
-            title = if (trackingCount == 0) {
-                stringResource(MR.strings.manga_tracking_tab)
-            } else {
-                pluralStringResource(MR.plurals.num_trackers, count = trackingCount, trackingCount)
-            },
-            icon = if (trackingCount == 0) Icons.Outlined.Sync else Icons.Outlined.Done,
-            color = if (trackingCount == 0) defaultActionButtonColor else MaterialTheme.colorScheme.primary,
-            onClick = onTrackingClicked,
-        )
+            MangaActionButton(
+                title = if (trackingCount == 0) {
+                    stringResource(MR.strings.manga_tracking_tab)
+                } else {
+                    pluralStringResource(MR.plurals.num_trackers, count = trackingCount, trackingCount)
+                },
+                icon = if (trackingCount == 0) Icons.Outlined.Sync else Icons.Outlined.Done,
+                color = if (trackingCount == 0) defaultActionButtonColor else MaterialTheme.colorScheme.primary,
+                onClick = onTrackingClicked,
+            )
         }
         if (onWebViewClicked != null) {
             MangaActionButton(

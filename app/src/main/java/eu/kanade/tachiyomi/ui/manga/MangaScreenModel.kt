@@ -574,7 +574,7 @@ class MangaScreenModel(
                     description?.trimOrNull(),
                     genre,
                     status.takeUnless { it == state.manga.ogStatus },
-                    mangaIncognitoMode.value
+                    mangaIncognitoMode.value,
                 ),
             )
             manga = manga.copy(lastUpdate = manga.lastUpdate + 1)
@@ -1175,7 +1175,7 @@ class MangaScreenModel(
     private fun getUnreadChaptersSorted(): List<Chapter> {
         val manga = successState?.manga ?: return emptyList()
         val chapters = getUnreadChapters()
-        
+
         // For novels (source ID 10001L), always sort by chapter number in ascending order
         return if (manga.source == 10001L) {
             chapters.sortedBy { it.chapterNumber }

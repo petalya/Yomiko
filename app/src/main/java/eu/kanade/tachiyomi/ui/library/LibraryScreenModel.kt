@@ -761,7 +761,7 @@ class LibraryScreenModel(
                 description = manga.description.takeUnless { it == manga.ogDescription },
                 genre = manga.genre.takeUnless { it == manga.ogGenre },
                 status = manga.status.takeUnless { it == manga.ogStatus }?.toLong(),
-                incognitoMode =  manga.incognitoMode
+                incognitoMode = manga.incognitoMode,
             )
 
             setCustomMangaInfo.set(mangaInfo)

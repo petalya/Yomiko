@@ -1,6 +1,7 @@
 package eu.kanade.presentation.components
 
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
@@ -58,7 +59,6 @@ import tachiyomi.presentation.core.util.clearFocusOnSoftKeyboardHide
 import tachiyomi.presentation.core.util.runOnEnterKeyPressed
 import tachiyomi.presentation.core.util.secondaryItemAlpha
 import tachiyomi.presentation.core.util.showSoftKeyboard
-import androidx.compose.foundation.clickable
 
 const val SEARCH_DEBOUNCE_MILLIS = 250L
 
@@ -171,8 +171,8 @@ fun AppBarTitle(
         modifier = modifier
             .clickable(
                 indication = null,
-                interactionSource = remember { MutableInteractionSource() }
-            ) { /* absorb click, do nothing */ }
+                interactionSource = remember { MutableInteractionSource() },
+            ) { /* absorb click, do nothing */ },
     ) {
         title?.let {
             Text(
@@ -436,7 +436,7 @@ sealed interface AppBar {
     data class Action(
         val title: String,
         val icon: ImageVector?,
-        val iconPainter: Painter? = null,   // If iconPainter is passed, icon will be ignored
+        val iconPainter: Painter? = null, // If iconPainter is passed, icon will be ignored
         val iconTint: Color? = null,
         val onClick: () -> Unit,
         val enabled: Boolean = true,

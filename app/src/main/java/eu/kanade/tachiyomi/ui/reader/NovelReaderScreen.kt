@@ -3,48 +3,116 @@ package eu.kanade.tachiyomi.ui.reader
 
 import android.app.Activity
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.foundation.BorderStroke
+import android.util.Log
+import android.view.View
+import android.view.WindowInsetsController
+import androidx.activity.ComponentActivity
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
+import com.mohamedrejeb.richeditor.model.rememberRichTextState
+import com.mohamedrejeb.richeditor.ui.material3.RichText
+import eu.kanade.domain.chapter.model.toSChapter
 import eu.kanade.domain.connections.service.ConnectionsPreferences
+import eu.kanade.presentation.components.AdaptiveSheet
+import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.components.AppBarTitle
+import eu.kanade.presentation.manga.components.ChapterDownloadAction
+import eu.kanade.presentation.manga.components.MangaChapterListItem
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.ReaderData
+import eu.kanade.tachiyomi.data.download.DownloadManager
+import eu.kanade.tachiyomi.data.download.model.Download
+import eu.kanade.tachiyomi.source.CatalogueSource
+import eu.kanade.tachiyomi.ui.reader.NovelReaderSettingsBottomSheet
+import eu.kanade.tachiyomi.ui.reader.chapter.ReaderChapterItem
+import eu.kanade.tachiyomi.ui.reader.model.getChapterWebUrl
+import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderPreferences
+import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderSettingsScreenModel
+import eu.kanade.tachiyomi.ui.webview.WebViewActivity
+import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -52,93 +120,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.jsoup.Jsoup
 import tachiyomi.domain.chapter.interactor.GetChaptersByMangaId
 import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.chapter.repository.ChapterRepository
+import tachiyomi.domain.chapter.service.getChapterSort
+import tachiyomi.domain.library.model.ChapterSwipeAction
 import tachiyomi.domain.manga.interactor.GetManga
 import tachiyomi.domain.manga.model.Manga
+import tachiyomi.domain.manga.model.asMangaCover
 import tachiyomi.domain.source.service.SourceManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
-import android.util.Log
-import eu.kanade.tachiyomi.source.online.HttpSource
-import eu.kanade.tachiyomi.ui.webview.WebViewActivity
-import eu.kanade.tachiyomi.util.system.toast
-import eu.kanade.domain.chapter.model.toSChapter
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.input.pointer.pointerInput
-import android.view.View
-import android.view.WindowInsetsController
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material.icons.filled.FormatListNumbered
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Settings
-import androidx.activity.ComponentActivity
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.Dp
-import eu.kanade.presentation.manga.components.MangaChapterListItem
-import eu.kanade.presentation.manga.components.ChapterDownloadAction
-import eu.kanade.tachiyomi.data.download.DownloadManager
-import eu.kanade.tachiyomi.data.download.model.Download
-import tachiyomi.domain.library.model.ChapterSwipeAction
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.FormatAlignLeft
-import androidx.compose.material.icons.filled.FormatAlignCenter
-import androidx.compose.material.icons.filled.FormatAlignRight
-import androidx.compose.material.icons.filled.FormatAlignJustify
-import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderSettingsScreenModel
-import eu.kanade.tachiyomi.ui.reader.NovelReaderSettingsBottomSheet
-import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderPreferences
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import android.widget.Toast
-import tachiyomi.domain.manga.model.asMangaCover
-import eu.kanade.tachiyomi.source.CatalogueSource
-import eu.kanade.domain.chapter.model.toSChapter
-import eu.kanade.tachiyomi.source.model.Page
-import android.text.Html
-import android.widget.TextView
-import androidx.compose.ui.viewinterop.AndroidView
-import android.graphics.Typeface
-import androidx.compose.material3.MaterialTheme
-import eu.kanade.presentation.components.AppBar
-import eu.kanade.presentation.components.AppBarTitle
-import com.mohamedrejeb.richeditor.ui.material3.RichText
-import com.mohamedrejeb.richeditor.model.rememberRichTextState
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import eu.kanade.presentation.components.AdaptiveSheet
-import eu.kanade.tachiyomi.ui.reader.chapter.ReaderChapterItem
 import java.time.format.DateTimeFormatter
-import tachiyomi.domain.chapter.service.getChapterSort
-import eu.kanade.tachiyomi.ui.reader.model.getChapterWebUrl
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 
 // --- State ---
 sealed class NovelReaderState {
@@ -150,7 +143,7 @@ sealed class NovelReaderState {
         val hasNext: Boolean = false,
         val hasPrev: Boolean = false,
         val progress: Float = 0f,
-        val bookmarked: Boolean = false
+        val bookmarked: Boolean = false,
     ) : NovelReaderState()
     data class Error(val message: String) : NovelReaderState()
 }
@@ -249,7 +242,7 @@ class NovelReaderViewModel(
     }
     fun jumpToChapter(index: Int) {
         if (index in chapters.indices) {
-            currentChapterIndex = index;
+            currentChapterIndex = index
             _state.value = NovelReaderState.Loading
             loadCurrentChapter(chapters)
             updateDiscordRPC()
@@ -289,24 +282,35 @@ class NovelReaderViewModel(
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 manga = getManga.await(novelId)
-                if (manga == null) { _state.value = NovelReaderState.Error("Novel not found"); return@launch }
+                if (manga == null) {
+                    _state.value = NovelReaderState.Error("Novel not found")
+                    return@launch
+                }
                 val loadedChapters = getChaptersByMangaId.await(novelId)
                 val sortedChapters = if (manga!!.source == 10001L) {
                     loadedChapters.sortedBy { chapter -> chapter.chapterNumber }
                 } else {
                     loadedChapters.sortedWith(getChapterSort(manga!!))
                 }
-                if (sortedChapters.isEmpty()) { _state.value = NovelReaderState.Error("No chapters found"); return@launch }
+                if (sortedChapters.isEmpty()) {
+                    _state.value = NovelReaderState.Error("No chapters found")
+                    return@launch
+                }
                 currentChapterIndex = sortedChapters.indexOfFirst { chapter -> chapter.id == initialChapterId }.takeIf { idx -> idx != -1 } ?: 0
                 chapters = sortedChapters
                 loadCurrentChapter(sortedChapters)
-            } catch (e: Exception) { _state.value = NovelReaderState.Error(e.message ?: "Unknown error") }
+            } catch (e: Exception) {
+                _state.value = NovelReaderState.Error(e.message ?: "Unknown error")
+            }
         }
     }
     internal fun loadCurrentChapter(chapters: List<Chapter>) {
         val chapter = chapters.getOrNull(currentChapterIndex)
         val manga = manga
-        if (chapter == null || manga == null) { _state.value = NovelReaderState.Error("Chapter not found"); return }
+        if (chapter == null || manga == null) {
+            _state.value = NovelReaderState.Error("Chapter not found")
+            return
+        }
         val savedProgress = if (chapter.lastPageRead > 0) chapter.lastPageRead / 1000f else 0f
         CoroutineScope(Dispatchers.IO).launch {
             _state.value = NovelReaderState.Loading
@@ -335,7 +339,9 @@ class NovelReaderViewModel(
                     bookmarked = chapter.bookmark,
                 )
                 updateDiscordRPC()
-            } catch (e: Exception) { _state.value = NovelReaderState.Error(e.message ?: "Failed to load chapter content") }
+            } catch (e: Exception) {
+                _state.value = NovelReaderState.Error(e.message ?: "Failed to load chapter content")
+            }
         }
     }
 
@@ -343,8 +349,8 @@ class NovelReaderViewModel(
         if (content == null) return false
         val trimmed = content.trim()
         return trimmed.startsWith("<html", ignoreCase = true) ||
-               trimmed.startsWith("<!DOCTYPE html", ignoreCase = true) ||
-               (!trimmed.startsWith("http://") && !trimmed.startsWith("https://"))
+            trimmed.startsWith("<!DOCTYPE html", ignoreCase = true) ||
+            (!trimmed.startsWith("http://") && !trimmed.startsWith("https://"))
     }
 
     private fun updateDiscordRPC() {
@@ -365,8 +371,8 @@ class NovelReaderViewModel(
                         mangaTitle = latestManga.title,
                         thumbnailUrl = coverUrl,
                         chapterNumber = Pair(chapterNumberFloat, chapters.size),
-                        chapterTitle = if (connectionsPreferences.useChapterTitles().get()) chapter.name else chapter.chapterNumber.toString()
-                    )
+                        chapterTitle = if (connectionsPreferences.useChapterTitles().get()) chapter.name else chapter.chapterNumber.toString(),
+                    ),
                 )
             }
         }
@@ -478,9 +484,11 @@ class NovelReaderScreen(
                 val flags = if (barsVisible) {
                     View.SYSTEM_UI_FLAG_VISIBLE
                 } else {
-                    (View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                        or View.SYSTEM_UI_FLAG_FULLSCREEN
-                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION)
+                    (
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            or View.SYSTEM_UI_FLAG_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        )
                 }
                 @Suppress("DEPRECATION")
                 activity.window.decorView.systemUiVisibility = flags
@@ -506,14 +514,14 @@ class NovelReaderScreen(
                 when (state) {
                     is NovelReaderState.Loading -> Box(
                         Modifier.fillMaxSize().background(presetColorScheme.background),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         ShimmerSkeletonLoader(lineCount = 24)
                     }
 
                     is NovelReaderState.Error -> Box(
                         Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) { Text((state as NovelReaderState.Error).message) }
 
                     is NovelReaderState.Success -> {
@@ -529,14 +537,14 @@ class NovelReaderScreen(
                         val cleanedHtml = s.content
                             .replace(Regex("text-align\\s*:\\s*[^;\"']*;?", RegexOption.IGNORE_CASE), "")
                             .replace(Regex("align\\s*=\\s*\"[^\"]*\"", RegexOption.IGNORE_CASE), "")
-                        
+
                         // Create a complete HTML document with CSS for paragraph indentation
                         val alignedHtml = """
                             <!DOCTYPE html>
                             <html>
                                 <head>
                                     <style>
-                                        body { 
+                                        body {
                                             text-align: $htmlAlign;
                                             margin: 0;
                                             padding: 0;
@@ -596,7 +604,7 @@ class NovelReaderScreen(
                         @OptIn(ExperimentalAnimationApi::class)
                         AnimatedContent(
                             targetState = contentReady,
-                            transitionSpec = { fadeIn() togetherWith fadeOut() }
+                            transitionSpec = { fadeIn() togetherWith fadeOut() },
                         ) { ready ->
                             if (!ready) {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -611,11 +619,11 @@ class NovelReaderScreen(
                                             top = 115.dp,
                                             start = 20.dp,
                                             end = 20.dp,
-                                            bottom = 16.dp
+                                            bottom = 16.dp,
                                         )
                                         .pointerInput(barsVisible) {
                                             detectTapGestures(onTap = { barsVisible = !barsVisible })
-                                        }
+                                        },
                                 ) {
                                     // Compose-native HTML rendering
                                     val resolvedTextAlign = when (textAlignment) {
@@ -637,9 +645,9 @@ class NovelReaderScreen(
                                                 textAlign = resolvedTextAlign,
                                                 lineHeight = resolvedLineHeight.sp,
                                                 platformStyle = androidx.compose.ui.text.PlatformTextStyle(
-                                                    includeFontPadding = false
-                                                )
-                                            )
+                                                    includeFontPadding = false,
+                                                ),
+                                            ),
                                         )
                                     }
                                     // Footer at the end of the chapter
@@ -653,13 +661,13 @@ class NovelReaderScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = 24.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
+                                        horizontalAlignment = Alignment.CenterHorizontally,
                                     ) {
                                         Text(
                                             text = "Finished: $currentChapterTitle",
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.padding(bottom = 16.dp)
+                                            modifier = Modifier.padding(bottom = 16.dp),
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))
                                         if (hasNext && nextChapterTitle != null) {
@@ -667,11 +675,11 @@ class NovelReaderScreen(
                                                 shape = MaterialTheme.shapes.large,
                                                 colors = androidx.compose.material3.CardDefaults.cardColors(
                                                     containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                                 ),
                                                 modifier = Modifier
                                                     .fillMaxWidth(0.85f)
-                                                    .height(56.dp)
+                                                    .height(56.dp),
                                             ) {
                                                 Box(
                                                     modifier = Modifier
@@ -682,11 +690,11 @@ class NovelReaderScreen(
                                                             // Reset scroll to top after loading next chapter
                                                             coroutineScope.launch { scrollState.scrollTo(0) }
                                                         },
-                                                    contentAlignment = Alignment.Center
+                                                    contentAlignment = Alignment.Center,
                                                 ) {
                                                     Text(
                                                         "Next: $nextChapterTitle",
-                                                        style = MaterialTheme.typography.titleMedium
+                                                        style = MaterialTheme.typography.titleMedium,
                                                     )
                                                 }
                                             }
@@ -702,7 +710,7 @@ class NovelReaderScreen(
                     visible = barsVisible && (state !is NovelReaderState.Loading),
                     enter = androidx.compose.animation.fadeIn(),
                     exit = androidx.compose.animation.fadeOut(),
-                    modifier = Modifier.align(Alignment.TopCenter)
+                    modifier = Modifier.align(Alignment.TopCenter),
                 ) {
                     NovelReaderTopBar(
                         title = (state as? NovelReaderState.Success)?.novelTitle ?: "Novel",
@@ -723,7 +731,7 @@ class NovelReaderScreen(
                     visible = (barsVisible || sliderInUse) && (state !is NovelReaderState.Loading),
                     enter = androidx.compose.animation.fadeIn(),
                     exit = androidx.compose.animation.fadeOut(),
-                    modifier = Modifier.align(Alignment.BottomCenter)
+                    modifier = Modifier.align(Alignment.BottomCenter),
                 ) {
                     val coroutineScope = rememberCoroutineScope()
                     val maxScroll = scrollState.maxValue
@@ -738,7 +746,7 @@ class NovelReaderScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 90.dp, start = 16.dp, end = 16.dp, top = 8.dp), // above bottom bar
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val percent = (sliderProgress * 100).toInt()
                         Text("$percent%", modifier = Modifier.padding(end = 8.dp))
@@ -756,7 +764,7 @@ class NovelReaderScreen(
                                 sliderInUse = false
                             },
                             valueRange = 0f..1f,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                         Text("100%", modifier = Modifier.padding(start = 8.dp))
                     }
@@ -766,7 +774,7 @@ class NovelReaderScreen(
                     visible = barsVisible && (state !is NovelReaderState.Loading),
                     enter = androidx.compose.animation.fadeIn(),
                     exit = androidx.compose.animation.fadeOut(),
-                    modifier = Modifier.align(Alignment.BottomCenter)
+                    modifier = Modifier.align(Alignment.BottomCenter),
                 ) {
                     Row(
                         modifier = Modifier
@@ -775,19 +783,19 @@ class NovelReaderScreen(
                             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
                             .padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // Previous chapter button
                         val hasPrevChapter = viewModel.currentChapterIndex > 0
                         IconButton(
                             onClick = { viewModel.prevChapter() },
                             enabled = hasPrevChapter,
-                            modifier = Modifier.graphicsLayer { alpha = if (hasPrevChapter) 1f else 0.5f }
+                            modifier = Modifier.graphicsLayer { alpha = if (hasPrevChapter) 1f else 0.5f },
                         ) {
                             Icon(
                                 Icons.Filled.SkipPrevious,
                                 contentDescription = "Previous chapter",
-                                tint = if (hasPrevChapter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                tint = if (hasPrevChapter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             )
                         }
                         IconButton(onClick = { showChapterListSheet = true }) {
@@ -818,7 +826,7 @@ class NovelReaderScreen(
                                             context,
                                             chapterUrl,
                                             manga.source,
-                                            manga.title
+                                            manga.title,
                                         )
                                         context.startActivity(intent)
                                     } catch (e: Exception) {
@@ -826,7 +834,7 @@ class NovelReaderScreen(
                                         context.toast("Could not open chapter")
                                     }
                                 }
-                            }
+                            },
                         ) {
                             Icon(Icons.Filled.Public, contentDescription = "Open in WebView")
                         }
@@ -834,7 +842,7 @@ class NovelReaderScreen(
                             onClick = {
                                 // Scroll to top
                                 coroutineScope.launch { scrollState.animateScrollTo(0) }
-                            }
+                            },
                         ) {
                             Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Scroll to top")
                         }
@@ -846,12 +854,12 @@ class NovelReaderScreen(
                         IconButton(
                             onClick = { viewModel.nextChapter() },
                             enabled = hasNextChapter,
-                            modifier = Modifier.graphicsLayer { alpha = if (hasNextChapter) 1f else 0.5f }
+                            modifier = Modifier.graphicsLayer { alpha = if (hasNextChapter) 1f else 0.5f },
                         ) {
                             Icon(
                                 Icons.Filled.SkipNext,
                                 contentDescription = "Next chapter",
-                                tint = if (hasNextChapter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                tint = if (hasNextChapter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             )
                         }
                     }
@@ -889,7 +897,7 @@ class NovelReaderScreen(
                             chapters,
                             currentChapterId,
                             downloadQueue,
-                            downloadProgressMap
+                            downloadProgressMap,
                         ) {
                             chapters.map { chapter ->
                                 val isCurrent = chapter.id == currentChapterId
@@ -938,7 +946,7 @@ class NovelReaderScreen(
                                     val (downloadState, downloadProgress) = remember(
                                         chapterItem.chapter.id,
                                         downloadStates[chapterItem.chapter.id],
-                                        downloadProgressMap[chapterItem.chapter.id]
+                                        downloadProgressMap[chapterItem.chapter.id],
                                     ) {
                                         val state = downloadStates[chapterItem.chapter.id]
                                         val progress = downloadProgressMap[chapterItem.chapter.id] ?: 0
@@ -962,7 +970,7 @@ class NovelReaderScreen(
                                         readProgress = viewModel.getSavedProgress(chapterItem.chapter.id)
                                             .let { percent ->
                                                 val pct = (percent * 100).toInt().coerceIn(0, 100)
-                                                if (pct > 0) "Progress ${pct}%" else null
+                                                if (pct > 0) "Progress $pct%" else null
                                             },
                                         scanlator = chapterItem.chapter.scanlator,
                                         sourceName = null,
@@ -983,11 +991,11 @@ class NovelReaderScreen(
                                             when (action) {
                                                 ChapterDownloadAction.START -> downloadManager.downloadChapters(
                                                     chapterItem.manga,
-                                                    listOf(chapterItem.chapter)
+                                                    listOf(chapterItem.chapter),
                                                 )
 
                                                 ChapterDownloadAction.START_NOW -> downloadManager.startDownloadNow(
-                                                    chapterItem.chapter.id
+                                                    chapterItem.chapter.id,
                                                 )
 
                                                 ChapterDownloadAction.CANCEL -> {
@@ -1005,13 +1013,14 @@ class NovelReaderScreen(
                                                         downloadManager.deleteChapters(
                                                             listOf(chapterItem.chapter),
                                                             chapterItem.manga,
-                                                            source
+                                                            source,
                                                         )
                                                         downloadProgressMap.remove(chapterItem.chapter.id)
                                                     }
                                                 }
 
-                                                else -> { /* no-op for exhaustiveness */
+                                                else -> {
+                                                    /* no-op for exhaustiveness */
                                                 }
                                             }
                                         },
@@ -1025,7 +1034,7 @@ class NovelReaderScreen(
                                                 }
                                                 else -> {}
                                             }
-                                        }
+                                        },
                                     )
                                 }
                             }
@@ -1039,8 +1048,11 @@ class NovelReaderScreen(
 
             // Always hide bars when loading
             LaunchedEffect(isLoading) {
-                if (isLoading) barsVisible = false
-                else barsVisible = true
+                if (isLoading) {
+                    barsVisible = false
+                } else {
+                    barsVisible = true
+                }
             }
 
             // Hide system UI during loading, restore after
@@ -1059,9 +1071,9 @@ class NovelReaderScreen(
                     if (isLoading) {
                         activity.window.decorView.systemUiVisibility = (
                             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                            View.SYSTEM_UI_FLAG_FULLSCREEN or
-                            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        )
+                                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            )
                     } else {
                         activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
                     }
@@ -1082,7 +1094,7 @@ class NovelReaderScreen(
         if (showSettingsSheet) {
             NovelReaderSettingsBottomSheet(
                 model = settingsModel,
-                onDismiss = { showSettingsSheet = false }
+                onDismiss = { showSettingsSheet = false },
             )
         }
     }
@@ -1104,7 +1116,7 @@ class NovelReaderScreen(
                 IconButton(onClick = onBookmark) {
                     Icon(
                         if (bookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                        contentDescription = "Bookmark"
+                        contentDescription = "Bookmark",
                     )
                 }
             },
@@ -1123,30 +1135,30 @@ class NovelReaderScreen(
         onChapterList: () -> Unit,
     ) {
         NavigationBar(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
         ) {
             NavigationBarItem(
                 selected = false,
                 onClick = onPrev,
                 icon = { Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous") },
-                enabled = hasPrev
+                enabled = hasPrev,
             )
             NavigationBarItem(
                 selected = false,
                 onClick = onChapterList,
                 icon = { Icon(Icons.Filled.MoreVert, contentDescription = "Chapters") },
-                enabled = true
+                enabled = true,
             )
             NavigationBarItem(
                 selected = false,
                 onClick = onNext,
                 icon = { Icon(Icons.Filled.SkipNext, contentDescription = "Next") },
-                enabled = hasNext
+                enabled = hasNext,
             )
             Slider(
                 value = progress,
                 onValueChange = onSliderChange,
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
             )
         }
     }
@@ -1168,14 +1180,14 @@ class NovelReaderScreen(
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
                 animation = tween(durationMillis = 1200, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
+                repeatMode = RepeatMode.Restart,
             ),
-            label = "shimmerTranslate"
+            label = "shimmerTranslate",
         )
         val brush = Brush.linearGradient(
             colors = listOf(baseColor, highlightColor, baseColor),
             start = Offset.Zero,
-            end = Offset(x = 600f * shimmerTranslate + 1f, y = 0f)
+            end = Offset(x = 600f * shimmerTranslate + 1f, y = 0f),
         )
         val widthFractions = listOf(0.9f, 0.8f, 0.7f, 0.6f)
         Column(
@@ -1183,7 +1195,7 @@ class NovelReaderScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = topPadding),
             verticalArrangement = Arrangement.Top,
-            horizontalAlignment = Alignment.Start // align left
+            horizontalAlignment = Alignment.Start, // align left
         ) {
             repeat(lineCount) {
                 val widthFraction = widthFractions[it % widthFractions.size]
@@ -1192,7 +1204,7 @@ class NovelReaderScreen(
                         .fillMaxWidth(widthFraction)
                         .height(lineHeight)
                         .clip(RoundedCornerShape(cornerRadius))
-                        .background(brush)
+                        .background(brush),
                 )
                 // Add extra space after every 4th line for paragraph effect
                 if ((it + 1) % 4 == 0) {

@@ -45,7 +45,6 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import dev.icerock.moko.resources.StringResource
 import eu.kanade.presentation.more.settings.Preference
-import eu.kanade.tachiyomi.core.security.PrivacyPreferences
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
 import eu.kanade.tachiyomi.ui.base.delegate.SecureActivityDelegate
 import eu.kanade.tachiyomi.ui.category.biometric.BiometricTimesScreen
@@ -73,7 +72,7 @@ object SettingsSecurityScreen : SearchableSettings {
     override fun getPreferences(): List<Preference> {
         val securityPreferences = remember { Injekt.get<SecurityPreferences>() }
         return listOf(
-            getSecurityGroup(securityPreferences)
+            getSecurityGroup(securityPreferences),
         )
     }
 

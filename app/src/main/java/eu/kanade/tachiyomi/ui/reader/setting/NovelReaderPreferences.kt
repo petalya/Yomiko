@@ -30,11 +30,19 @@ class NovelReaderPreferences(
     fun colorSchemeIndex() = preferenceStore.getInt(PREF_COLOR_SCHEME_INDEX, DEFAULT_COLOR_SCHEME_INDEX)
 
     enum class TextAlignment {
-        Left, Center, Justify, Right
+        Left,
+        Center,
+        Justify,
+        Right,
     }
 
     enum class FontFamilyPref {
-        ORIGINAL, LORA, NOTO_SANS, OPEN_SANS, ARBUTUS_SLAB, LATO
+        ORIGINAL,
+        LORA,
+        NOTO_SANS,
+        OPEN_SANS,
+        ARBUTUS_SLAB,
+        LATO,
     }
 
     companion object {
@@ -78,4 +86,4 @@ class NovelReaderPreferences(
             ReaderColorScheme(Color(0xFF000000), Color(0xFFECECEC)), // Black bg, light gray text
         )
     }
-} 
+}

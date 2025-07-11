@@ -81,7 +81,7 @@ class AnilistApi(val client: OkHttpClient, interceptor: AnilistInterceptor) {
         }
     }
 
-suspend fun updateLibManga(track: Track): Track {
+    suspend fun updateLibManga(track: Track): Track {
         return withIOContext {
             val query = """
             |mutation UpdateManga(

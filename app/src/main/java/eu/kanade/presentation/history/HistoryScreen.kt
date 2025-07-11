@@ -172,7 +172,7 @@ private fun HistoryScreenContent(
                         AnimatedVisibility(
                             visible = expanded,
                             enter = fadeIn() + expandVertically(),
-                            exit = fadeOut() + shrinkVertically()
+                            exit = fadeOut() + shrinkVertically(),
                         ) {
                             if (prevHistory == null) return@AnimatedVisibility
                             val itemsCount = prevHistory.size
@@ -197,15 +197,19 @@ private fun HistoryScreenContent(
                                                     .fillMaxSize(),
                                             ) {
                                                 Text(
-                                                    text = if (showMoreState.value) stringResource(MR.strings.show_less) else stringResource(
-                                                        MR.strings.show_n_more_chapters,
-                                                        itemsCount - splitIndex * 2,
-                                                    ),
+                                                    text = if (showMoreState.value) {
+                                                        stringResource(MR.strings.show_less)
+                                                    } else {
+                                                        stringResource(
+                                                            MR.strings.show_n_more_chapters,
+                                                            itemsCount - splitIndex * 2,
+                                                        )
+                                                    },
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     modifier = Modifier.padding(
                                                         horizontal = 60.dp,
-                                                        vertical = 20.dp
+                                                        vertical = 20.dp,
                                                     ),
                                                 )
                                             }

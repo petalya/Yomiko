@@ -1,6 +1,6 @@
 package eu.kanade.presentation.manga.components
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -9,18 +9,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,28 +26,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.geometry.lerp
+import eu.kanade.presentation.components.DropdownMenu
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.model.Download
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.IconButtonTokens
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.secondaryItemAlpha
-import androidx.compose.runtime.MutableState
-import eu.kanade.presentation.components.DropdownMenu
-import androidx.compose.animation.Crossfade
 
 enum class ChapterDownloadAction {
     START,
@@ -86,7 +81,7 @@ fun ChapterDownloadIndicator(
         Download.State.NOT_DOWNLOADED, Download.State.QUEUE, Download.State.DOWNLOADING -> {
             Crossfade(
                 targetState = currentState != Download.State.NOT_DOWNLOADED,
-                label = "download_indicator_crossfade"
+                label = "download_indicator_crossfade",
             ) { showProgress ->
                 if (!showProgress) {
                     NotDownloadedIndicator(
@@ -103,12 +98,18 @@ fun ChapterDownloadIndicator(
                                 enabled = enabled,
                                 hapticFeedback = LocalHapticFeedback.current,
                                 onLongClick = {
-                                    if (currentState == Download.State.QUEUE || currentState == Download.State.DOWNLOADING) onClick(ChapterDownloadAction.CANCEL)
-                                    else onClick(ChapterDownloadAction.START_NOW)
+                                    if (currentState == Download.State.QUEUE || currentState == Download.State.DOWNLOADING) {
+                                        onClick(ChapterDownloadAction.CANCEL)
+                                    } else {
+                                        onClick(ChapterDownloadAction.START_NOW)
+                                    }
                                 },
                                 onClick = {
-                                    if (currentState == Download.State.QUEUE || currentState == Download.State.DOWNLOADING) onClick(ChapterDownloadAction.CANCEL)
-                                    else onClick(ChapterDownloadAction.START)
+                                    if (currentState == Download.State.QUEUE || currentState == Download.State.DOWNLOADING) {
+                                        onClick(ChapterDownloadAction.CANCEL)
+                                    } else {
+                                        onClick(ChapterDownloadAction.START)
+                                    }
                                 },
                             ),
                         contentAlignment = Alignment.Center,
@@ -206,8 +207,11 @@ private fun MorphingDownloadIndicator(
                 enabled = enabled,
                 hapticFeedback = LocalHapticFeedback.current,
                 onLongClick = {
-                    if (!isDownloaded) onClick(ChapterDownloadAction.CANCEL)
-                    else isMenuExpanded = true
+                    if (!isDownloaded) {
+                        onClick(ChapterDownloadAction.CANCEL)
+                    } else {
+                        isMenuExpanded = true
+                    }
                 },
                 onClick = { isMenuExpanded = true },
             ),
@@ -223,7 +227,7 @@ private fun MorphingDownloadIndicator(
                     startAngle = -90f,
                     sweepAngle = arcSweep * (1 - morph),
                     useCenter = false,
-                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round),
                 )
             }
             // Draw check mark (grows as morph progresses)
@@ -249,7 +253,7 @@ private fun MorphingDownloadIndicator(
                 drawPath(
                     path = checkPath,
                     color = strokeColor,
-                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round, join = StrokeJoin.Round),
                 )
             }
         }

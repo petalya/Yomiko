@@ -34,8 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -158,9 +158,9 @@ object HomeScreen : Screen() {
                                                 flickOffsetX = 0F
 
                                                 tabNavigator.current = filteredTabs.getOrNull(newIndex) ?: tabNavigator.current
-                                            }
+                                            },
                                         )
-                                    }
+                                    },
                                 ) {
                                     TABS
                                         // SY -->
@@ -188,7 +188,7 @@ object HomeScreen : Screen() {
                             targetState = tabNavigator.current,
                             transitionSpec = {
                                 fadeIn(animationSpec = tween(durationMillis = TabFadeDuration)) togetherWith
-                                fadeOut(animationSpec = tween(durationMillis = TabFadeDuration))
+                                    fadeOut(animationSpec = tween(durationMillis = TabFadeDuration))
                             },
                             label = "tabContent",
                         ) {

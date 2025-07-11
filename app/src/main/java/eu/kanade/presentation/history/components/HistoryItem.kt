@@ -103,8 +103,11 @@ fun HistoryItem(
             AnimatedVisibility(visible = !expanded) {
                 Text(
                     text = stringResource(MR.strings.label_read_chapters) + " " +
-                        if (isPreviousHistory) formattedReadAtString
-                        else relativeTimeSpanString(history.readAt?.time ?: 0),
+                        if (isPreviousHistory) {
+                            formattedReadAtString
+                        } else {
+                            relativeTimeSpanString(history.readAt?.time ?: 0)
+                        },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = textStyle,
                 )

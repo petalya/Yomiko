@@ -41,8 +41,8 @@ import tachiyomi.source.local.image.LocalCoverManager
 import tachiyomi.source.local.io.Archive
 import tachiyomi.source.local.io.Format
 import tachiyomi.source.local.io.LocalSourceFileSystem
-import tachiyomi.source.local.metadata.fillMangaMetadata
 import tachiyomi.source.local.metadata.fillChapterMetadata
+import tachiyomi.source.local.metadata.fillMangaMetadata
 import uy.kohesive.injekt.injectLazy
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
@@ -348,7 +348,7 @@ actual class LocalSource(
                     if (!seenNames.add(chapterName)) continue // skip duplicates
                     val href = tocRef.resource?.href ?: continue
                     val sChapter = SChapter.create().apply {
-                        url = "${manga.url}/${chapterFile.name}::${href}"
+                        url = "${manga.url}/${chapterFile.name}::$href"
                         name = chapterName
                         date_upload = chapterFile.lastModified()
                         chapter_number = index.toFloat() + 1f

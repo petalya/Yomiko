@@ -17,7 +17,7 @@ class GetIncognitoState(
     private val extensionManager: ExtensionManager,
     private val sourceManager: SourceManager,
     private val customMangaManager: GetCustomMangaInfo,
-){
+) {
     fun await(sourceId: Long? = null, mangaId: Long? = null): Boolean {
         if (basePreferences.incognitoMode().get()) return true
         var isIncognito = false

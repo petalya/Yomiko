@@ -99,8 +99,6 @@ internal fun LazyListScope.updatesUiItems(
     onDownloadChapter: (List<UpdatesItem>, ChapterDownloadAction) -> Unit,
     onUpdateSwipe: (UpdatesItem, ChapterSwipeAction) -> Unit,
 ) {
-
-
     items(
         items = uiModels,
         contentType = {
@@ -135,7 +133,7 @@ internal fun LazyListScope.updatesUiItems(
                 AnimatedVisibility(
                     visible = isFirstInGroup || expanded,
                     enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
+                    exit = fadeOut() + shrinkVertically(),
                 ) {
                     UpdatesUiItem(
                         modifier = Modifier.animateItemFastScroll(),
@@ -144,10 +142,10 @@ internal fun LazyListScope.updatesUiItems(
                         readProgress = updatesItem.update.lastPageRead
                             .takeIf {
                                 /* SY --> */(
-                                !updatesItem.update.read ||
-                                    (preserveReadingPosition && updatesItem.isEhBasedUpdate())
-                                )/* SY <-- */ &&
-                                it > 0L
+                                    !updatesItem.update.read ||
+                                        (preserveReadingPosition && updatesItem.isEhBasedUpdate())
+                                    )/* SY <-- */ &&
+                                    it > 0L
                             }
                             ?.let {
                                 stringResource(
@@ -240,7 +238,7 @@ private fun UpdatesUiItem(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     },
                 )
-                .height(if (isFirstInGroup) 56.dp else 40.dp)   // shorter height for subsequent chapters
+                .height(if (isFirstInGroup) 56.dp else 40.dp) // shorter height for subsequent chapters
                 .padding(horizontal = MaterialTheme.padding.medium),
             verticalAlignment = Alignment.CenterVertically,
         ) {

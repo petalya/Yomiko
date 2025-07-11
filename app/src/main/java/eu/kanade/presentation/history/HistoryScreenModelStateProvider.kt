@@ -108,7 +108,7 @@ class HistoryScreenModelStateProvider : PreviewParameterProvider<HistoryScreenMo
                             lastModified = Random.nextLong(),
                         ),
                     ),
-                )
+                ),
             )
     }
 }

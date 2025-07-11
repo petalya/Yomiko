@@ -1,13 +1,10 @@
 package eu.kanade.tachiyomi.util.storage
 
-import mihon.core.common.archive.ArchiveReader
-import nl.siegmann.epublib.epub.EpubReader
 import nl.siegmann.epublib.domain.Book
 import nl.siegmann.epublib.domain.Resource
+import nl.siegmann.epublib.epub.EpubReader
 import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
 import java.io.Closeable
-import java.io.File
 import java.io.InputStream
 
 /**

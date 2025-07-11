@@ -126,9 +126,12 @@ class HistoryScreenModel(
             }
 
             if (!isExpanded) { // If expanding, load previous history if not already loaded
-                if ((currentState.list?.find {
-                    it is HistoryUiModel.Item && it.item.mangaId == mangaId
-                } as? HistoryUiModel.Item)?.previousHistory == null) {
+                if ((
+                        currentState.list?.find {
+                            it is HistoryUiModel.Item && it.item.mangaId == mangaId
+                        } as? HistoryUiModel.Item
+                        )?.previousHistory == null
+                ) {
                     loadPreviousHistory(historyItem)
                 }
             }
@@ -146,9 +149,11 @@ class HistoryScreenModel(
 
             mutableState.update { currentState ->
                 val newList = currentState.list?.map { uiModel ->
-                    if (uiModel is HistoryUiModel.Item && uiModel.item.mangaId == historyItem.mangaId)
+                    if (uiModel is HistoryUiModel.Item && uiModel.item.mangaId == historyItem.mangaId) {
                         uiModel.copy(previousHistory = previousHistoryList)
-                    else uiModel
+                    } else {
+                        uiModel
+                    }
                 }?.toImmutableList()
 
                 currentState.copy(list = newList ?: currentState.list) // Update list only if not null

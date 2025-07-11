@@ -3,16 +3,14 @@ package eu.kanade.tachiyomi.ui.reader.loader
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.util.storage.EpubFile
-import mihon.core.common.archive.ArchiveReader
 import java.io.File
-import java.io.InputStream
 
 /**
  * Loader used to load a chapter from a .epub file.
  */
 internal class EpubPageLoader(
     epubFile: File,
-    private val spineHref: String? = null
+    private val spineHref: String? = null,
 ) : PageLoader() {
 
     // Convert ArchiveReader to InputStream for EpubFile
@@ -27,20 +25,24 @@ internal class EpubPageLoader(
             if (resource != null) {
                 val html = resource.reader.readText()
                 val text = org.jsoup.Jsoup.parse(html).body().text()
-                return listOf(ReaderPage(0).apply {
-                    url = text
-                    imageUrl = null
-                    stream = null
-                    status = Page.State.Ready
-                })
+                return listOf(
+                    ReaderPage(0).apply {
+                        url = text
+                        imageUrl = null
+                        stream = null
+                        status = Page.State.Ready
+                    },
+                )
             } else {
                 // Fallback: show error page
-                return listOf(ReaderPage(0).apply {
-                    url = "Could not find chapter content."
-                    imageUrl = null
-                    stream = null
-                    status = Page.State.Ready
-                })
+                return listOf(
+                    ReaderPage(0).apply {
+                        url = "Could not find chapter content."
+                        imageUrl = null
+                        stream = null
+                        status = Page.State.Ready
+                    },
+                )
             }
         }
         val imagePages = epub.getImagesFromPages()
@@ -55,12 +57,14 @@ internal class EpubPageLoader(
         } else {
             // Text-based EPUB: create a single ReaderPage with the text content
             val text = epub.getTextFromPages()
-            listOf(ReaderPage(0).apply {
-                url = text
-                imageUrl = null
-                stream = null
-                status = Page.State.Ready
-            })
+            listOf(
+                ReaderPage(0).apply {
+                    url = text
+                    imageUrl = null
+                    stream = null
+                    status = Page.State.Ready
+                },
+            )
         }
     }
 

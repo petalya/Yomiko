@@ -116,9 +116,9 @@ fun SourceFilterDialog(
             item {
                 CheckboxItem(
                     label = stringResource(MR.strings.pref_hide_in_library_items),
-                    checked = hideEntriesInLibraryState?:false,
+                    checked = hideEntriesInLibraryState ?: false,
                 ) {
-                    onHideEntriesInLibraryChange(!(hideEntriesInLibraryState?:false))
+                    onHideEntriesInLibraryChange(!(hideEntriesInLibraryState ?: false))
                 }
             }
 

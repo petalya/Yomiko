@@ -25,7 +25,6 @@ import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.ui.browse.extension.ExtensionsScreenModel
 import eu.kanade.tachiyomi.ui.browse.extension.extensionsTab
 import eu.kanade.tachiyomi.ui.browse.feed.feedTab
-import eu.kanade.tachiyomi.ui.browse.migration.sources.migrateSourceTab
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchScreen
 import eu.kanade.tachiyomi.ui.browse.source.sourcesTab
 import eu.kanade.tachiyomi.ui.main.MainActivity
@@ -80,19 +79,19 @@ data object BrowseTab : Tab {
         val tabs = if (hideFeedTab) {
             persistentListOf(
                 sourcesTab(),
-                extensionsTab(extensionsScreenModel)
+                extensionsTab(extensionsScreenModel),
             )
         } else if (feedTabInFront) {
             persistentListOf(
                 feedTab(),
                 sourcesTab(),
-                extensionsTab(extensionsScreenModel)
+                extensionsTab(extensionsScreenModel),
             )
         } else {
             persistentListOf(
                 sourcesTab(),
                 feedTab(),
-                extensionsTab(extensionsScreenModel)
+                extensionsTab(extensionsScreenModel),
             )
         }
         // SY <--

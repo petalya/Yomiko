@@ -2,9 +2,11 @@
 package eu.kanade.tachiyomi.ui.reader.epub
 
 import android.annotation.SuppressLint
+import android.util.Base64
+import android.view.MotionEvent
 import android.view.ViewGroup
+import android.webkit.WebSettings
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,8 +14,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -22,28 +30,41 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -51,6 +72,8 @@ import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import eu.kanade.presentation.components.AdaptiveSheet
+import eu.kanade.presentation.components.AppBar
+import eu.kanade.presentation.components.AppBarTitle
 import eu.kanade.presentation.manga.components.MangaChapterListItem
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.DownloadManager
@@ -58,26 +81,13 @@ import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.ui.reader.NovelReaderSettingsBottomSheet
 import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderSettingsScreenModel
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.library.model.ChapterSwipeAction
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.util.plus
-import tachiyomi.presentation.core.util.selectedBackground
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
-import java.time.format.DateTimeFormatter
-import eu.kanade.presentation.components.AppBar
-import eu.kanade.presentation.components.AppBarTitle
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.text.style.TextAlign
-import android.view.MotionEvent
-import android.view.View
-import android.webkit.WebSettings
-import android.util.Base64
-import androidx.core.content.res.ResourcesCompat
 import java.io.ByteArrayOutputStream
 
 class EpubReaderScreen(
@@ -114,7 +124,7 @@ class EpubReaderScreen(
         val view = LocalView.current
         val window = remember { view.context.getActivity()?.window }
         val windowInsetsController = remember { window?.let { WindowCompat.getInsetsController(it, view) } }
-        
+
         // Apply immersive mode based on bars visibility
         LaunchedEffect(barsVisible) {
             windowInsetsController?.let {
@@ -128,7 +138,7 @@ class EpubReaderScreen(
                 }
             }
         }
-        
+
         // Restore system UI when leaving the screen
         DisposableEffect(Unit) {
             onDispose {
@@ -139,7 +149,7 @@ class EpubReaderScreen(
                 window?.navigationBarColor = Color.Transparent.toArgb()
             }
         }
-        
+
         // Set navigation bar color
         LaunchedEffect(surfaceColor) {
             window?.navigationBarColor = surfaceColor.toArgb()
@@ -190,11 +200,11 @@ class EpubReaderScreen(
 
         Box(modifier = Modifier.fillMaxSize()) {
             when (val s = state) {
-                is EpubReaderState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { 
-                    CircularProgressIndicator() 
+                is EpubReaderState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
-                is EpubReaderState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { 
-                    Text(s.message) 
+                is EpubReaderState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(s.message)
                 }
                 is EpubReaderState.Success -> {
                     // Use a single-column scrollable column containing WebView for now
@@ -206,12 +216,12 @@ class EpubReaderScreen(
                                 detectTapGestures {
                                     barsVisible = !barsVisible
                                 }
-                            }
+                            },
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .verticalScroll(scrollState)
+                                .verticalScroll(scrollState),
                         ) {
                             // Create a CSS style based on user settings
                             val cssStyle = buildString {
@@ -227,7 +237,7 @@ class EpubReaderScreen(
                                 append("-webkit-tap-highlight-color:transparent;") // Prevent tap highlight
                                 append("-webkit-touch-callout:none;") // Prevent callout
                                 append("user-select:none;") // Prevent text selection
-                                
+
                                 // Font family
                                 when (fontFamilyPref) {
                                     NovelReaderPreferences.FontFamilyPref.LORA -> append("font-family:'Lora',serif!important;")
@@ -236,7 +246,7 @@ class EpubReaderScreen(
                                     NovelReaderPreferences.FontFamilyPref.LATO -> append("font-family:'Lato',sans-serif!important;")
                                     else -> {} // Use original font
                                 }
-                                
+
                                 // Text alignment
                                 when (textAlignment) {
                                     NovelReaderPreferences.TextAlignment.Left -> append("text-align:left!important;")
@@ -244,11 +254,11 @@ class EpubReaderScreen(
                                     NovelReaderPreferences.TextAlignment.Right -> append("text-align:right!important;")
                                     NovelReaderPreferences.TextAlignment.Justify -> append("text-align:justify!important;")
                                 }
-                                
+
                                 append("}")
                                 append("img{max-width:100%;height:auto}")
                                 append("p{margin:0.5em 0; text-indent:1.2em}") // Add paragraph indentation
-                                
+
                                 // Add JavaScript to prevent text selection
                                 append("</style><script>")
                                 append("document.addEventListener('click', function(e) { e.preventDefault(); }, false);")
@@ -260,7 +270,7 @@ class EpubReaderScreen(
                                 append("}, false);")
                                 append("</script><style>")
                             }
-                            
+
                             // Apply the CSS to the HTML content
                             val htmlWithStyles = """
                                 <html>
@@ -273,10 +283,10 @@ class EpubReaderScreen(
                                     <body>${extractBodyContent(s.content)}</body>
                                 </html>
                             """.trimIndent()
-                            
+
                             WebContent(
                                 html = htmlWithStyles,
-                                onTap = { barsVisible = !barsVisible }
+                                onTap = { barsVisible = !barsVisible },
                             )
                         }
                     }
@@ -288,9 +298,9 @@ class EpubReaderScreen(
                 visible = barsVisible && (state !is EpubReaderState.Loading),
                 enter = fadeIn(),
                 exit = fadeOut(),
-                modifier = Modifier.align(Alignment.TopCenter)
+                modifier = Modifier.align(Alignment.TopCenter),
             ) {
-                    val s = state as? EpubReaderState.Success ?: return@AnimatedVisibility
+                val s = state as? EpubReaderState.Success ?: return@AnimatedVisibility
                 AppBar(
                     titleContent = {
                         AppBarTitle(title = s.bookTitle, subtitle = s.chapterTitle)
@@ -304,7 +314,7 @@ class EpubReaderScreen(
                         }) {
                             Icon(
                                 if (s.bookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                                contentDescription = "Bookmark"
+                                contentDescription = "Bookmark",
                             )
                         }
                     },
@@ -318,14 +328,14 @@ class EpubReaderScreen(
                 visible = (barsVisible || sliderInUse) && (state !is EpubReaderState.Loading),
                 enter = fadeIn(),
                 exit = fadeOut(),
-                modifier = Modifier.align(Alignment.BottomCenter)
+                modifier = Modifier.align(Alignment.BottomCenter),
             ) {
                 val maxScroll = scrollState.maxValue
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 90.dp, start = 16.dp, end = 16.dp, top = 8.dp), // above bottom bar
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val percent = (sliderProgress * 100).toInt()
                     Text("$percent%", modifier = Modifier.padding(end = 8.dp))
@@ -343,7 +353,7 @@ class EpubReaderScreen(
                             sliderInUse = false
                         },
                         valueRange = 0f..1f,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     )
                     Text("100%", modifier = Modifier.padding(start = 8.dp))
                 }
@@ -354,32 +364,32 @@ class EpubReaderScreen(
                 visible = barsVisible && (state !is EpubReaderState.Loading),
                 enter = fadeIn(),
                 exit = fadeOut(),
-                modifier = Modifier.align(Alignment.BottomCenter)
+                modifier = Modifier.align(Alignment.BottomCenter),
             ) {
                 val s = state as? EpubReaderState.Success ?: return@AnimatedVisibility
                 Surface(
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                     shape = RectangleShape,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
-                            modifier = Modifier
+                        modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
                             .padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // Previous chapter button
                         IconButton(
                             onClick = { viewModel.prevChapter() },
                             enabled = s.hasPrev,
-                            modifier = Modifier.alpha(if (s.hasPrev) 1f else 0.5f)
+                            modifier = Modifier.alpha(if (s.hasPrev) 1f else 0.5f),
                         ) {
                             Icon(
-                                Icons.Filled.SkipPrevious, 
+                                Icons.Filled.SkipPrevious,
                                 contentDescription = "Previous chapter",
-                                tint = if (s.hasPrev) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                tint = if (s.hasPrev) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             )
                         }
                         IconButton(onClick = { showChapterListSheet = true }) {
@@ -389,7 +399,7 @@ class EpubReaderScreen(
                             onClick = {
                                 // Scroll to top
                                 coroutineScope.launch { scrollState.animateScrollTo(0) }
-                            }
+                            },
                         ) {
                             Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Scroll to top")
                         }
@@ -400,12 +410,12 @@ class EpubReaderScreen(
                         IconButton(
                             onClick = { viewModel.nextChapter() },
                             enabled = s.hasNext,
-                            modifier = Modifier.alpha(if (s.hasNext) 1f else 0.5f)
+                            modifier = Modifier.alpha(if (s.hasNext) 1f else 0.5f),
                         ) {
                             Icon(
-                                Icons.Filled.SkipNext, 
+                                Icons.Filled.SkipNext,
                                 contentDescription = "Next chapter",
-                                tint = if (s.hasNext) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                tint = if (s.hasNext) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             )
                         }
                     }
@@ -417,14 +427,14 @@ class EpubReaderScreen(
                 val downloadManager: DownloadManager = Injekt.get()
                 val downloadQueue by downloadManager.queueState.collectAsState()
                 val downloadProgressMap = remember { mutableStateMapOf<Long, Int>() }
-                
+
                 // Collect download progress
                 LaunchedEffect(Unit) {
                     downloadManager.progressFlow().collect { download ->
                         downloadProgressMap[download.chapter.id] = download.progress
                     }
                 }
-                
+
                 // Create a derived state for the current download states
                 val downloadStates by remember(downloadQueue) {
                     derivedStateOf {
@@ -438,7 +448,7 @@ class EpubReaderScreen(
                     val isCurrent = chapter.id == viewModel.currentChapterId
                     val downloadState = downloadStates[chapter.id]?.first ?: Download.State.NOT_DOWNLOADED
                     val progress = downloadStates[chapter.id]?.second ?: 0
-                    
+
                     ChapterItem(
                         chapter = chapter,
                         isCurrent = isCurrent,
@@ -462,14 +472,14 @@ class EpubReaderScreen(
                         ) { chapterItem ->
                             val downloadState = downloadStates[chapterItem.chapter.id]?.first ?: Download.State.NOT_DOWNLOADED
                             val downloadProgress = downloadStates[chapterItem.chapter.id]?.second ?: 0
-                            
+
                             MangaChapterListItem(
                                 title = chapterItem.chapter.name,
                                 date = null,
                                 readProgress = viewModel.getSavedProgress(chapterItem.chapter.id)
                                     .let { percent ->
                                         val pct = (percent * 100).toInt().coerceIn(0, 100)
-                                        if (pct > 0) "Progress ${pct}%" else null
+                                        if (pct > 0) "Progress $pct%" else null
                                     },
                                 scanlator = chapterItem.chapter.scanlator,
                                 sourceName = null,
@@ -500,12 +510,12 @@ class EpubReaderScreen(
                 }
             }
         }
-        
+
         // Settings bottom sheet (outside of main Box)
         if (showSettingsSheet) {
             NovelReaderSettingsBottomSheet(
                 model = settingsModel,
-                onDismiss = { showSettingsSheet = false }
+                onDismiss = { showSettingsSheet = false },
             )
         }
     }
@@ -524,13 +534,13 @@ private fun isColorLight(color: Color): Boolean {
 @Composable
 private fun WebContent(html: String, onTap: () -> Unit) {
     val context = LocalContext.current
-    
+
     // Load font files as base64 strings
     val loraFontBase64 = remember { context.loadFontAsBase64(R.font.lora) }
     val openSansFontBase64 = remember { context.loadFontAsBase64(R.font.open_sans) }
     val arbutusFontBase64 = remember { context.loadFontAsBase64(R.font.arbutus_slab) }
     val latoFontBase64 = remember { context.loadFontAsBase64(R.font.lato) }
-    
+
     // Create font face definitions
     val fontFaceStyles = """
         @font-face {
@@ -558,10 +568,10 @@ private fun WebContent(html: String, onTap: () -> Unit) {
             font-style: normal;
         }
     """.trimIndent()
-    
+
     // Add font faces to the HTML
     val htmlWithFonts = html.replace("<style>", "<style>\n$fontFaceStyles\n")
-    
+
     AndroidView(
         factory = {
             WebView(context).apply {
@@ -570,20 +580,20 @@ private fun WebContent(html: String, onTap: () -> Unit) {
                 settings.setSupportZoom(false)
                 settings.textZoom = 100
                 settings.cacheMode = WebSettings.LOAD_NO_CACHE
-                
+
                 // Make WebView transparent to allow the background color to show through
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                
+
                 // Set layout parameters
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
                 )
-                
+
                 // Disable long press
                 isLongClickable = false
                 setOnLongClickListener { true } // Consume all long clicks
-                
+
                 // Handle touch events to allow tap gestures to pass through
                 setOnTouchListener { _, event ->
                     when (event.action) {
@@ -605,14 +615,14 @@ private fun WebContent(html: String, onTap: () -> Unit) {
                         else -> false // Let other touch events pass through
                     }
                 }
-                
+
                 loadDataWithBaseURL(null, htmlWithFonts, "text/html", "UTF-8", null)
             }
-        }, 
+        },
         update = {
             it.loadDataWithBaseURL(null, htmlWithFonts, "text/html", "UTF-8", null)
         },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 
@@ -623,16 +633,16 @@ private fun android.content.Context.loadFontAsBase64(fontResId: Int): String {
         val file = ResourcesCompat.getFont(this, fontResId)?.let {
             resources.openRawResource(fontResId)
         }
-        
+
         file?.use { inputStream ->
             val buffer = ByteArrayOutputStream()
             val data = ByteArray(1024)
             var count: Int
-            
+
             while (inputStream.read(data).also { count = it } != -1) {
                 buffer.write(data, 0, count)
             }
-            
+
             buffer.flush()
             Base64.encodeToString(buffer.toByteArray(), Base64.NO_WRAP)
         } ?: ""
@@ -644,10 +654,11 @@ private fun android.content.Context.loadFontAsBase64(fontResId: Int): String {
 
 // Extension function to convert Color to CSS color string
 private fun Color.toCssColor(): String {
-    return String.format("#%02X%02X%02X", 
-        (red * 255).toInt(), 
-        (green * 255).toInt(), 
-        (blue * 255).toInt()
+    return String.format(
+        "#%02X%02X%02X",
+        (red * 255).toInt(),
+        (green * 255).toInt(),
+        (blue * 255).toInt(),
     )
 }
 
@@ -656,7 +667,7 @@ private fun extractBodyContent(html: String): String {
     val bodyStart = html.indexOf("<body")
     val bodyContentStart = html.indexOf(">", bodyStart) + 1
     val bodyEnd = html.lastIndexOf("</body>")
-    
+
     return if (bodyStart >= 0 && bodyEnd > bodyContentStart) {
         html.substring(bodyContentStart, bodyEnd)
     } else {
@@ -684,17 +695,17 @@ private fun FontPill(label: String, selected: Boolean, onClick: () -> Unit, font
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, Color.Gray),
         modifier = Modifier
             .height(36.dp)
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp),
         ) {
             Text(
                 text = label,
                 fontFamily = fontFamily,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             )
         }
     }

@@ -40,7 +40,7 @@ fun ChapterHeader(
             .combinedClickable(
                 enabled = enabled,
                 onClick = onClick,
-                onLongClick = onLongClick
+                onLongClick = onLongClick,
             )
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(MaterialTheme.padding.extraSmall),
@@ -63,7 +63,7 @@ fun ChapterHeader(
             Icon(
                 imageVector = Icons.Outlined.FilterList,
                 contentDescription = null,
-                tint =  if (hasFilters) MaterialTheme.colorScheme.active else LocalContentColor.current,
+                tint = if (hasFilters) MaterialTheme.colorScheme.active else LocalContentColor.current,
             )
         }
 

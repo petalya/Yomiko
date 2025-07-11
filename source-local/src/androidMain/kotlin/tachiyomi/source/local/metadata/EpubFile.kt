@@ -2,12 +2,6 @@ package tachiyomi.source.local.metadata
 
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
-import eu.kanade.tachiyomi.util.storage.EpubFile
-import java.io.Closeable
-import java.io.InputStream
-import java.text.ParseException
-import java.text.SimpleDateFormat
-import java.util.Locale
 import nl.siegmann.epublib.domain.Book
 
 /**
