@@ -7,19 +7,19 @@
     <color name="yomiko_primaryContainer">#B86D82</color> <!-- Muted pink -->
     <color name="yomiko_onPrimaryContainer">#FFF0F3</color>
     <color name="yomiko_inversePrimary">#FFB7C5</color> <!-- Pastel pink -->
-    
+
     <!-- Secondary colors (Lighter Pastel Pink) -->
     <color name="yomiko_secondary">#FFD6E0</color> <!-- Lighter pastel pink -->
     <color name="yomiko_onSecondary">#3A1A21</color>
     <color name="yomiko_secondaryContainer">#D48E9F</color> <!-- Softer pink -->
     <color name="yomiko_onSecondaryContainer">#FFF0F3</color>
-    
+
     <!-- Tertiary colors (Very Light Pink) -->
     <color name="yomiko_tertiary">#FFCCD5</color> <!-- Very light pink -->
     <color name="yomiko_onTertiary">#3A1A21</color>
     <color name="yomiko_tertiaryContainer">#E8A8B8</color> <!-- Soft pink -->
     <color name="yomiko_onTertiaryContainer">#FFF0F3</color>
-    
+
     <!-- Background and surface colors (Dark Brownish Pink) -->
     <color name="yomiko_background">#2A1A1E</color> <!-- Dark brownish pink background -->
     <color name="yomiko_onBackground">#FFF0F3</color> <!-- White with pink tint -->
@@ -31,11 +31,11 @@
     <color name="yomiko_inverseSurface">#FFF0F3</color>
     <color name="yomiko_inverseOnSurface">#3D2A2F</color>
     <color name="yomiko_outline">#E8A8B8</color> <!-- Soft pink outline -->
-    
+
     <!-- Surface container colors -->
     <color name="yomiko_surfaceContainer">#3D2A2F</color> <!-- Navigation bar background -->
     <color name="yomiko_surfaceContainerHigh">#4A353A</color>
     <color name="yomiko_surfaceContainerHighest">#574045</color>
     <color name="yomiko_surfaceContainerLow">#2F1F23</color>
     <color name="yomiko_surfaceContainerLowest">#241519</color>
-</resources> 
+</resources>
