@@ -38,8 +38,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import eu.kanade.presentation.util.rememberRequestPackageInstallsPermissionState
 import eu.kanade.tachiyomi.core.security.PrivacyPreferences
 import eu.kanade.tachiyomi.util.system.launchRequestPackageInstallsPermission
+import mihon.core.firebase.FirebaseConfig
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
+import tachiyomi.presentation.core.util.collectAsState
 import tachiyomi.presentation.core.util.secondaryItemAlpha
 import uy.kohesive.injekt.injectLazy
 
@@ -119,6 +121,31 @@ internal class PermissionStep : OnboardingStep {
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+
+            // Privacy toggles for analytics and crash reporting
+            val crashlyticsPref = privacyPreferences.crashlytics()
+            val crashlytics by crashlyticsPref.collectAsState()
+            PermissionSwitch(
+                title = stringResource(MR.strings.onboarding_permission_crashlytics),
+                subtitle = stringResource(MR.strings.onboarding_permission_crashlytics_description),
+                granted = crashlytics,
+                onToggleChange = {
+                    crashlyticsPref.set(it)
+                    FirebaseConfig.setCrashlyticsEnabled(it)
+                },
+            )
+
+            val analyticsPref = privacyPreferences.analytics()
+            val analytics by analyticsPref.collectAsState()
+            PermissionSwitch(
+                title = stringResource(MR.strings.onboarding_permission_analytics),
+                subtitle = stringResource(MR.strings.onboarding_permission_analytics_description),
+                granted = analytics,
+                onToggleChange = {
+                    analyticsPref.set(it)
+                    FirebaseConfig.setAnalyticsEnabled(it)
+                },
             )
         }
     }

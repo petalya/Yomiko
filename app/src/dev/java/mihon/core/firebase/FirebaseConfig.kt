@@ -1,11 +1,21 @@
 package mihon.core.firebase
 
 import android.content.Context
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 object FirebaseConfig {
-    fun init(context: Context) = Unit
+    private var context: Context? = null
 
-    fun setAnalyticsEnabled(enabled: Boolean) = Unit
+    fun init(context: Context) {
+        this.context = context.applicationContext
+    }
 
-    fun setCrashlyticsEnabled(enabled: Boolean) = Unit
+    fun setAnalyticsEnabled(enabled: Boolean) {
+        context?.let { FirebaseAnalytics.getInstance(it).setAnalyticsCollectionEnabled(enabled) }
+    }
+
+    fun setCrashlyticsEnabled(enabled: Boolean) {
+        FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(enabled)
+    }
 }

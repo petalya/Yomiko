@@ -13,6 +13,8 @@ plugins {
     alias(libs.plugins.aboutLibraries)
     id("com.github.ben-manes.versions")
     id("com.android.application")
+    id("com.google.gms.google-services")
+    alias(libs.plugins.googleFirebaseCrashlytics)
 }
 
 if (gradle.startParameter.taskRequests.toString().contains("Standard")) {
@@ -79,7 +81,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             setProguardFiles(listOf(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"))
-            // signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("release")
             buildConfigField("String", "BUILD_TIME", "\"${getBuildTime(useLastCommitTime = true)}\"")
         }
         create("benchmark") {
@@ -185,6 +187,7 @@ dependencies {
     implementation(compose.material.icons)
     implementation(compose.animation)
     implementation(compose.animation.graphics)
+    implementation(libs.firebase.crashlytics)
     debugImplementation(compose.ui.tooling)
     implementation(compose.ui.tooling.preview)
     implementation(compose.ui.util)
@@ -241,6 +244,10 @@ dependencies {
 
     // Preferences
     implementation(libs.preferencektx)
+
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
+    implementation("com.google.firebase:firebase-analytics")
 
     // Dependency injection
     implementation(libs.injekt)

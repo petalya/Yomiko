@@ -45,6 +45,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import dev.icerock.moko.resources.StringResource
 import eu.kanade.presentation.more.settings.Preference
+import eu.kanade.tachiyomi.core.security.PrivacyPreferences
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
 import eu.kanade.tachiyomi.ui.base.delegate.SecureActivityDelegate
 import eu.kanade.tachiyomi.ui.category.biometric.BiometricTimesScreen
@@ -53,6 +54,7 @@ import eu.kanade.tachiyomi.util.system.AuthenticatorUtil.authenticate
 import eu.kanade.tachiyomi.util.system.AuthenticatorUtil.isAuthenticationSupported
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableMap
+import mihon.core.firebase.FirebaseConfig
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.sy.SYMR
@@ -69,10 +71,43 @@ object SettingsSecurityScreen : SearchableSettings {
     override fun getTitleRes() = MR.strings.pref_category_security
 
     @Composable
+    private fun getFirebaseGroup(): Preference.PreferenceGroup {
+        val privacyPreferences = remember { Injekt.get<PrivacyPreferences>() }
+        val crashlyticsPref = privacyPreferences.crashlytics()
+        val crashlytics by crashlyticsPref.collectAsState()
+        val analyticsPref = privacyPreferences.analytics()
+        val analytics by analyticsPref.collectAsState()
+        return Preference.PreferenceGroup(
+            title = "Firebase",
+            preferenceItems = persistentListOf(
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = crashlyticsPref,
+                    title = "Crash Reporting",
+                    subtitle = "Allow sending crash logs to Firebase Crashlytics.",
+                    onValueChanged = {
+                        FirebaseConfig.setCrashlyticsEnabled(it)
+                        true
+                    },
+                ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = analyticsPref,
+                    title = "Analytics",
+                    subtitle = "Allow sending usage statistics to Firebase Analytics.",
+                    onValueChanged = {
+                        FirebaseConfig.setAnalyticsEnabled(it)
+                        true
+                    },
+                ),
+            ),
+        )
+    }
+
+    @Composable
     override fun getPreferences(): List<Preference> {
         val securityPreferences = remember { Injekt.get<SecurityPreferences>() }
         return listOf(
             getSecurityGroup(securityPreferences),
+            getFirebaseGroup(),
         )
     }
 
