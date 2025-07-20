@@ -327,7 +327,7 @@ class MainActivity : BaseActivity() {
             }
             // SY <--
 
-            var showChangelog by remember { mutableStateOf(didMigration && !BuildConfig.DEBUG) }
+            var showChangelog by remember { mutableStateOf(false) } // hide 'what\'s new' screen
             if (showChangelog) {
                 // SY -->
                 WhatsNewDialog(onDismissRequest = { showChangelog = false })
