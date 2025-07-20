@@ -33,6 +33,15 @@ jobs:
       - name: Check code format
         run: ./gradlew spotlessCheck
 
+      - name: Write google-services.json for all flavors
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > app/google-services.json
+          cp app/google-services.json app/src/standard/google-services.json || true
+          cp app/google-services.json app/src/dev/google-services.json || true
+          cp app/google-services.json app/src/release/google-services.json || true
+          cp app/google-services.json app/src/standard/release/google-services.json || true
+          cp app/google-services.json app/src/dev/release/google-services.json || true
+
       - name: Build app
         run: ./gradlew assembleStandardRelease
 
