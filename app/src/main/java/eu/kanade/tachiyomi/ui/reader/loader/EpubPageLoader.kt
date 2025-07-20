@@ -18,7 +18,7 @@ internal class EpubPageLoader(
 
     // Lazy initialize the EpubFile to avoid unnecessary loading
     private val epub by lazy { EpubFile(epubFile.inputStream()) }
-    
+
     // Cache for loaded resources to avoid repeated processing
     private val resourceCache = ConcurrentHashMap<String, ByteArray>()
 
@@ -28,7 +28,7 @@ internal class EpubPageLoader(
         if (spineHref != null) {
             return getSpineChapterPage()
         }
-        
+
         // Check if this is an image-based or text-based EPUB
         val imagePages = epub.getImagesFromPages()
         return if (imagePages.isNotEmpty()) {
@@ -37,7 +37,7 @@ internal class EpubPageLoader(
             getTextPage()
         }
     }
-    
+
     private fun getSpineChapterPage(): List<ReaderPage> {
         // Only load the specific internal chapter (spine item) - use the optimized method
         try {
@@ -52,7 +52,7 @@ internal class EpubPageLoader(
                     },
                 )
             }
-            
+
             // Fallback to old method if optimized method fails
             val resource = epub.book.spine.spineReferences.find { it.resource.href == spineHref }?.resource
             if (resource != null) {
@@ -70,7 +70,7 @@ internal class EpubPageLoader(
         } catch (e: Exception) {
             // Log error but continue to fallback
         }
-        
+
         // Fallback: show error page
         return listOf(
             ReaderPage(0).apply {
@@ -81,7 +81,7 @@ internal class EpubPageLoader(
             },
         )
     }
-    
+
     private fun getImagePages(imagePages: List<String>): List<ReaderPage> {
         return imagePages.mapIndexed { i, path ->
             ReaderPage(i).apply {
@@ -91,7 +91,7 @@ internal class EpubPageLoader(
             }
         }
     }
-    
+
     private fun getTextPage(): List<ReaderPage> {
         // Text-based EPUB: create a single ReaderPage with the text content
         val text = epub.getTextFromPages()
@@ -107,7 +107,7 @@ internal class EpubPageLoader(
 
     override suspend fun loadPage(page: ReaderPage) {
         check(!isRecycled)
-        
+
         // Only load image pages on demand
         if (page.status == Page.State.Queue && page.url != null) {
             try {
@@ -118,14 +118,14 @@ internal class EpubPageLoader(
             }
         }
     }
-    
+
     private fun getImageStream(path: String): InputStream {
         // Check cache first
         val cachedData = resourceCache[path]
         if (cachedData != null) {
             return cachedData.inputStream()
         }
-        
+
         // Load and cache the resource
         val inputStream = epub.getInputStream(path)!!
         val bytes = inputStream.readBytes()

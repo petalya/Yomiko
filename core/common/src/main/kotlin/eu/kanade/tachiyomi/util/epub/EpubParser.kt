@@ -7,13 +7,12 @@ import nl.siegmann.epublib.domain.Book
 import nl.siegmann.epublib.domain.Resource
 import nl.siegmann.epublib.domain.SpineReference
 import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import tachiyomi.core.common.util.system.logcat
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
-import tachiyomi.core.common.util.system.logcat
 
 /**
  * Enhanced EPUB parser that parses EPUB files into a more usable model structure
@@ -82,10 +81,10 @@ class EpubParser {
     private fun extractMetadata(book: Book): EpubMetadata {
         val metadata = book.metadata
         val otherMetadata = mutableMapOf<String, String>()
-        
+
         // We need to handle metadata differently since the API structure is complex
         // Just extract what we can access directly
-        
+
         return EpubMetadata(
             title = book.title ?: "Unknown",
             creator = book.metadata.authors.firstOrNull()?.let { "${it.firstname} ${it.lastname}".trim() },
@@ -109,12 +108,16 @@ class EpubParser {
 
     private fun isImageFile(href: String, mediaType: String?): Boolean {
         val lower = href.lowercase()
-        return lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".gif") ||
+        return lower.endsWith(".jpg") ||
+            lower.endsWith(".jpeg") ||
+            lower.endsWith(".png") ||
+            lower.endsWith(".gif") ||
             (mediaType?.startsWith("image/") == true)
     }
 
     private fun extractChapters(book: Book): List<EpubChapter> {
         val tocHrefs = mutableListOf<Pair<String, String>>() // Pair<href, title>
+
         // Flatten TOC entries to a list of hrefs and titles (normalized)
         fun collectToc(entries: List<nl.siegmann.epublib.domain.TOCReference>) {
             for (entry in entries) {
@@ -154,7 +157,7 @@ class EpubParser {
                         mediaType = chapterMediaType,
                         position = chapterStartSpineIndex,
                         embeddedResources = accumulatedResources.toMap(),
-                    )
+                    ),
                 )
             }
             accumulatedContent = StringBuilder()
@@ -189,7 +192,7 @@ class EpubParser {
                         mediaType = mediaType,
                         position = spineIndex,
                         embeddedResources = extractEmbeddedResources(resource, book),
-                    )
+                    ),
                 )
                 // Reset accumulators
                 currentTOC = null
@@ -286,7 +289,7 @@ class EpubParser {
         }
         return resources
     }
-    
+
     /**
      * Helper function to find a resource when the direct path resolution fails
      * Tries different variations of the path to handle quirky EPUB files
@@ -296,7 +299,7 @@ class EpubParser {
         val filename = resolvedPath.substringAfterLast('/')
         val resourceByFilename = book.resources.getByHref(filename)
         if (resourceByFilename != null) return resourceByFilename
-        
+
         // Try looking for the resource in common image directories
         val commonImageDirs = listOf("images/", "Images/", "image/", "Image/", "img/", "Img/")
         for (dir in commonImageDirs) {
@@ -304,7 +307,7 @@ class EpubParser {
             val resourceWithDir = book.resources.getByHref(pathWithDir)
             if (resourceWithDir != null) return resourceWithDir
         }
-        
+
         // Try looking through all resources for a partial match
         return book.resources.all.find { resource ->
             resource.href.endsWith(filename)
@@ -316,16 +319,16 @@ class EpubParser {
         if (relativePath.startsWith("data:") || relativePath.startsWith("http")) {
             return relativePath
         }
-        
+
         if (relativePath.startsWith("/")) {
             return relativePath.removePrefix("/")
         }
-        
+
         if (basePath.isEmpty()) return relativePath
-        
+
         // Split the base path into components
         val baseComponents = basePath.split("/").toMutableList()
-        
+
         // If the base path doesn't end with a filename, it's already a directory
         if (!basePath.contains(".")) {
             // It's a directory path, nothing to remove
@@ -333,10 +336,10 @@ class EpubParser {
             // Remove the filename component if present
             baseComponents.removeLastOrNull()
         }
-        
+
         // Process the relative path
         val relComponents = relativePath.split("/").toMutableList()
-        
+
         // Process any "../" components
         while (relComponents.isNotEmpty() && relComponents[0] == "..") {
             relComponents.removeAt(0)
@@ -344,7 +347,7 @@ class EpubParser {
                 baseComponents.removeAt(baseComponents.size - 1)
             }
         }
-        
+
         // Combine the path components
         val resultPath = (baseComponents + relComponents).joinToString("/")
         return resultPath
@@ -355,12 +358,12 @@ class EpubParser {
         try {
             val html = String(data, Charsets.UTF_8)
             val doc = Jsoup.parse(html)
-            
+
             // Try to find a title in the HTML
             val title = doc.select("title").firstOrNull()?.text()
                 ?: doc.select("h1").firstOrNull()?.text()
                 ?: doc.select("h2").firstOrNull()?.text()
-            
+
             return title?.takeIf { it.isNotBlank() } ?: "Chapter ${index + 1}"
         } catch (e: Exception) {
             return "Chapter ${index + 1}"
@@ -370,13 +373,14 @@ class EpubParser {
     private fun shouldIncludeInChapters(spineRef: SpineReference, resource: Resource): Boolean {
         if (resource.mediaType == null) return false
         val mediaType = resource.mediaType.name
-        
-        return !spineRef.isLinear || mediaType.contains("html", ignoreCase = true) ||
-                mediaType.contains("xhtml", ignoreCase = true) ||
-                mediaType.contains("svg", ignoreCase = true) ||
-                mediaType.contains("xml", ignoreCase = true)
+
+        return !spineRef.isLinear ||
+            mediaType.contains("html", ignoreCase = true) ||
+            mediaType.contains("xhtml", ignoreCase = true) ||
+            mediaType.contains("svg", ignoreCase = true) ||
+            mediaType.contains("xml", ignoreCase = true)
     }
-    
+
     private fun extractTableOfContents(book: Book): List<EpubTableOfContentsEntry> {
         val entries = mutableListOf<EpubTableOfContentsEntry>()
         book.tableOfContents.tocReferences.forEachIndexed { index, tocRef ->
@@ -395,7 +399,7 @@ class EpubParser {
         }
         return entries
     }
-    
+
     private fun extractTocChildren(children: List<nl.siegmann.epublib.domain.TOCReference>, level: Int): List<EpubTableOfContentsEntry> {
         return children.mapIndexedNotNull { index, tocRef ->
             if (tocRef.resource == null) {
@@ -403,7 +407,7 @@ class EpubParser {
                 return@mapIndexedNotNull null
             }
             EpubTableOfContentsEntry(
-                id = tocRef.resourceId ?: "toc_sub_${level}-$index",
+                id = tocRef.resourceId ?: "toc_sub_$level-$index",
                 href = tocRef.completeHref,
                 title = tocRef.title ?: "Section $level.${index + 1}",
                 level = level,
@@ -411,7 +415,7 @@ class EpubParser {
             )
         }
     }
-    
+
     /**
      * Extract content blocks from HTML content
      */
@@ -447,7 +451,8 @@ class EpubParser {
         return when (tagName.lowercase()) {
             "address", "article", "aside", "blockquote", "canvas", "dd", "div", "dl", "dt", "fieldset",
             "figcaption", "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li",
-            "main", "nav", "noscript", "ol", "p", "pre", "section", "table", "tfoot", "ul", "video", "tr", "td", "th" -> true
+            "main", "nav", "noscript", "ol", "p", "pre", "section", "table", "tfoot", "ul", "video", "tr", "td", "th",
+            -> true
             else -> false
         }
     }
@@ -496,7 +501,7 @@ class EpubParser {
                             src = child.attr("src"),
                             alt = child.attr("alt"),
                             data = null,
-                        )
+                        ),
                     )
                 }
                 "a" -> {
@@ -504,7 +509,7 @@ class EpubParser {
                         EpubContentBlock.Link(
                             href = child.attr("href"),
                             content = child.text(),
-                        )
+                        ),
                     )
                 }
                 "ul", "ol" -> {
@@ -513,7 +518,7 @@ class EpubParser {
                         EpubContentBlock.ListBlock(
                             items = items,
                             ordered = tag == "ol",
-                        )
+                        ),
                     )
                 }
                 "table" -> {
@@ -525,7 +530,7 @@ class EpubParser {
                         EpubContentBlock.Table(
                             headers = headers,
                             rows = rows,
-                        )
+                        ),
                     )
                 }
                 else -> {
@@ -549,7 +554,7 @@ class EpubParser {
                             src = child.attr("src"),
                             alt = child.attr("alt"),
                             data = null,
-                        )
+                        ),
                     )
                 }
                 "a" -> {
@@ -557,7 +562,7 @@ class EpubParser {
                         EpubContentBlock.Link(
                             href = child.attr("href"),
                             content = child.text(),
-                        )
+                        ),
                     )
                 }
                 else -> {
@@ -567,4 +572,4 @@ class EpubParser {
             }
         }
     }
-} 
+}

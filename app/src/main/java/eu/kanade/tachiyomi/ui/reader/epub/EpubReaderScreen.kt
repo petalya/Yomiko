@@ -2,6 +2,8 @@
 package eu.kanade.tachiyomi.ui.reader.epub
 
 import android.annotation.SuppressLint
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.util.Base64
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -9,15 +11,20 @@ import android.view.WindowInsetsController
 import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -32,6 +39,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
@@ -61,22 +69,41 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
+import coil3.asDrawable
+import coil3.imageLoader
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
+import coil3.size.Size
+import com.valentinilk.shimmer.ShimmerBounds
+import com.valentinilk.shimmer.rememberShimmer
+import com.valentinilk.shimmer.shimmer
 import eu.kanade.presentation.components.AdaptiveSheet
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarTitle
@@ -85,6 +112,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderSettingsScreenModel
+import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
 import eu.kanade.tachiyomi.util.epub.EpubTableOfContentsEntry
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import kotlinx.coroutines.launch
@@ -93,36 +121,6 @@ import tachiyomi.domain.library.model.ChapterSwipeAction
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.ByteArrayOutputStream
-import com.valentinilk.shimmer.shimmer
-import com.valentinilk.shimmer.rememberShimmer
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.Dp
-import com.valentinilk.shimmer.ShimmerBounds
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
-import coil3.request.ImageRequest
-import coil3.size.Size
-import coil3.asDrawable
-import coil3.imageLoader
-import coil3.request.CachePolicy
-import android.graphics.drawable.BitmapDrawable
-import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import android.graphics.BitmapFactory
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectDragGestures
 
 class EpubReaderScreen(
     private val mangaId: Long,
@@ -289,13 +287,13 @@ class EpubReaderScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(backgroundColor)
+                .background(backgroundColor),
         ) {
             // Main content area with fade transition
             AnimatedContent(
                 targetState = state,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             ) { animatedState ->
                 when (animatedState) {
                     is EpubReaderState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -313,9 +311,9 @@ class EpubReaderScreen(
                                     detectTapGestures(
                                         onTap = { _ ->
                                             barsVisible = !barsVisible
-                                        }
+                                        },
                                     )
-                                }
+                                },
                         ) {
                             Column(modifier = Modifier.verticalScroll(scrollState)) {
                                 Spacer(modifier = Modifier.height(verticalPadding))
@@ -325,7 +323,7 @@ class EpubReaderScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     chapterTitle = animatedState.chapterTitle ?: "",
                                     onTap = { _ -> barsVisible = !barsVisible },
-                                    onImageClick = { imageData -> fullscreenImage = imageData }
+                                    onImageClick = { imageData -> fullscreenImage = imageData },
                                 )
                                 Spacer(modifier = Modifier.height(verticalPadding))
                             }
@@ -337,7 +335,7 @@ class EpubReaderScreen(
                                 WebView(context).apply {
                                     layoutParams = ViewGroup.LayoutParams(
                                         ViewGroup.LayoutParams.MATCH_PARENT,
-                                        ViewGroup.LayoutParams.MATCH_PARENT
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
                                     )
 
                                     settings.apply {
@@ -356,7 +354,7 @@ class EpubReaderScreen(
                                         animatedState.content,
                                         "text/html",
                                         "UTF-8",
-                                        null
+                                        null,
                                     )
 
                                     @SuppressLint("ClickableViewAccessibility")
@@ -367,7 +365,7 @@ class EpubReaderScreen(
                                         false
                                     }
                                 }
-                            }
+                            },
                         )
                     }
                 }
@@ -490,10 +488,15 @@ class EpubReaderScreen(
                             },
                             modifier = Modifier.alpha(
                                 if (when (val currentState = s) {
-                                    is EpubReaderState.ReflowSuccess -> currentState.hasNext
-                                    is EpubReaderState.HtmlSuccess -> currentState.hasNext
-                                    else -> false
-                                }) 1f else 0.3f
+                                        is EpubReaderState.ReflowSuccess -> currentState.hasNext
+                                        is EpubReaderState.HtmlSuccess -> currentState.hasNext
+                                        else -> false
+                                    }
+                                ) {
+                                    1f
+                                } else {
+                                    0.3f
+                                },
                             ),
                         ) {
                             val hasNext = when (val currentState = s) {
@@ -531,10 +534,15 @@ class EpubReaderScreen(
                             },
                             modifier = Modifier.alpha(
                                 if (when (val currentState = s) {
-                                    is EpubReaderState.ReflowSuccess -> currentState.hasPrev
-                                    is EpubReaderState.HtmlSuccess -> currentState.hasPrev
-                                    else -> false
-                                }) 1f else 0.3f // Make disabled more visually distinct
+                                        is EpubReaderState.ReflowSuccess -> currentState.hasPrev
+                                        is EpubReaderState.HtmlSuccess -> currentState.hasPrev
+                                        else -> false
+                                    }
+                                ) {
+                                    1f
+                                } else {
+                                    0.3f // Make disabled more visually distinct
+                                },
                             ),
                         ) {
                             val hasPrev = when (val currentState = s) {
@@ -676,7 +684,7 @@ class EpubReaderScreen(
         if (fullscreenImage != null) {
             FullscreenImageOverlay(
                 imageData = fullscreenImage!!,
-                onDismiss = { fullscreenImage = null }
+                onDismiss = { fullscreenImage = null },
             )
         }
     }
@@ -933,7 +941,7 @@ fun EpubShimmerSkeletonLoader(
 @Composable
 private fun FullscreenImageOverlay(
     imageData: FullscreenImageData,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -944,7 +952,7 @@ private fun FullscreenImageOverlay(
     var isDismissing by remember { mutableStateOf(false) }
     val backgroundAlpha = animateFloatAsState(
         targetValue = (0.6f * (1f - (kotlin.math.abs(offsetY.value) / (dragThresholdPx * 2))).coerceIn(0.2f, 0.6f)),
-        animationSpec = tween(durationMillis = 120), label = "fullscreenImageBgAlpha"
+        animationSpec = tween(durationMillis = 120), label = "fullscreenImageBgAlpha",
     )
     // Dismiss on back
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -975,20 +983,20 @@ private fun FullscreenImageOverlay(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false,
             dismissOnClickOutside = true,
-            dismissOnBackPress = true
-        )
+            dismissOnBackPress = true,
+        ),
     ) {
         BoxWithConstraints(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = backgroundAlpha.value))
+                .background(Color.Black.copy(alpha = backgroundAlpha.value)),
         ) {
             // Blurred background (under image)
             Box(
                 Modifier
                     .matchParentSize()
                     .blur(32.dp)
-                    .background(Color.Black.copy(alpha = backgroundAlpha.value))
+                    .background(Color.Black.copy(alpha = backgroundAlpha.value)),
             )
             // Image with pan/zoom and scale animation
             Box(
@@ -1008,14 +1016,14 @@ private fun FullscreenImageOverlay(
                             },
                             onDrag = { change, dragAmount ->
                                 scope.launch { offsetY.snapTo(offsetY.value + dragAmount.y) }
-                            }
+                            },
                         )
                     }
                     .pointerInput(Unit) {
                         detectTapGestures(
-                            onTap = { dismissWithScale() }
+                            onTap = { dismissWithScale() },
                         )
-                    }
+                    },
             ) {
                 AndroidView(
                     factory = { ctx ->
@@ -1050,7 +1058,7 @@ private fun FullscreenImageOverlay(
                             translationY = offsetY.value
                             scaleX = scaleAnim.value
                             scaleY = scaleAnim.value
-                        }
+                        },
                 )
             }
         }

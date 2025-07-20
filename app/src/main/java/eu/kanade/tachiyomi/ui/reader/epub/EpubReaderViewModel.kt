@@ -8,6 +8,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cafe.adriel.voyager.core.model.ScreenModel
 import com.hippo.unifile.UniFile
+import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
+import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
+import eu.kanade.tachiyomi.data.connections.discord.ReaderData
 import eu.kanade.tachiyomi.util.epub.EpubChapter
 import eu.kanade.tachiyomi.util.epub.EpubContentBlock
 import eu.kanade.tachiyomi.util.epub.EpubDocument
@@ -16,7 +19,6 @@ import eu.kanade.tachiyomi.util.epub.EpubReaderSettings
 import eu.kanade.tachiyomi.util.epub.EpubTableOfContentsEntry
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import eu.kanade.tachiyomi.util.epub.TextAlignment
-import tachiyomi.core.common.util.system.logcat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,12 +27,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.jsoup.Jsoup
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.chapter.interactor.GetChaptersByMangaId
 import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.chapter.model.ChapterUpdate
 import tachiyomi.domain.chapter.repository.ChapterRepository
+import tachiyomi.domain.history.interactor.UpsertHistory
+import tachiyomi.domain.history.model.HistoryUpdate
 import tachiyomi.domain.manga.interactor.GetManga
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.manga.model.asMangaCover
@@ -39,15 +42,9 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
 import java.io.InputStream
 import java.util.UUID
 import kotlin.math.absoluteValue
-import tachiyomi.domain.history.interactor.UpsertHistory
-import tachiyomi.domain.history.model.HistoryUpdate
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
-import eu.kanade.tachiyomi.data.connections.discord.ReaderData
-import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 
 /**
  * Screen-independent state-holder for reading local EPUB files.
@@ -64,13 +61,13 @@ class EpubReaderViewModel(
     private val epubParser = EpubParser()
     private val epubPreferences = EpubReaderPreferences(Injekt.get())
     private val upsertHistory: UpsertHistory = Injekt.get()
-    
+
     // Define a coroutine scope for the view model
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
-    
+
     private val _state = MutableStateFlow<EpubReaderState>(EpubReaderState.Loading)
     val state: StateFlow<EpubReaderState> = _state.asStateFlow()
-    
+
     private val _settings = MutableStateFlow(EpubReaderSettings())
     val settings: StateFlow<EpubReaderSettings> = _settings.asStateFlow()
 
@@ -82,15 +79,15 @@ class EpubReaderViewModel(
 
     var currentChapterId: Long? = null
         private set
-    
+
     private var currentChapterIndex: Int = -1
-    
+
     // Cache the parsed EPUB document
     private var parsedEpub: EpubDocument? = null
-    
+
     // Cache the extracted content blocks for the current chapter
     private var currentChapterBlocks = mutableListOf<EpubContentBlock>()
-    
+
     // Current chapter in the epub document
     private var currentEpubChapterIndex: Int = 0
 
@@ -110,7 +107,7 @@ class EpubReaderViewModel(
                 lineSpacing = epubPreferences.lineSpacing().get(),
                 alignment = epubPreferences.textAlignment().get(),
                 theme = epubPreferences.theme().get(),
-                isScrollMode = false // Not persisted yet
+                isScrollMode = false, // Not persisted yet
             )
             try {
                 // Load manga and chapter data
@@ -133,14 +130,14 @@ class EpubReaderViewModel(
                 // Set current chapter and load it
                 currentChapterIndex = _chapters.value.indexOf(initialChapter)
                 currentChapterId = initialChapter.id
-                
+
                 // Parse the EPUB file
                 val epubFile = getEpubFile(initialChapter.url)
                 if (epubFile == null || !epubFile.exists()) {
                     _state.value = EpubReaderState.Error("EPUB file not found")
                     return@launch
                 }
-                
+
                 try {
                     parsedEpub = epubParser.parseFile(epubFile)
                     loadChapter(initialChapter)
@@ -152,41 +149,41 @@ class EpubReaderViewModel(
             }
         }
     }
-    
+
     fun updateSettings(newSettings: EpubReaderSettings) {
         _settings.value = newSettings
         // No need to reload/reprocess chapter for visual-only settings changes
     }
-    
+
     fun setFontSize(size: Float) {
         _settings.value = _settings.value.copy(fontSize = size)
         coroutineScope.launch { epubPreferences.fontSize().set(size) }
     }
-    
+
     fun setFontFamily(family: String?) {
         _settings.value = _settings.value.copy(fontFamily = family)
         coroutineScope.launch { epubPreferences.fontFamily().set(family ?: "") }
     }
-    
+
     fun setLineSpacing(spacing: Float) {
         _settings.value = _settings.value.copy(lineSpacing = spacing)
         coroutineScope.launch { epubPreferences.lineSpacing().set(spacing) }
     }
-    
+
     fun setTextAlignment(alignment: TextAlignment) {
         _settings.value = _settings.value.copy(alignment = alignment)
         coroutineScope.launch { epubPreferences.textAlignment().set(alignment) }
     }
-    
+
     fun setTheme(theme: ReaderTheme) {
         _settings.value = _settings.value.copy(theme = theme)
         coroutineScope.launch { epubPreferences.theme().set(theme) }
     }
-    
+
     fun toggleScrollMode() {
         _settings.value = _settings.value.copy(isScrollMode = !_settings.value.isScrollMode)
     }
-    
+
     /**
      * Load a specific chapter from the book
      */
@@ -215,7 +212,7 @@ class EpubReaderViewModel(
                 if (epubChapter.isHtml) {
                     _state.value = EpubReaderState.ReflowSuccess(
                         bookTitle = epub.title,
-                        chapterTitle = epubChapter.title ?: "Chapter "+ (currentEpubChapterIndex + 1),
+                        chapterTitle = epubChapter.title ?: "Chapter " + (currentEpubChapterIndex + 1),
                         contentBlocks = currentChapterBlocks,
                         hasPrev = currentChapterIndex > 0,
                         hasNext = currentChapterIndex < _chapters.value.size - 1,
@@ -224,7 +221,7 @@ class EpubReaderViewModel(
                 } else {
                     _state.value = EpubReaderState.HtmlSuccess(
                         bookTitle = epub.title,
-                        chapterTitle = epubChapter.title ?: "Chapter "+ (currentEpubChapterIndex + 1),
+                        chapterTitle = epubChapter.title ?: "Chapter " + (currentEpubChapterIndex + 1),
                         content = epubChapter.content,
                         hasPrev = currentChapterIndex > 0,
                         hasNext = currentChapterIndex < _chapters.value.size - 1,
@@ -233,45 +230,45 @@ class EpubReaderViewModel(
                 }
                 refreshChapters()
             } catch (e: Exception) {
-                _state.value = EpubReaderState.Error("Failed to load chapter: "+ e.message)
+                _state.value = EpubReaderState.Error("Failed to load chapter: " + e.message)
             }
         }
     }
-    
+
     /**
      * Process embedded resources (images, CSS) and add them to the content blocks
      */
     private fun processEmbeddedResources(chapter: EpubChapter) {
         // Create a list to hold unresolved image references for logging
         val unresolvedImages = mutableListOf<String>()
-        
+
         // Get app context for creating cache files
         val context = Injekt.get<Context>()
         val cacheDir = context.cacheDir
         val epubImagesDir = File(cacheDir, "epub_images").also { it.mkdirs() }
-        
+
         for (i in currentChapterBlocks.indices) {
             val block = currentChapterBlocks[i]
             when (block) {
                 is EpubContentBlock.Image -> {
                     val src = block.src
-                    
+
                     // For base64 encoded images
                     if (src.startsWith("data:")) {
                         // These are handled directly by the parser
                         continue
                     }
-                    
+
                     // Try to get the image data directly
                     var imageData = chapter.embeddedResources[src]
-                    
+
                     // If direct path fails, try with various path manipulations
                     if (imageData == null) {
                         // Try with just the filename
                         val filename = src.substringAfterLast('/')
                         imageData = chapter.embeddedResources.entries.find { it.key.endsWith(filename) }?.value
                     }
-                    
+
                     if (imageData != null) {
                         // Convert image data to a file URI for better handling
                         val imageUri = saveImageToCache(imageData, src, epubImagesDir)
@@ -290,7 +287,7 @@ class EpubReaderViewModel(
                     val src = block.src
                     val embedData = chapter.embeddedResources[src]
                         ?: chapter.embeddedResources.entries.find { it.key.endsWith(src.substringAfterLast('/')) }?.value
-                        
+
                     if (embedData != null) {
                         // For image embeds, create a file URI for better handling
                         if (block.mediaType.startsWith("image/")) {
@@ -308,13 +305,13 @@ class EpubReaderViewModel(
                 else -> {} // No processing needed
             }
         }
-        
+
         // Log unresolved images for debugging
         if (unresolvedImages.isNotEmpty()) {
             logcat { "Unresolved image paths: $unresolvedImages" }
         }
     }
-    
+
     /**
      * Save image data to a cache file and return its URI
      */
@@ -330,31 +327,36 @@ class EpubReaderViewModel(
                     // Try to detect from the first few bytes
                     when {
                         imageData.size > 2 && imageData[0] == 0xFF.toByte() && imageData[1] == 0xD8.toByte() -> ".jpg"
-                        imageData.size > 4 && imageData[0] == 0x89.toByte() && imageData[1] == 0x50.toByte() &&
-                                imageData[2] == 0x4E.toByte() && imageData[3] == 0x47.toByte() -> ".png"
-                        imageData.size > 3 && imageData[0] == 0x47.toByte() && imageData[1] == 0x49.toByte() &&
-                                imageData[2] == 0x46.toByte() -> ".gif"
+                        imageData.size > 4 &&
+                            imageData[0] == 0x89.toByte() &&
+                            imageData[1] == 0x50.toByte() &&
+                            imageData[2] == 0x4E.toByte() &&
+                            imageData[3] == 0x47.toByte() -> ".png"
+                        imageData.size > 3 &&
+                            imageData[0] == 0x47.toByte() &&
+                            imageData[1] == 0x49.toByte() &&
+                            imageData[2] == 0x46.toByte() -> ".gif"
                         else -> ".bin" // Fallback
                     }
                 }
             }
-            
+
             // Create a unique filename based on the source path
-            val filename = "${src.hashCode().absoluteValue}${extension}"
+            val filename = "${src.hashCode().absoluteValue}$extension"
             val imageFile = File(cacheDir, filename)
-            
+
             // Only write if file doesn't exist yet
             if (!imageFile.exists()) {
                 FileOutputStream(imageFile).use { it.write(imageData) }
             }
-            
+
             return Uri.fromFile(imageFile)
         } catch (e: Exception) {
             logcat { "Failed to save image to cache: ${e.message}" }
             return null
         }
     }
-    
+
     /**
      * Navigate to previous chapter or previous internal chapter
      */
@@ -365,11 +367,11 @@ class EpubReaderViewModel(
             _state.value = EpubReaderState.Loading
             coroutineScope.launch {
                 kotlinx.coroutines.delay(600)
-            loadChapter(_chapters.value[currentChapterIndex])
+                loadChapter(_chapters.value[currentChapterIndex])
             }
         }
     }
-    
+
     /**
      * Navigate to next chapter or next internal chapter
      */
@@ -380,11 +382,11 @@ class EpubReaderViewModel(
             _state.value = EpubReaderState.Loading
             coroutineScope.launch {
                 kotlinx.coroutines.delay(600)
-            loadChapter(_chapters.value[currentChapterIndex])
+                loadChapter(_chapters.value[currentChapterIndex])
             }
         }
     }
-    
+
     /**
      * Jump to a specific chapter from the chapters list
      */
@@ -395,17 +397,17 @@ class EpubReaderViewModel(
             _state.value = EpubReaderState.Loading
             coroutineScope.launch {
                 kotlinx.coroutines.delay(600)
-            loadChapter(_chapters.value[currentChapterIndex])
+                loadChapter(_chapters.value[currentChapterIndex])
             }
         }
     }
-    
+
     /**
      * Jump to a specific table of contents entry
      */
     fun jumpToTableOfContentsEntry(href: String) {
         val epub = parsedEpub ?: return
-        
+
         // Find which chapter contains this TOC entry
         val targetChapterIndex = epub.chapters.indexOfFirst { it.href == href }
         if (targetChapterIndex >= 0) {
@@ -473,7 +475,7 @@ class EpubReaderViewModel(
         val chapter = _chapters.value.find { it.id == chapterId }
         return if (chapter != null && chapter.lastPageRead > 0) chapter.lastPageRead / 1000f else 0f
     }
-    
+
     /**
      * Get the File object for the EPUB from the chapter URL
      */
@@ -482,18 +484,18 @@ class EpubReaderViewModel(
             // Load EPUB file from URL
             val epubPath = resolveEpubPath(chapterUrl)
             val inputStream = openEpubInputStream(epubPath) ?: return null
-            
+
             // Create a temporary file for the EPUB
             val cacheFile = File(
-                Injekt.get<Context>().cacheDir, 
-                "epub_" + UUID.randomUUID().toString() + ".epub"
+                Injekt.get<Context>().cacheDir,
+                "epub_" + UUID.randomUUID().toString() + ".epub",
             )
-            
+
             // Copy the input stream to the cache file
             FileOutputStream(cacheFile).use { output ->
                 inputStream.copyTo(output)
             }
-            
+
             return cacheFile
         } catch (e: Exception) {
             return null
@@ -547,7 +549,7 @@ class EpubReaderViewModel(
             }
         }
     }
-    
+
     fun getTableOfContents(): List<EpubTableOfContentsEntry> {
         return parsedEpub?.tableOfContents ?: emptyList()
     }

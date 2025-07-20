@@ -9,12 +9,6 @@ import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -101,6 +95,9 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichText
+import com.valentinilk.shimmer.ShimmerBounds
+import com.valentinilk.shimmer.rememberShimmer
+import com.valentinilk.shimmer.shimmer
 import eu.kanade.domain.chapter.model.toSChapter
 import eu.kanade.domain.connections.service.ConnectionsPreferences
 import eu.kanade.presentation.components.AdaptiveSheet
@@ -142,9 +139,6 @@ import tachiyomi.domain.source.service.SourceManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.time.format.DateTimeFormatter
-import com.valentinilk.shimmer.shimmer
-import com.valentinilk.shimmer.rememberShimmer
-import com.valentinilk.shimmer.ShimmerBounds
 
 // --- State ---
 sealed class NovelReaderState {

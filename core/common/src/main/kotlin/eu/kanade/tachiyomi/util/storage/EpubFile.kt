@@ -48,7 +48,7 @@ class EpubFile(epubInputStream: InputStream) : Closeable {
     /**
      * Returns the plain text content from a specific XHTML page in the epub file.
      * This is more efficient than loading all pages when only one is needed.
-     * 
+     *
      * @param href The href of the resource to extract text from
      * @return The plain text content of the specified resource
      */
@@ -99,15 +99,15 @@ class EpubFile(epubInputStream: InputStream) : Closeable {
      */
     private fun findCoverImageResource(): Resource? {
         // First check resources with "cover" in the ID (most reliable)
-        book.resources.all.firstOrNull { 
-            it.id?.contains("cover", ignoreCase = true) == true && 
-            it.mediaType?.name?.startsWith("image/") == true
+        book.resources.all.firstOrNull {
+            it.id?.contains("cover", ignoreCase = true) == true &&
+                it.mediaType?.name?.startsWith("image/") == true
         }?.let { return it }
 
         // Then check resources with "cover" in the href
         book.resources.all.firstOrNull {
-            it.href?.contains("cover", ignoreCase = true) == true && 
-            it.mediaType?.name?.startsWith("image/") == true
+            it.href?.contains("cover", ignoreCase = true) == true &&
+                it.mediaType?.name?.startsWith("image/") == true
         }?.let { return it }
 
         // Finally, just return the first image if nothing else found

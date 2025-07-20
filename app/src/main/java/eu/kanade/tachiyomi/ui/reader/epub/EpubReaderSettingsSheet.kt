@@ -5,7 +5,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -22,20 +31,24 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderPreferences
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import eu.kanade.tachiyomi.util.epub.TextAlignment
-import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderPreferences
-import androidx.compose.ui.text.font.Font
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -168,7 +181,7 @@ fun EpubReaderSettingsSheet(
                             "Lora" to "lora",
                             "Open Sans" to "open_sans",
                             "Arbutus Slab" to "arbutus_slab",
-                            "Lato" to "lato"
+                            "Lato" to "lato",
                         )
                         fonts.forEach { (label, value) ->
                             val fontFamily = when (value) {
@@ -184,13 +197,13 @@ fun EpubReaderSettingsSheet(
                                 border = BorderStroke(1.dp, if (settings.fontFamily == value || (value == null && settings.fontFamily == null)) MaterialTheme.colorScheme.primary else Color.Gray),
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .clickable { viewModel.setFontFamily(value) }
+                                    .clickable { viewModel.setFontFamily(value) },
                             ) {
                                 Text(
                                     label,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                     fontSize = 14.sp,
-                                    fontFamily = fontFamily
+                                    fontFamily = fontFamily,
                                 )
                             }
                         }

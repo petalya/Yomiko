@@ -435,7 +435,7 @@ actual class LocalSource(
                 chapters.add(sChapter)
             }
         }
-        
+
         // Copy the cover from the first chapter found if still not available
         if (manga.thumbnail_url.isNullOrBlank()) {
             chapters.lastOrNull()?.let { chapter ->
@@ -446,7 +446,7 @@ actual class LocalSource(
                 }
             }
         }
-        
+
         chapters.sortedWith { c1, c2 ->
             val c = c2.chapter_number.compareTo(c1.chapter_number)
             if (c == 0) c2.name.compareToCaseInsensitiveNaturalOrder(c1.name) else c
@@ -461,17 +461,17 @@ actual class LocalSource(
     private fun extractCoversFromEpubs(files: List<UniFile>, manga: SManga): Boolean {
         val epubFiles = files.filter { it.extension.equals("epub", true) }
         if (epubFiles.isEmpty()) return false
-        
+
         val mangaDir = fileSystem.getMangaDirectory(manga.url) ?: return false
         val mangaDirPath = mangaDir.filePath ?: return false
-        
+
         // Check cache first to avoid re-processing
         val cacheKey = "${manga.url}:cover"
         if (epubCoverCache.get(cacheKey) == true) {
             // We've already tried to extract the cover for this manga
             return false
         }
-        
+
         // Only process the first EPUB file instead of all of them for faster loading
         val epubFile = epubFiles.first()
         try {
@@ -499,7 +499,7 @@ actual class LocalSource(
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Error extracting cover from EPUB ${epubFile.name}" }
         }
-        
+
         // Cache the result even if we failed to avoid repeated attempts
         epubCoverCache.put(cacheKey, true)
         return false
@@ -515,7 +515,7 @@ actual class LocalSource(
             val mangaDirs = fileSystem.getFilesInBaseDirectory()
                 .filter { it.isDirectory && !it.name.orEmpty().startsWith('.') }
                 .take(10) // Limit to first 10 to avoid excessive processing
-            
+
             // Process each directory in parallel with a limit
             mangaDirs.map { mangaDir ->
                 async {
@@ -523,15 +523,15 @@ actual class LocalSource(
                         title = mangaDir.name.orEmpty()
                         url = mangaDir.name.orEmpty()
                     }
-                    
+
                     // Skip if cover already exists
                     if (coverManager.find(manga.url) != null) return@async
-                    
+
                     // Find EPUB files
                     val epubFiles = fileSystem.getFilesInMangaDirectory(manga.url)
                         ?.filter { it.extension.equals("epub", true) }
                         ?: return@async
-                    
+
                     if (epubFiles.isNotEmpty()) {
                         extractCoversFromEpubs(epubFiles, manga)
                     }

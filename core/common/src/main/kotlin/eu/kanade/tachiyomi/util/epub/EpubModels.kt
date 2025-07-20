@@ -23,7 +23,9 @@ data class EpubDocument(
         if (coverImage != null) {
             if (other.coverImage == null) return false
             if (!coverImage.contentEquals(other.coverImage)) return false
-        } else if (other.coverImage != null) return false
+        } else if (other.coverImage != null) {
+            return false
+        }
         if (chapters != other.chapters) return false
         if (tableOfContents != other.tableOfContents) return false
         if (metadata != other.metadata) return false
@@ -94,23 +96,23 @@ data class EpubMetadata(
  */
 sealed class EpubContentBlock {
     data class Text(val content: String) : EpubContentBlock()
-    
+
     /**
      * A paragraph block that should be rendered with proper paragraph styling
      * including first-line indentation and vertical margins
      */
     data class Paragraph(val content: String) : EpubContentBlock()
-    
+
     /**
      * Explicit line break
      */
     object LineBreak : EpubContentBlock()
-    
+
     /**
      * Block quote with nested content blocks
      */
     data class BlockQuote(val content: List<EpubContentBlock>) : EpubContentBlock()
-    
+
     data class Image(val src: String, val alt: String?, val data: ByteArray? = null) : EpubContentBlock() {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -123,7 +125,9 @@ sealed class EpubContentBlock {
             if (data != null) {
                 if (other.data == null) return false
                 if (!data.contentEquals(other.data)) return false
-            } else if (other.data != null) return false
+            } else if (other.data != null) {
+                return false
+            }
 
             return true
         }
@@ -151,7 +155,9 @@ sealed class EpubContentBlock {
             if (data != null) {
                 if (other.data == null) return false
                 if (!data.contentEquals(other.data)) return false
-            } else if (other.data != null) return false
+            } else if (other.data != null) {
+                return false
+            }
 
             return true
         }
@@ -179,9 +185,16 @@ data class EpubReaderSettings(
 )
 
 enum class TextAlignment {
-    LEFT, CENTER, RIGHT, JUSTIFY
+    LEFT,
+    CENTER,
+    RIGHT,
+    JUSTIFY,
 }
 
 enum class ReaderTheme {
-    LIGHT, SEPIA, MINT, BLUE_GRAY, BLACK
-} 
+    LIGHT,
+    SEPIA,
+    MINT,
+    BLUE_GRAY,
+    BLACK,
+}

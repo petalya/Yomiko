@@ -24,4 +24,4 @@ class EpubReaderPreferences(
         const val DEFAULT_FONT_SIZE = 18f
         const val DEFAULT_LINE_SPACING = 1.5f
     }
-} 
+}

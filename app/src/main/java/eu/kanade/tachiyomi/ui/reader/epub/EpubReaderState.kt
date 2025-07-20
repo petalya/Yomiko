@@ -39,4 +39,4 @@ sealed class EpubReaderState {
         val hasNext: Boolean,
         val progress: Float,
     ) : EpubReaderState()
-} 
+}

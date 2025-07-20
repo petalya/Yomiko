@@ -4,9 +4,12 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -25,6 +28,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -36,22 +40,18 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.util.epub.EpubContentBlock
 import eu.kanade.tachiyomi.util.epub.EpubReaderSettings
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import eu.kanade.tachiyomi.util.epub.TextAlignment
-import androidx.compose.ui.text.font.Font
-import eu.kanade.tachiyomi.R
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 
 // Data class to hold fullscreen image info
 
 data class FullscreenImageData(
     val src: String?,
     val data: ByteArray?,
-    val alt: String?
+    val alt: String?,
 )
 
 /**
@@ -109,10 +109,10 @@ fun EpubReflowableContent(
                     detectTapGestures(
                         onTap = { offset ->
                             onTap?.invoke(offset)
-                        }
+                        },
                     )
                 },
-            verticalArrangement = Arrangement.Top
+            verticalArrangement = Arrangement.Top,
         ) {
             // Wrap all content in a single SelectionContainer to allow cross-paragraph selection
             SelectionContainer {
@@ -143,7 +143,7 @@ fun EpubReflowableContent(
                                         fontFamily = fontFamily,
                                         textAlign = textAlign,
                                         lineHeight = settings.lineSpacing.em,
-                                        textIndent = TextIndent(firstLine = 1.2.em)
+                                        textIndent = TextIndent(firstLine = 1.2.em),
                                     ),
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -160,9 +160,9 @@ fun EpubReflowableContent(
                                         .padding(vertical = 8.dp, horizontal = 16.dp)
                                         .background(
                                             color = textColor.copy(alpha = 0.1f),
-                                            shape = MaterialTheme.shapes.small
+                                            shape = MaterialTheme.shapes.small,
                                         )
-                                        .padding(8.dp)
+                                        .padding(8.dp),
                                 ) {
                                     Column {
                                         block.content.forEach { nestedBlock ->
@@ -188,7 +188,7 @@ fun EpubReflowableContent(
                                                             fontFamily = fontFamily,
                                                             textAlign = textAlign,
                                                             lineHeight = settings.lineSpacing.em,
-                                                            textIndent = TextIndent(firstLine = 1.2.em)
+                                                            textIndent = TextIndent(firstLine = 1.2.em),
                                                         ),
                                                     )
                                                 }
@@ -264,10 +264,10 @@ private fun NonSelectableBlock(
                                 FullscreenImageData(
                                     src = block.src,
                                     data = block.data,
-                                    alt = block.alt
-                                )
+                                    alt = block.alt,
+                                ),
                             )
-                        }
+                        },
                     )
                 }
             Box(
