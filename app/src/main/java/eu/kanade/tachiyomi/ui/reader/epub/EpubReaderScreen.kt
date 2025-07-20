@@ -5,12 +5,14 @@ import android.annotation.SuppressLint
 import android.util.Base64
 import android.view.MotionEvent
 import android.view.ViewGroup
+import android.view.WindowInsetsController
 import android.webkit.WebSettings
 import android.webkit.WebView
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,7 +41,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -66,8 +68,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.res.ResourcesCompat
@@ -84,18 +84,45 @@ import eu.kanade.presentation.manga.components.MangaChapterListItem
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.model.Download
-import eu.kanade.tachiyomi.ui.reader.NovelReaderSettingsBottomSheet
-import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderSettingsScreenModel
+import eu.kanade.tachiyomi.util.epub.EpubTableOfContentsEntry
+import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import kotlinx.coroutines.launch
 import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.library.model.ChapterSwipeAction
-import tachiyomi.presentation.core.components.material.padding
-import tachiyomi.presentation.core.util.plus
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.ByteArrayOutputStream
-import java.time.format.DateTimeFormatter
+import com.valentinilk.shimmer.shimmer
+import com.valentinilk.shimmer.rememberShimmer
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.Dp
+import com.valentinilk.shimmer.ShimmerBounds
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
+import coil3.request.ImageRequest
+import coil3.size.Size
+import coil3.asDrawable
+import coil3.imageLoader
+import coil3.request.CachePolicy
+import android.graphics.drawable.BitmapDrawable
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import android.graphics.BitmapFactory
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.detectDragGestures
 
 class EpubReaderScreen(
     private val mangaId: Long,
@@ -106,6 +133,7 @@ class EpubReaderScreen(
     override fun Content() {
         val viewModel = rememberScreenModel { EpubReaderViewModel(mangaId, chapterId, chapterUrl) }
         val state by viewModel.state.collectAsState()
+        val readerSettings by viewModel.settings.collectAsState()
         val chapters = viewModel.chapters
         val scrollState = rememberScrollState()
         val coroutineScope = rememberCoroutineScope()
@@ -115,16 +143,8 @@ class EpubReaderScreen(
         val fontSize by settingsModel.fontSize.collectAsState()
         val textAlignment by settingsModel.textAlignment.collectAsState()
         val lineSpacing by settingsModel.lineSpacing.collectAsState()
-        val colorScheme by settingsModel.colorScheme.collectAsState()
+        val colorSchemeIndex by settingsModel.colorSchemeIndex.collectAsState()
         val fontFamilyPref by settingsModel.fontFamily.collectAsState()
-        val fontFamily = when (fontFamilyPref) {
-            NovelReaderPreferences.FontFamilyPref.ORIGINAL -> null
-            NovelReaderPreferences.FontFamilyPref.LORA -> FontFamily(Font(R.font.lora))
-            NovelReaderPreferences.FontFamilyPref.OPEN_SANS -> FontFamily(Font(R.font.open_sans))
-            NovelReaderPreferences.FontFamilyPref.ARBUTUS_SLAB -> FontFamily(Font(R.font.arbutus_slab))
-            NovelReaderPreferences.FontFamilyPref.LATO -> FontFamily(Font(R.font.lato))
-            else -> null
-        }
 
         // Set system UI colors - ensure it matches the bottom bar
         val surfaceColor = MaterialTheme.colorScheme.surface
@@ -132,15 +152,29 @@ class EpubReaderScreen(
         val window = remember { view.context.getActivity()?.window }
         val windowInsetsController = remember { window?.let { WindowCompat.getInsetsController(it, view) } }
 
+        // Set navigation bar color
+        val bottomBarColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+
         // Apply immersive mode based on bars visibility
+        LaunchedEffect(Unit) {
+            windowInsetsController?.let {
+                // Always enable immersive mode when entering the reader
+                it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
+                if (barsVisible) {
+                    it.show(WindowInsetsCompat.Type.systemBars())
+                } else {
+                    it.hide(WindowInsetsCompat.Type.systemBars())
+                }
+            }
+        }
+
+        // Update system bars when barsVisible changes
         LaunchedEffect(barsVisible) {
             windowInsetsController?.let {
                 if (!barsVisible) {
-                    // Hide system bars when our UI bars are hidden (immersive mode)
                     it.hide(WindowInsetsCompat.Type.systemBars())
-                    it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 } else {
-                    // Show system bars when our UI bars are visible
                     it.show(WindowInsetsCompat.Type.systemBars())
                 }
             }
@@ -151,16 +185,10 @@ class EpubReaderScreen(
             onDispose {
                 windowInsetsController?.let {
                     it.show(WindowInsetsCompat.Type.systemBars())
-                    it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+                    it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 }
-                window?.navigationBarColor = Color.Transparent.toArgb()
+                window?.navigationBarColor = bottomBarColor.toArgb()
             }
-        }
-
-        // Set navigation bar color
-        LaunchedEffect(surfaceColor) {
-            window?.navigationBarColor = surfaceColor.toArgb()
-            windowInsetsController?.isAppearanceLightNavigationBars = isColorLight(surfaceColor)
         }
 
         // Hide-on-scroll state
@@ -193,6 +221,7 @@ class EpubReaderScreen(
                 sliderProgress.value = scrollState.value.toFloat() / scrollState.maxValue
             }
         }
+
         // save progress debounced
         LaunchedEffect(scrollState.value, viewModel.currentChapterId) {
             if (scrollState.maxValue > 0) {
@@ -201,101 +230,145 @@ class EpubReaderScreen(
             }
         }
 
-        // Chapter list and settings bottom sheet state
+        // Smooth scroll to last saved progress when chapter loads
+        LaunchedEffect(state) {
+            val progress = when (state) {
+                is EpubReaderState.ReflowSuccess -> (state as EpubReaderState.ReflowSuccess).progress
+                else -> 0f
+            }
+            if (progress > 0f) {
+                // Wait for content to be measured
+                kotlinx.coroutines.delay(100)
+                if (scrollState.maxValue > 0) {
+                    val target = (progress * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
+                    scrollState.animateScrollTo(target)
+                }
+            }
+        }
+
+        // Hide system UI bars during loading
+        LaunchedEffect(state is EpubReaderState.Loading) {
+            val activity = view.context.getActivity() as? android.app.Activity ?: return@LaunchedEffect
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                val controller = activity.window.insetsController
+                if (state is EpubReaderState.Loading) {
+                    controller?.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+                } else {
+                    controller?.show(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+                    controller?.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                if (state is EpubReaderState.Loading) {
+                    activity.window.decorView.systemUiVisibility = (
+                        android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                            android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+                            android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        )
+                } else {
+                    activity.window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+                }
+            }
+        }
+
+        // Bottom sheets state
         var showChapterListSheet = remember { mutableStateOf(false) }
         var showSettingsSheet = remember { mutableStateOf(false) }
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            when (val s = state) {
-                is EpubReaderState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-                is EpubReaderState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(s.message)
-                }
-                is EpubReaderState.Success -> {
-                    // Use a single-column scrollable column containing WebView for now
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(colorScheme.background)
-                            .pointerInput(Unit) {
-                                detectTapGestures {
-                                    barsVisible = !barsVisible
-                                }
-                            },
-                    ) {
-                        Column(
+        val backgroundColor = when (readerSettings.theme) {
+            ReaderTheme.LIGHT -> Color.White
+            ReaderTheme.SEPIA -> Color(0xFFFFE4C7)
+            ReaderTheme.MINT -> Color(0xFFDDE7E3)
+            ReaderTheme.BLUE_GRAY -> Color(0xFF2B2B38)
+            ReaderTheme.BLACK -> Color(0xFF000000)
+        }
+
+        // Fullscreen image state
+        var fullscreenImage by remember { mutableStateOf<FullscreenImageData?>(null) }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(backgroundColor)
+        ) {
+            // Main content area with fade transition
+            AnimatedContent(
+                targetState = state,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                modifier = Modifier.fillMaxSize()
+            ) { animatedState ->
+                when (animatedState) {
+                    is EpubReaderState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        EpubShimmerSkeletonLoader(lineCount = 24)
+                    }
+                    is EpubReaderState.Error -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Error: ${animatedState.message}")
+                    }
+                    is EpubReaderState.ReflowSuccess -> {
+                        val verticalPadding = 16.dp
+                        Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .verticalScroll(scrollState),
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onTap = { _ ->
+                                            barsVisible = !barsVisible
+                                        }
+                                    )
+                                }
                         ) {
-                            // Create a CSS style based on user settings
-                            val cssStyle = buildString {
-                                append("body{")
-                                append("color:${colorScheme.text.toCssColor()}!important;")
-                                append("background:${colorScheme.background.toCssColor()}!important;")
-                                append("margin:0;padding:120px 20px 32px 20px;") // Top: 120px, Right/Left: 20px, Bottom: 32px
-                                append("font-size:${fontSize}px!important;")
-                                append("line-height:${lineSpacing / 100f}!important;")
-                                append("max-width:800px;")
-                                append("margin-left:auto;")
-                                append("margin-right:auto;")
-                                append("-webkit-tap-highlight-color:transparent;") // Prevent tap highlight
-                                append("-webkit-touch-callout:none;") // Prevent callout
-                                append("user-select:none;") // Prevent text selection
-
-                                // Font family
-                                when (fontFamilyPref) {
-                                    NovelReaderPreferences.FontFamilyPref.LORA -> append("font-family:'Lora',serif!important;")
-                                    NovelReaderPreferences.FontFamilyPref.OPEN_SANS -> append("font-family:'Open Sans',sans-serif!important;")
-                                    NovelReaderPreferences.FontFamilyPref.ARBUTUS_SLAB -> append("font-family:'Arbutus Slab',serif!important;")
-                                    NovelReaderPreferences.FontFamilyPref.LATO -> append("font-family:'Lato',sans-serif!important;")
-                                    else -> {} // Use original font
-                                }
-
-                                // Text alignment
-                                when (textAlignment) {
-                                    NovelReaderPreferences.TextAlignment.Left -> append("text-align:left!important;")
-                                    NovelReaderPreferences.TextAlignment.Center -> append("text-align:center!important;")
-                                    NovelReaderPreferences.TextAlignment.Right -> append("text-align:right!important;")
-                                    NovelReaderPreferences.TextAlignment.Justify -> append("text-align:justify!important;")
-                                }
-
-                                append("}")
-                                append("img{max-width:100%;height:auto}")
-                                append("p{margin:0.5em 0; text-indent:1.2em}") // Add paragraph indentation
-
-                                // Add JavaScript to prevent text selection
-                                append("</style><script>")
-                                append("document.addEventListener('click', function(e) { e.preventDefault(); }, false);")
-                                append("document.addEventListener('mousedown', function(e) { e.preventDefault(); }, false);")
-                                append("document.addEventListener('mouseup', function(e) { e.preventDefault(); }, false);")
-                                append("document.addEventListener('selectionchange', function() { ")
-                                append("  if (window.getSelection) { window.getSelection().removeAllRanges(); }")
-                                append("  else if (document.selection) { document.selection.empty(); }")
-                                append("}, false);")
-                                append("</script><style>")
+                            Column(modifier = Modifier.verticalScroll(scrollState)) {
+                                Spacer(modifier = Modifier.height(verticalPadding))
+                                EpubReflowableContent(
+                                    contentBlocks = animatedState.contentBlocks,
+                                    settings = readerSettings,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    chapterTitle = animatedState.chapterTitle ?: "",
+                                    onTap = { _ -> barsVisible = !barsVisible },
+                                    onImageClick = { imageData -> fullscreenImage = imageData }
+                                )
+                                Spacer(modifier = Modifier.height(verticalPadding))
                             }
-
-                            // Apply the CSS to the HTML content
-                            val htmlWithStyles = """
-                                <html>
-                                    <head>
-                                        <style>
-                                            $cssStyle
-                                        </style>
-                                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                                    </head>
-                                    <body>${extractBodyContent(s.content)}</body>
-                                </html>
-                            """.trimIndent()
-
-                            WebContent(
-                                html = htmlWithStyles,
-                                onTap = { barsVisible = !barsVisible },
-                            )
                         }
+                    }
+                    is EpubReaderState.HtmlSuccess -> {
+                        AndroidView(
+                            factory = { context ->
+                                WebView(context).apply {
+                                    layoutParams = ViewGroup.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.MATCH_PARENT
+                                    )
+
+                                    settings.apply {
+                                        javaScriptEnabled = true
+                                        defaultTextEncodingName = "UTF-8"
+                                        allowFileAccess = true
+                                        domStorageEnabled = true
+                                        cacheMode = WebSettings.LOAD_DEFAULT
+                                        setSupportMultipleWindows(false)
+                                        builtInZoomControls = true
+                                        displayZoomControls = false
+                                    }
+
+                                    loadDataWithBaseURL(
+                                        null,
+                                        animatedState.content,
+                                        "text/html",
+                                        "UTF-8",
+                                        null
+                                    )
+
+                                    @SuppressLint("ClickableViewAccessibility")
+                                    setOnTouchListener { _, event ->
+                                        if (event.action == MotionEvent.ACTION_UP) {
+                                            barsVisible = !barsVisible
+                                        }
+                                        false
+                                    }
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -307,21 +380,36 @@ class EpubReaderScreen(
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.TopCenter),
             ) {
-                val s = state as? EpubReaderState.Success ?: return@AnimatedVisibility
+                val s = when (state) {
+                    is EpubReaderState.ReflowSuccess -> state as EpubReaderState.ReflowSuccess
+                    is EpubReaderState.HtmlSuccess -> state as EpubReaderState.HtmlSuccess
+                    else -> return@AnimatedVisibility
+                }
+
                 AppBar(
                     titleContent = {
-                        AppBarTitle(title = s.bookTitle, subtitle = s.chapterTitle)
+                        when (val currentState = state) {
+                            is EpubReaderState.ReflowSuccess -> {
+                                AppBarTitle(title = currentState.bookTitle, subtitle = currentState.chapterTitle)
+                            }
+                            is EpubReaderState.HtmlSuccess -> {
+                                AppBarTitle(title = currentState.bookTitle, subtitle = currentState.chapterTitle)
+                            }
+                            else -> {
+                                AppBarTitle(title = "EPUB Reader")
+                            }
+                        }
                     },
                     navigateUp = { navigator?.pop() },
                     actions = {
+                        val currentChapter = viewModel.chapters.find { it.id == viewModel.currentChapterId }
                         IconButton(onClick = {
-                            viewModel.currentChapterId?.let { id ->
-                                chapters.find { it.id == id }?.let { ch -> viewModel.toggleBookmark(ch) }
-                            }
+                            currentChapter?.let { viewModel.toggleBookmark(it) }
                         }) {
+                            val isBookmarked = currentChapter?.bookmark == true
                             Icon(
-                                if (s.bookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                                contentDescription = "Bookmark",
+                                imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                                contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
                             )
                         }
                     },
@@ -373,7 +461,12 @@ class EpubReaderScreen(
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
-                val s = state as? EpubReaderState.Success ?: return@AnimatedVisibility
+                val s = when (state) {
+                    is EpubReaderState.ReflowSuccess -> state as EpubReaderState.ReflowSuccess
+                    is EpubReaderState.HtmlSuccess -> state as EpubReaderState.HtmlSuccess
+                    else -> return@AnimatedVisibility
+                }
+
                 Surface(
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                     shape = RectangleShape,
@@ -387,16 +480,31 @@ class EpubReaderScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Previous chapter button
+                        // Next chapter button
                         IconButton(
-                            onClick = { viewModel.prevChapter() },
-                            enabled = s.hasPrev,
-                            modifier = Modifier.alpha(if (s.hasPrev) 1f else 0.5f),
+                            onClick = { viewModel.nextChapter() },
+                            enabled = when (val currentState = s) {
+                                is EpubReaderState.ReflowSuccess -> currentState.hasNext
+                                is EpubReaderState.HtmlSuccess -> currentState.hasNext
+                                else -> false
+                            },
+                            modifier = Modifier.alpha(
+                                if (when (val currentState = s) {
+                                    is EpubReaderState.ReflowSuccess -> currentState.hasNext
+                                    is EpubReaderState.HtmlSuccess -> currentState.hasNext
+                                    else -> false
+                                }) 1f else 0.3f
+                            ),
                         ) {
+                            val hasNext = when (val currentState = s) {
+                                is EpubReaderState.ReflowSuccess -> currentState.hasNext
+                                is EpubReaderState.HtmlSuccess -> currentState.hasNext
+                                else -> false
+                            }
                             Icon(
                                 Icons.Filled.SkipPrevious,
-                                contentDescription = "Previous chapter",
-                                tint = if (s.hasPrev) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                contentDescription = "Next chapter",
+                                tint = if (hasNext) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
                             )
                         }
                         IconButton(onClick = { showChapterListSheet.value = true }) {
@@ -413,16 +521,31 @@ class EpubReaderScreen(
                         IconButton(onClick = { showSettingsSheet.value = true }) {
                             Icon(Icons.Filled.Settings, contentDescription = "Settings")
                         }
-                        // Next chapter button
+                        // Previous chapter button (moved to the right)
                         IconButton(
-                            onClick = { viewModel.nextChapter() },
-                            enabled = s.hasNext,
-                            modifier = Modifier.alpha(if (s.hasNext) 1f else 0.5f),
+                            onClick = { viewModel.prevChapter() },
+                            enabled = when (val currentState = s) {
+                                is EpubReaderState.ReflowSuccess -> currentState.hasPrev
+                                is EpubReaderState.HtmlSuccess -> currentState.hasPrev
+                                else -> false
+                            },
+                            modifier = Modifier.alpha(
+                                if (when (val currentState = s) {
+                                    is EpubReaderState.ReflowSuccess -> currentState.hasPrev
+                                    is EpubReaderState.HtmlSuccess -> currentState.hasPrev
+                                    else -> false
+                                }) 1f else 0.3f // Make disabled more visually distinct
+                            ),
                         ) {
+                            val hasPrev = when (val currentState = s) {
+                                is EpubReaderState.ReflowSuccess -> currentState.hasPrev
+                                is EpubReaderState.HtmlSuccess -> currentState.hasPrev
+                                else -> false
+                            }
                             Icon(
                                 Icons.Filled.SkipNext,
-                                contentDescription = "Next chapter",
-                                tint = if (s.hasNext) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                contentDescription = "Previous chapter",
+                                tint = if (hasPrev) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
                             )
                         }
                     }
@@ -543,9 +666,47 @@ class EpubReaderScreen(
 
         // Settings bottom sheet (outside of main Box)
         if (showSettingsSheet.value) {
-            NovelReaderSettingsBottomSheet(
-                model = settingsModel,
+            EpubReaderSettingsSheet(
+                viewModel = viewModel,
                 onDismiss = { showSettingsSheet.value = false },
+            )
+        }
+
+        // Fullscreen image overlay
+        if (fullscreenImage != null) {
+            FullscreenImageOverlay(
+                imageData = fullscreenImage!!,
+                onDismiss = { fullscreenImage = null }
+            )
+        }
+    }
+}
+
+@Composable
+private fun TocItem(
+    tocEntry: EpubTableOfContentsEntry,
+    onClick: () -> Unit,
+) {
+    Column {
+        Text(
+            text = tocEntry.title,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(
+                    start = (16 + tocEntry.level * 16).dp,
+                    end = 16.dp,
+                    top = 12.dp,
+                    bottom = 12.dp,
+                ),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+
+        // Render children
+        tocEntry.children.forEach { child ->
+            TocItem(
+                tocEntry = child,
+                onClick = onClick,
             )
         }
     }
@@ -717,33 +878,181 @@ private fun android.content.Context.getActivity(): android.app.Activity? {
     return null
 }
 
-@Composable
-private fun FontPill(label: String, selected: Boolean, onClick: () -> Unit, fontFamily: FontFamily?) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
-        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, Color.Gray),
-        modifier = Modifier
-            .height(36.dp)
-            .clickable(onClick = onClick),
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.padding(horizontal = 16.dp),
-        ) {
-            Text(
-                text = label,
-                fontFamily = fontFamily,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            )
-        }
-    }
-}
-
 data class ChapterItem(
     val chapter: Chapter,
     val isCurrent: Boolean,
     val downloadState: Download.State,
     val downloadProgress: Int,
 )
+
+@Composable
+fun EpubShimmerSkeletonLoader(
+    modifier: Modifier = Modifier,
+    lineCount: Int = 24,
+    lineHeight: Dp = 18.dp,
+    lineSpacing: Dp = 18.dp,
+    topPadding: Dp = 64.dp,
+    cornerRadius: Dp = 8.dp,
+    baseColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    highlightColor: Color = MaterialTheme.colorScheme.primary,
+) {
+    val shimmerInstance = rememberShimmer(shimmerBounds = ShimmerBounds.View)
+    val widthFractions = listOf(0.9f, 0.8f, 0.7f, 0.6f)
+    val shimmerBrush = Brush.linearGradient(
+        colors = listOf(baseColor, highlightColor, baseColor),
+        start = Offset.Zero,
+        end = Offset(x = 1000f, y = 0f),
+    )
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = topPadding)
+            .shimmer(shimmerInstance),
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.Start,
+    ) {
+        repeat(lineCount) {
+            val widthFraction = widthFractions[it % widthFractions.size]
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(widthFraction)
+                    .height(lineHeight)
+                    .clip(RoundedCornerShape(cornerRadius))
+                    .background(shimmerBrush),
+            )
+            if ((it + 1) % 4 == 0) {
+                Spacer(modifier = Modifier.height(lineSpacing * 1.5f))
+            } else {
+                Spacer(modifier = Modifier.height(lineSpacing))
+            }
+        }
+    }
+}
+
+@SuppressLint("UnusedBoxWithConstraintsScope")
+@Composable
+private fun FullscreenImageOverlay(
+    imageData: FullscreenImageData,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val dragThresholdPx = with(density) { 80.dp.toPx() }
+    val offsetY = remember { Animatable(0f) }
+    val scaleAnim = remember { Animatable(0.92f) }
+    var isDismissing by remember { mutableStateOf(false) }
+    val backgroundAlpha = animateFloatAsState(
+        targetValue = (0.6f * (1f - (kotlin.math.abs(offsetY.value) / (dragThresholdPx * 2))).coerceIn(0.2f, 0.6f)),
+        animationSpec = tween(durationMillis = 120), label = "fullscreenImageBgAlpha"
+    )
+    // Dismiss on back
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) onDismiss()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    // Animate in on first composition
+    LaunchedEffect(Unit) {
+        scaleAnim.snapTo(0.92f)
+        scaleAnim.animateTo(1f, tween(180))
+    }
+    fun dismissWithScale() {
+        if (!isDismissing) {
+            isDismissing = true
+            scope.launch {
+                scaleAnim.animateTo(0.92f, tween(180))
+                onDismiss()
+            }
+        }
+    }
+    Dialog(
+        onDismissRequest = { dismissWithScale() },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+            dismissOnClickOutside = true,
+            dismissOnBackPress = true
+        )
+    ) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = backgroundAlpha.value))
+        ) {
+            // Blurred background (under image)
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .blur(32.dp)
+                    .background(Color.Black.copy(alpha = backgroundAlpha.value))
+            )
+            // Image with pan/zoom and scale animation
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragEnd = {
+                                if (kotlin.math.abs(offsetY.value) > dragThresholdPx) {
+                                    dismissWithScale()
+                                } else {
+                                    scope.launch { offsetY.animateTo(0f, tween(220)) }
+                                }
+                            },
+                            onDragCancel = {
+                                scope.launch { offsetY.animateTo(0f, tween(220)) }
+                            },
+                            onDrag = { change, dragAmount ->
+                                scope.launch { offsetY.snapTo(offsetY.value + dragAmount.y) }
+                            }
+                        )
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { dismissWithScale() }
+                        )
+                    }
+            ) {
+                AndroidView(
+                    factory = { ctx ->
+                        ReaderPageImageView(ctx).apply {
+                            onViewClicked = { dismissWithScale() }
+                        }
+                    },
+                    update = { view ->
+                        val config = ReaderPageImageView.Config(zoomDuration = 300)
+                        when {
+                            imageData.data != null -> {
+                                val drawable = BitmapDrawable(context.resources, BitmapFactory.decodeByteArray(imageData.data, 0, imageData.data.size))
+                                view.setImage(drawable, config)
+                            }
+                            imageData.src != null -> {
+                                val request = ImageRequest.Builder(context)
+                                    .data(imageData.src)
+                                    .size(Size.ORIGINAL)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .target { image ->
+                                        val drawable = image.asDrawable(context.resources)
+                                        view.setImage(drawable, config)
+                                    }
+                                    .build()
+                                context.imageLoader.enqueue(request)
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer {
+                            translationY = offsetY.value
+                            scaleX = scaleAnim.value
+                            scaleY = scaleAnim.value
+                        }
+                )
+            }
+        }
+    }
+}

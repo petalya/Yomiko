@@ -1,6 +1,6 @@
 package eu.kanade.tachiyomi.ui.reader.epub
 
-import android.app.Application
+import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.getValue
@@ -8,6 +8,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cafe.adriel.voyager.core.model.ScreenModel
 import com.hippo.unifile.UniFile
+import eu.kanade.tachiyomi.util.epub.EpubChapter
+import eu.kanade.tachiyomi.util.epub.EpubContentBlock
+import eu.kanade.tachiyomi.util.epub.EpubDocument
+import eu.kanade.tachiyomi.util.epub.EpubParser
+import eu.kanade.tachiyomi.util.epub.EpubReaderSettings
+import eu.kanade.tachiyomi.util.epub.EpubTableOfContentsEntry
+import eu.kanade.tachiyomi.util.epub.ReaderTheme
+import eu.kanade.tachiyomi.util.epub.TextAlignment
+import tachiyomi.core.common.util.system.logcat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import tachiyomi.domain.chapter.interactor.GetChaptersByMangaId
 import tachiyomi.domain.chapter.model.Chapter
@@ -23,14 +33,25 @@ import tachiyomi.domain.chapter.model.ChapterUpdate
 import tachiyomi.domain.chapter.repository.ChapterRepository
 import tachiyomi.domain.manga.interactor.GetManga
 import tachiyomi.domain.manga.model.Manga
+import tachiyomi.domain.manga.model.asMangaCover
 import tachiyomi.domain.storage.service.StorageManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import java.io.InputStream
+import java.util.UUID
+import kotlin.math.absoluteValue
+import tachiyomi.domain.history.interactor.UpsertHistory
+import tachiyomi.domain.history.model.HistoryUpdate
+import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
+import eu.kanade.tachiyomi.data.connections.discord.ReaderData
+import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 
 /**
  * Screen-independent state-holder for reading local EPUB files.
- * Mirrors [NovelReaderViewModel] structure so UI layer can be reused.
+ * Supports both reflowable and fixed-layout EPUBs.
  */
 class EpubReaderViewModel(
     private val mangaId: Long,
@@ -40,9 +61,18 @@ class EpubReaderViewModel(
     private val chapterRepo: ChapterRepository = Injekt.get()
     private val getManga: GetManga = Injekt.get()
     private val getChaptersByMangaId: GetChaptersByMangaId = Injekt.get()
-
+    private val epubParser = EpubParser()
+    private val epubPreferences = EpubReaderPreferences(Injekt.get())
+    private val upsertHistory: UpsertHistory = Injekt.get()
+    
+    // Define a coroutine scope for the view model
+    private val coroutineScope = CoroutineScope(Dispatchers.Main)
+    
     private val _state = MutableStateFlow<EpubReaderState>(EpubReaderState.Loading)
     val state: StateFlow<EpubReaderState> = _state.asStateFlow()
+    
+    private val _settings = MutableStateFlow(EpubReaderSettings())
+    val settings: StateFlow<EpubReaderSettings> = _settings.asStateFlow()
 
     private var _chapters = mutableStateOf<List<Chapter>>(emptyList())
     val chapters: List<Chapter> get() = _chapters.value
@@ -52,7 +82,17 @@ class EpubReaderViewModel(
 
     var currentChapterId: Long? = null
         private set
+    
     private var currentChapterIndex: Int = -1
+    
+    // Cache the parsed EPUB document
+    private var parsedEpub: EpubDocument? = null
+    
+    // Cache the extracted content blocks for the current chapter
+    private var currentChapterBlocks = mutableListOf<EpubContentBlock>()
+    
+    // Current chapter in the epub document
+    private var currentEpubChapterIndex: Int = 0
 
     // Debounce job for saving progress
     private var saveProgressJob: Job? = null
@@ -62,7 +102,16 @@ class EpubReaderViewModel(
     private val readThreshold = 0.98f
 
     init {
-        CoroutineScope(Dispatchers.IO).launch {
+        coroutineScope.launch {
+            // Load persisted settings from preferences
+            _settings.value = EpubReaderSettings(
+                fontSize = epubPreferences.fontSize().get(),
+                fontFamily = epubPreferences.fontFamily().get().ifEmpty { null },
+                lineSpacing = epubPreferences.lineSpacing().get(),
+                alignment = epubPreferences.textAlignment().get(),
+                theme = epubPreferences.theme().get(),
+                isScrollMode = false // Not persisted yet
+            )
             try {
                 // Load manga and chapter data
                 manga = getManga.await(mangaId)
@@ -74,7 +123,7 @@ class EpubReaderViewModel(
                 // Load all chapters for this manga
                 _chapters.value = getChaptersByMangaId.await(mangaId).sortedBy { it.sourceOrder }
 
-                // Find the initial chapter index
+                // Find the initial chapter
                 val initialChapter = _chapters.value.find { it.id == initialChapterId }
                 if (initialChapter == null) {
                     _state.value = EpubReaderState.Error("Chapter not found")
@@ -84,78 +133,292 @@ class EpubReaderViewModel(
                 // Set current chapter and load it
                 currentChapterIndex = _chapters.value.indexOf(initialChapter)
                 currentChapterId = initialChapter.id
-                loadChapter(initialChapter)
+                
+                // Parse the EPUB file
+                val epubFile = getEpubFile(initialChapter.url)
+                if (epubFile == null || !epubFile.exists()) {
+                    _state.value = EpubReaderState.Error("EPUB file not found")
+                    return@launch
+                }
+                
+                try {
+                    parsedEpub = epubParser.parseFile(epubFile)
+                    loadChapter(initialChapter)
+                } catch (e: Exception) {
+                    _state.value = EpubReaderState.Error("Failed to parse EPUB: ${e.message}")
+                }
             } catch (e: Exception) {
                 _state.value = EpubReaderState.Error("Failed to load: ${e.message}")
             }
         }
     }
-
+    
+    fun updateSettings(newSettings: EpubReaderSettings) {
+        _settings.value = newSettings
+        // No need to reload/reprocess chapter for visual-only settings changes
+    }
+    
+    fun setFontSize(size: Float) {
+        _settings.value = _settings.value.copy(fontSize = size)
+        coroutineScope.launch { epubPreferences.fontSize().set(size) }
+    }
+    
+    fun setFontFamily(family: String?) {
+        _settings.value = _settings.value.copy(fontFamily = family)
+        coroutineScope.launch { epubPreferences.fontFamily().set(family ?: "") }
+    }
+    
+    fun setLineSpacing(spacing: Float) {
+        _settings.value = _settings.value.copy(lineSpacing = spacing)
+        coroutineScope.launch { epubPreferences.lineSpacing().set(spacing) }
+    }
+    
+    fun setTextAlignment(alignment: TextAlignment) {
+        _settings.value = _settings.value.copy(alignment = alignment)
+        coroutineScope.launch { epubPreferences.textAlignment().set(alignment) }
+    }
+    
+    fun setTheme(theme: ReaderTheme) {
+        _settings.value = _settings.value.copy(theme = theme)
+        coroutineScope.launch { epubPreferences.theme().set(theme) }
+    }
+    
+    fun toggleScrollMode() {
+        _settings.value = _settings.value.copy(isScrollMode = !_settings.value.isScrollMode)
+    }
+    
+    /**
+     * Load a specific chapter from the book
+     */
     private fun loadChapter(chapter: Chapter) {
-        CoroutineScope(Dispatchers.IO).launch {
+        Log.d("EpubReaderVM", "loadChapter called: chapterId=${chapter.id}, chapterIndex=${_chapters.value.indexOf(chapter)}")
+        coroutineScope.launch {
             try {
                 _state.value = EpubReaderState.Loading
-
-                // Extract content from the chapter
-                val content = extractEpubContent(chapter.url)
-
-                // Update current chapter ID
+                val epub = parsedEpub ?: throw IllegalStateException("EPUB not parsed yet")
+                val internalHref = chapter.url.substringAfter("::", "")
+                currentEpubChapterIndex = if (internalHref.isNotEmpty()) {
+                    epub.chapters.indexOfFirst { it.href == internalHref }
+                } else {
+                    0
+                }
+                if (currentEpubChapterIndex < 0) currentEpubChapterIndex = 0
+                val epubChapter = epub.chapters.getOrNull(currentEpubChapterIndex)
+                    ?: throw IllegalStateException("Chapter not found in EPUB")
                 currentChapterId = chapter.id
                 currentChapterIndex = _chapters.value.indexOf(chapter)
-
-                // Update state with success
-                _state.value = EpubReaderState.Success(
-                    bookTitle = manga?.title ?: "",
-                    chapterTitle = chapter.name,
-                    content = content,
-                    bookmarked = chapter.bookmark,
-                    hasPrev = currentChapterIndex > 0,
-                    hasNext = currentChapterIndex < _chapters.value.size - 1,
-                    progress = getSavedProgress(chapter.id),
-                )
-
-                // Refresh chapters list to ensure we have the latest data
+                recordHistory(chapter.id)
+                updateDiscordRPC()
+                Log.d("EpubReaderVM", "After load: currentEpubChapterIndex=$currentEpubChapterIndex, currentChapterIndex=$currentChapterIndex, currentChapterId=$currentChapterId")
+                currentChapterBlocks = epubParser.extractContentBlocks(epubChapter.content).toMutableList()
+                processEmbeddedResources(epubChapter)
+                if (epubChapter.isHtml) {
+                    _state.value = EpubReaderState.ReflowSuccess(
+                        bookTitle = epub.title,
+                        chapterTitle = epubChapter.title ?: "Chapter "+ (currentEpubChapterIndex + 1),
+                        contentBlocks = currentChapterBlocks,
+                        hasPrev = currentChapterIndex > 0,
+                        hasNext = currentChapterIndex < _chapters.value.size - 1,
+                        progress = getSavedProgress(chapter.id),
+                    )
+                } else {
+                    _state.value = EpubReaderState.HtmlSuccess(
+                        bookTitle = epub.title,
+                        chapterTitle = epubChapter.title ?: "Chapter "+ (currentEpubChapterIndex + 1),
+                        content = epubChapter.content,
+                        hasPrev = currentChapterIndex > 0,
+                        hasNext = currentChapterIndex < _chapters.value.size - 1,
+                        progress = getSavedProgress(chapter.id),
+                    )
+                }
                 refreshChapters()
             } catch (e: Exception) {
-                _state.value = EpubReaderState.Error("Failed to load chapter: ${e.message}")
+                _state.value = EpubReaderState.Error("Failed to load chapter: "+ e.message)
             }
         }
     }
-
+    
+    /**
+     * Process embedded resources (images, CSS) and add them to the content blocks
+     */
+    private fun processEmbeddedResources(chapter: EpubChapter) {
+        // Create a list to hold unresolved image references for logging
+        val unresolvedImages = mutableListOf<String>()
+        
+        // Get app context for creating cache files
+        val context = Injekt.get<Context>()
+        val cacheDir = context.cacheDir
+        val epubImagesDir = File(cacheDir, "epub_images").also { it.mkdirs() }
+        
+        for (i in currentChapterBlocks.indices) {
+            val block = currentChapterBlocks[i]
+            when (block) {
+                is EpubContentBlock.Image -> {
+                    val src = block.src
+                    
+                    // For base64 encoded images
+                    if (src.startsWith("data:")) {
+                        // These are handled directly by the parser
+                        continue
+                    }
+                    
+                    // Try to get the image data directly
+                    var imageData = chapter.embeddedResources[src]
+                    
+                    // If direct path fails, try with various path manipulations
+                    if (imageData == null) {
+                        // Try with just the filename
+                        val filename = src.substringAfterLast('/')
+                        imageData = chapter.embeddedResources.entries.find { it.key.endsWith(filename) }?.value
+                    }
+                    
+                    if (imageData != null) {
+                        // Convert image data to a file URI for better handling
+                        val imageUri = saveImageToCache(imageData, src, epubImagesDir)
+                        if (imageUri != null) {
+                            // Create a new block with the image data and URI
+                            currentChapterBlocks[i] = block.copy(data = imageData, src = imageUri.toString())
+                        } else {
+                            // Fall back to using raw data
+                            currentChapterBlocks[i] = block.copy(data = imageData)
+                        }
+                    } else {
+                        unresolvedImages.add(src)
+                    }
+                }
+                is EpubContentBlock.Embed -> {
+                    val src = block.src
+                    val embedData = chapter.embeddedResources[src]
+                        ?: chapter.embeddedResources.entries.find { it.key.endsWith(src.substringAfterLast('/')) }?.value
+                        
+                    if (embedData != null) {
+                        // For image embeds, create a file URI for better handling
+                        if (block.mediaType.startsWith("image/")) {
+                            val imageUri = saveImageToCache(embedData, src, epubImagesDir)
+                            if (imageUri != null) {
+                                currentChapterBlocks[i] = block.copy(data = embedData, src = imageUri.toString())
+                            } else {
+                                currentChapterBlocks[i] = block.copy(data = embedData)
+                            }
+                        } else {
+                            currentChapterBlocks[i] = block.copy(data = embedData)
+                        }
+                    }
+                }
+                else -> {} // No processing needed
+            }
+        }
+        
+        // Log unresolved images for debugging
+        if (unresolvedImages.isNotEmpty()) {
+            logcat { "Unresolved image paths: $unresolvedImages" }
+        }
+    }
+    
+    /**
+     * Save image data to a cache file and return its URI
+     */
+    private fun saveImageToCache(imageData: ByteArray, src: String, cacheDir: File): Uri? {
+        try {
+            val extension = when {
+                src.lowercase().endsWith(".jpg") || src.lowercase().endsWith(".jpeg") -> ".jpg"
+                src.lowercase().endsWith(".png") -> ".png"
+                src.lowercase().endsWith(".gif") -> ".gif"
+                src.lowercase().endsWith(".webp") -> ".webp"
+                src.lowercase().endsWith(".svg") -> ".svg"
+                else -> {
+                    // Try to detect from the first few bytes
+                    when {
+                        imageData.size > 2 && imageData[0] == 0xFF.toByte() && imageData[1] == 0xD8.toByte() -> ".jpg"
+                        imageData.size > 4 && imageData[0] == 0x89.toByte() && imageData[1] == 0x50.toByte() &&
+                                imageData[2] == 0x4E.toByte() && imageData[3] == 0x47.toByte() -> ".png"
+                        imageData.size > 3 && imageData[0] == 0x47.toByte() && imageData[1] == 0x49.toByte() &&
+                                imageData[2] == 0x46.toByte() -> ".gif"
+                        else -> ".bin" // Fallback
+                    }
+                }
+            }
+            
+            // Create a unique filename based on the source path
+            val filename = "${src.hashCode().absoluteValue}${extension}"
+            val imageFile = File(cacheDir, filename)
+            
+            // Only write if file doesn't exist yet
+            if (!imageFile.exists()) {
+                FileOutputStream(imageFile).use { it.write(imageData) }
+            }
+            
+            return Uri.fromFile(imageFile)
+        } catch (e: Exception) {
+            logcat { "Failed to save image to cache: ${e.message}" }
+            return null
+        }
+    }
+    
+    /**
+     * Navigate to previous chapter or previous internal chapter
+     */
     fun prevChapter() {
-        if (currentChapterIndex <= 0) return
-        val prevChapter = _chapters.value.getOrNull(currentChapterIndex - 1) ?: return
-        loadChapter(prevChapter)
-    }
-
-    fun nextChapter() {
-        if (currentChapterIndex >= _chapters.value.size - 1) return
-        val nextChapter = _chapters.value.getOrNull(currentChapterIndex + 1) ?: return
-        loadChapter(nextChapter)
-    }
-
-    fun jumpToChapter(index: Int) {
-        if (index < 0 || index >= _chapters.value.size || index == currentChapterIndex) return
-        val chapter = _chapters.value[index]
-        loadChapter(chapter)
-    }
-
-    fun toggleBookmark(chapter: Chapter) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val newBookmark = !chapter.bookmark
-            chapterRepo.update(ChapterUpdate(id = chapter.id, bookmark = newBookmark))
-
-            // Update state if this is the current chapter
-            val currentState = _state.value
-            if (currentState is EpubReaderState.Success && chapter.id == currentChapterId) {
-                _state.value = currentState.copy(bookmarked = newBookmark)
+        if (currentChapterIndex > 0) {
+            currentChapterIndex--
+            currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
+            _state.value = EpubReaderState.Loading
+            coroutineScope.launch {
+                kotlinx.coroutines.delay(600)
+            loadChapter(_chapters.value[currentChapterIndex])
             }
-
-            // Refresh chapters list to reflect the change
-            refreshChapters()
+        }
+    }
+    
+    /**
+     * Navigate to next chapter or next internal chapter
+     */
+    fun nextChapter() {
+        if (currentChapterIndex < _chapters.value.size - 1) {
+            currentChapterIndex++
+            currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
+            _state.value = EpubReaderState.Loading
+            coroutineScope.launch {
+                kotlinx.coroutines.delay(600)
+            loadChapter(_chapters.value[currentChapterIndex])
+            }
+        }
+    }
+    
+    /**
+     * Jump to a specific chapter from the chapters list
+     */
+    fun jumpToChapter(index: Int) {
+        if (index in _chapters.value.indices) {
+            currentChapterIndex = index
+            currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
+            _state.value = EpubReaderState.Loading
+            coroutineScope.launch {
+                kotlinx.coroutines.delay(600)
+            loadChapter(_chapters.value[currentChapterIndex])
+            }
+        }
+    }
+    
+    /**
+     * Jump to a specific table of contents entry
+     */
+    fun jumpToTableOfContentsEntry(href: String) {
+        val epub = parsedEpub ?: return
+        
+        // Find which chapter contains this TOC entry
+        val targetChapterIndex = epub.chapters.indexOfFirst { it.href == href }
+        if (targetChapterIndex >= 0) {
+            currentEpubChapterIndex = targetChapterIndex
+            currentChapterId?.let { id ->
+                chapters.find { it.id == id }?.let { loadChapter(it) }
+            }
         }
     }
 
+    /**
+     * Toggle read state for a chapter
+     */
     fun toggleRead(chapter: Chapter) {
         CoroutineScope(Dispatchers.IO).launch {
             val newReadState = !chapter.read
@@ -166,6 +429,20 @@ class EpubReaderViewModel(
         }
     }
 
+    /**
+     * Toggle bookmark state for a chapter
+     */
+    fun toggleBookmark(chapter: Chapter) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val newBookmark = !chapter.bookmark
+            chapterRepo.update(ChapterUpdate(id = chapter.id, bookmark = newBookmark))
+            refreshChapters()
+        }
+    }
+
+    /**
+     * Update reading progress with debounce
+     */
     fun updateScrollProgressDebounced(progress: Float) {
         val chapterId = currentChapterId ?: return
         if (kotlin.math.abs(progress - lastSavedProgress) < 0.001) return
@@ -175,7 +452,7 @@ class EpubReaderViewModel(
             delay(500) // 0.5s debounce
             val percentInt = (progress * 1000).toLong()
             chapterRepo.update(ChapterUpdate(id = chapterId, lastPageRead = percentInt))
-
+            recordHistory(chapterId)
             // Mark as read if progress exceeds threshold
             if (progress >= readThreshold) {
                 val chapter = _chapters.value.find { it.id == chapterId }
@@ -196,115 +473,33 @@ class EpubReaderViewModel(
         val chapter = _chapters.value.find { it.id == chapterId }
         return if (chapter != null && chapter.lastPageRead > 0) chapter.lastPageRead / 1000f else 0f
     }
-
+    
     /**
-     * Checks if HTML content is essentially blank/empty.
+     * Get the File object for the EPUB from the chapter URL
      */
-    private fun isBlankHtml(html: String): Boolean {
-        val text = Jsoup.parse(html).text().trim()
-        return text.length < 80
-    }
-
-    private fun extractEpubContent(chapterUrl: String): String {
+    private fun getEpubFile(chapterUrl: String): File? {
         try {
-            // Load EPUB file and extract HTML for current chapter
+            // Load EPUB file from URL
             val epubPath = resolveEpubPath(chapterUrl)
-            val inputStream = openEpubInputStream(epubPath) ?: throw java.io.FileNotFoundException(epubPath)
-            val book = nl.siegmann.epublib.epub.EpubReader().readEpub(inputStream)
-
-            // Try to match spine item by chapter URL (DB stores internal href) else fallback to index
-            val spineResources = book.spine.spineReferences
-
-            val internalHref = chapterUrl.substringAfter("::", "")
-            // try exact match by href using book resources as LNReader does
-            val resourceExact: nl.siegmann.epublib.domain.Resource? = if (internalHref.isNotEmpty()) {
-                book.resources.getByHref(internalHref)
-            } else {
-                null
+            val inputStream = openEpubInputStream(epubPath) ?: return null
+            
+            // Create a temporary file for the EPUB
+            val cacheFile = File(
+                Injekt.get<Context>().cacheDir, 
+                "epub_" + UUID.randomUUID().toString() + ".epub"
+            )
+            
+            // Copy the input stream to the cache file
+            FileOutputStream(cacheFile).use { output ->
+                inputStream.copyTo(output)
             }
-
-            // fallback heuristics
-            val firstSubstantialRes = spineResources.firstOrNull { ref ->
-                val data = ref.resource.data ?: ref.resource.getData()
-                if (data == null || data.isEmpty()) return@firstOrNull false
-                val text = Jsoup.parse(String(data, Charsets.UTF_8)).text()
-                text.length > 80
-            }?.resource
-
-            val resource = resourceExact ?: when {
-                internalHref.isNotEmpty() -> spineResources.firstOrNull { it.resource.href.contains(internalHref) }?.resource
-                firstSubstantialRes != null -> firstSubstantialRes
-                else -> spineResources.getOrNull(currentChapterIndex)?.resource ?: spineResources.firstOrNull()?.resource
-            }
-
-            val rawBytes = resource?.data ?: resource?.getData() ?: ByteArray(0)
-            val charsetName = resource?.inputEncoding ?: "UTF-8"
-            var htmlStr: String = try {
-                String(rawBytes, java.nio.charset.Charset.forName(charsetName))
-            } catch (_: Exception) {
-                String(rawBytes, Charsets.UTF_8)
-            }
-
-            // Rebuild HTML with our own CSS and body content like LNReader
-            val doc = Jsoup.parse(htmlStr)
-            val bodyInner = doc.body().html()
-            val css = """
-                <style>
-                    body{color:#ffffff!important;background:#000000!important;margin:0;padding:0;font-size:1.1em;line-height:1.6}
-                    img{max-width:100%;height:auto}
-                </style>
-            """.trimIndent()
-            htmlStr = """
-                <html>
-                    <head>$css</head>
-                    <body>$bodyInner</body>
-                </html>
-            """.trimIndent()
-
-            if (isBlankHtml(htmlStr)) {
-                val startIdx = spineResources.indexOfFirst { it.resource == resource }.coerceAtLeast(0)
-
-                // forward scan
-                for (idx in (startIdx + 1) until spineResources.size) {
-                    val data = spineResources[idx].resource.data ?: spineResources[idx].resource.getData()
-                    if (data != null && data.isNotEmpty()) {
-                        val candidate = String(data, Charsets.UTF_8)
-                        if (!isBlankHtml(candidate)) {
-                            htmlStr = candidate
-                            break
-                        }
-                    }
-                }
-
-                // if still blank, scan backwards
-                if (isBlankHtml(htmlStr)) {
-                    for (idx in (startIdx - 1) downTo 0) {
-                        val data = spineResources[idx].resource.data ?: spineResources[idx].resource.getData()
-                        if (data != null && data.isNotEmpty()) {
-                            val candidate = String(data, Charsets.UTF_8)
-                            if (!isBlankHtml(candidate)) {
-                                htmlStr = candidate
-                                break
-                            }
-                        }
-                    }
-                }
-            }
-
-            return htmlStr
+            
+            return cacheFile
         } catch (e: Exception) {
-            Log.e("EpubReader", "Failed to extract EPUB content", e)
-            return "<html><body><h1>Error</h1><p>Failed to load EPUB content: ${e.message}</p></body></html>"
+            return null
         }
     }
 
-    /**
-     * Converts chapter URL or manga URL into an absolute .epub file path on disk.
-     * Handles cases like:
-     *  – "/storage/emulated/0/Tachiyomi/local/MyBook/book.epub::OEBPS/ch001.xhtml"
-     *  – "file:///storage/emulated/0/Tachiyomi/local/MyBook/book.epub::OEBPS/ch001.xhtml"
-     *  – "MyBook/book.epub::OEBPS/ch001.xhtml"  (relative to Local source dir)
-     */
     private fun resolveEpubPath(raw: String): String {
         // Keep only the path to the .epub archive (strip chapter anchor)
         var path = raw.substringBefore("::")
@@ -334,7 +529,7 @@ class EpubReaderViewModel(
         return when {
             path.startsWith("content://") -> {
                 val uri = Uri.parse(path)
-                Injekt.get<Application>().contentResolver.openInputStream(uri)
+                Injekt.get<Context>().contentResolver.openInputStream(uri)
             }
             path.startsWith("/") -> {
                 java.io.FileInputStream(File(path))
@@ -352,19 +547,89 @@ class EpubReaderViewModel(
             }
         }
     }
-}
+    
+    fun getTableOfContents(): List<EpubTableOfContentsEntry> {
+        return parsedEpub?.tableOfContents ?: emptyList()
+    }
 
-// ────────────────────────────── State ─────────────────────────────────────────
-sealed class EpubReaderState {
-    object Loading : EpubReaderState()
-    data class Success(
-        val bookTitle: String,
-        val chapterTitle: String,
-        val content: String, // Raw HTML or already-parsed content depending on renderer
-        val hasNext: Boolean = false,
-        val hasPrev: Boolean = false,
-        val progress: Float = 0f,
-        val bookmarked: Boolean = false,
-    ) : EpubReaderState()
-    data class Error(val message: String) : EpubReaderState()
+    private fun recordHistory(chapterId: Long) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val now = java.util.Date()
+            upsertHistory.await(HistoryUpdate(chapterId, now, 0L))
+        }
+    }
+
+    private fun updateDiscordRPC() {
+        val connectionsPreferences = Injekt.get<eu.kanade.domain.connections.service.ConnectionsPreferences>()
+        val chapter = _chapters.value.getOrNull(currentChapterIndex)
+        val context = Injekt.get<android.content.Context>()
+        val chapterNumberFloat = chapter?.chapterNumber?.toFloat() ?: -1f
+        CoroutineScope(Dispatchers.IO).launch {
+            val latestManga = getManga.await(mangaId)
+            val mangaCover = latestManga?.asMangaCover()
+            val coverUrl = mangaCover?.url as? String
+            val epubIconUrl = "emojis/1396447904264359997.webp?quality=lossless"
+            if (latestManga != null && chapter != null && connectionsPreferences.enableDiscordRPC().get()) {
+                if (latestManga.source == 0L) {
+                    // Use EPUB local feed icon for local source EPUBs
+                    DiscordRPCService.setScreen(
+                        context = context,
+                        discordScreen = DiscordScreen.EPUB_LOCAL_FEED,
+                        readerData = ReaderData(
+                            incognitoMode = latestManga.incognitoMode,
+                            mangaId = latestManga.id,
+                            mangaTitle = "EPUB: ${latestManga.title}",
+                            thumbnailUrl = epubIconUrl,
+                            chapterNumber = Pair(chapterNumberFloat, _chapters.value.size),
+                            chapterTitle = if (connectionsPreferences.useChapterTitles().get()) chapter.name else chapter.chapterNumber.toString(),
+                        ),
+                    )
+                } else if (coverUrl != null) {
+                    DiscordRPCService.setReaderActivity(
+                        context = context,
+                        readerData = ReaderData(
+                            incognitoMode = latestManga.incognitoMode,
+                            mangaId = latestManga.id,
+                            mangaTitle = "EPUB: ${latestManga.title}",
+                            thumbnailUrl = coverUrl,
+                            chapterNumber = Pair(chapterNumberFloat, _chapters.value.size),
+                            chapterTitle = if (connectionsPreferences.useChapterTitles().get()) chapter.name else chapter.chapterNumber.toString(),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    companion object {
+        /**
+         * Clears the EPUB image cache directory (epub_images) in the app's cacheDir.
+         * @param context The application context.
+         * @return The number of files deleted.
+         */
+        fun clearEpubCache(context: Context): Int {
+            var deletedFiles = 0
+            // 1. Clear epub_images
+            val epubImagesDir = File(context.cacheDir, "epub_images")
+            if (epubImagesDir.exists() && epubImagesDir.isDirectory) {
+                epubImagesDir.listFiles()?.forEach {
+                    if (it.delete()) deletedFiles++
+                }
+            }
+            // 2. Clear temp EPUB files (epub_*.epub)
+            context.cacheDir.listFiles()?.forEach {
+                if (it.isFile && it.name.startsWith("epub_") && it.name.endsWith(".epub")) {
+                    if (it.delete()) deletedFiles++
+                }
+            }
+            // 3. Clear UniFileTempFileManager temp files (externalCacheDir/tmp)
+            val tmpDir = File(context.externalCacheDir, "tmp")
+            if (tmpDir.exists() && tmpDir.isDirectory) {
+                tmpDir.listFiles()?.forEach {
+                    if (it.delete()) deletedFiles++
+                }
+            }
+            return deletedFiles
+        }
+    }
 }

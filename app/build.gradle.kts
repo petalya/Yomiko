@@ -312,6 +312,7 @@ dependencies {
         exclude(group = "xmlpull", module = "xmlpull")
         exclude(group = "net.sf.kxml", module = "kxml2")
     }
+    implementation("com.valentinilk.shimmer:compose-shimmer:1.3.3")
 }
 
 androidComponents {

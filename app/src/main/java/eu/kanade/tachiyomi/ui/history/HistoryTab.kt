@@ -93,6 +93,12 @@ data object HistoryTab : Tab {
             onClickExpand = screenModel::toggleExpandHistory,
             onDialogChange = screenModel::setDialog,
             onClickFavorite = screenModel::addFavorite,
+            onOpenEpub = { mangaId, chapterId, chapterUrl ->
+                navigator.push(eu.kanade.tachiyomi.ui.reader.epub.EpubReaderScreen(mangaId, chapterId, chapterUrl))
+            },
+            onOpenNovel = { mangaId, chapterId ->
+                navigator.push(eu.kanade.tachiyomi.ui.reader.NovelReaderScreen(mangaId, chapterId))
+            },
         )
 
         val onDismissRequest = { screenModel.setDialog(null) }

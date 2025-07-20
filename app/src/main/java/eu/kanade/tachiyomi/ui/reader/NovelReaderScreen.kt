@@ -132,6 +132,8 @@ import tachiyomi.domain.chapter.interactor.GetChaptersByMangaId
 import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.chapter.repository.ChapterRepository
 import tachiyomi.domain.chapter.service.getChapterSort
+import tachiyomi.domain.history.interactor.UpsertHistory
+import tachiyomi.domain.history.model.HistoryUpdate
 import tachiyomi.domain.library.model.ChapterSwipeAction
 import tachiyomi.domain.manga.interactor.GetManga
 import tachiyomi.domain.manga.model.Manga
@@ -140,6 +142,9 @@ import tachiyomi.domain.source.service.SourceManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.time.format.DateTimeFormatter
+import com.valentinilk.shimmer.shimmer
+import com.valentinilk.shimmer.rememberShimmer
+import com.valentinilk.shimmer.ShimmerBounds
 
 // --- State ---
 sealed class NovelReaderState {
@@ -172,6 +177,7 @@ class NovelReaderViewModel(
     private val getManga: GetManga = Injekt.get()
     private val getChaptersByMangaId: GetChaptersByMangaId = Injekt.get()
     internal val sourceManager: SourceManager = Injekt.get()
+    private val upsertHistory: UpsertHistory = Injekt.get()
     private val _state = MutableStateFlow<NovelReaderState>(NovelReaderState.Loading)
     val state: StateFlow<NovelReaderState> = _state.asStateFlow()
 
@@ -200,6 +206,7 @@ class NovelReaderViewModel(
             delay(500) // 0.5s debounce
             val percentInt = (progress * 1000).toLong()
             chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapterId, lastPageRead = percentInt))
+            recordHistory(chapterId)
         }
         val current = state.value
         if (current is NovelReaderState.Success) {
@@ -286,6 +293,12 @@ class NovelReaderViewModel(
             }
         }
     }
+    private fun recordHistory(chapterId: Long) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val now = java.util.Date()
+            upsertHistory.await(HistoryUpdate(chapterId, now, 0L))
+        }
+    }
     init {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -347,6 +360,7 @@ class NovelReaderViewModel(
                     bookmarked = chapter.bookmark,
                 )
                 updateDiscordRPC()
+                recordHistory(chapter.id)
             } catch (e: Exception) {
                 _state.value = NovelReaderState.Error(e.message ?: "Failed to load chapter content")
             }
@@ -524,7 +538,7 @@ class NovelReaderScreen(
                         Modifier.fillMaxSize().background(presetColorScheme.background),
                         contentAlignment = Alignment.Center,
                     ) {
-                        ShimmerSkeletonLoader(lineCount = 24)
+                        EpubShimmerSkeletonLoader(lineCount = 24)
                     }
 
                     is NovelReaderState.Error -> Box(
@@ -616,7 +630,7 @@ class NovelReaderScreen(
                         ) { ready ->
                             if (!ready) {
                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    ShimmerSkeletonLoader(lineCount = 24)
+                                    EpubShimmerSkeletonLoader(lineCount = 24)
                                 }
                             } else {
                                 Column(
@@ -1172,7 +1186,7 @@ class NovelReaderScreen(
     }
 
     @Composable
-    fun ShimmerSkeletonLoader(
+    fun EpubShimmerSkeletonLoader(
         modifier: Modifier = Modifier,
         lineCount: Int = 24,
         lineHeight: Dp = 18.dp,
@@ -1180,30 +1194,22 @@ class NovelReaderScreen(
         topPadding: Dp = 64.dp,
         cornerRadius: Dp = 8.dp,
         baseColor: Color = MaterialTheme.colorScheme.surfaceVariant,
-        highlightColor: Color = MaterialTheme.colorScheme.surface,
+        highlightColor: Color = MaterialTheme.colorScheme.primary,
     ) {
-        val shimmerTransition = rememberInfiniteTransition(label = "shimmer")
-        val shimmerTranslate by shimmerTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1200, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart,
-            ),
-            label = "shimmerTranslate",
-        )
-        val brush = Brush.linearGradient(
+        val shimmerInstance = rememberShimmer(shimmerBounds = ShimmerBounds.View)
+        val widthFractions = listOf(0.9f, 0.8f, 0.7f, 0.6f)
+        val shimmerBrush = Brush.linearGradient(
             colors = listOf(baseColor, highlightColor, baseColor),
             start = Offset.Zero,
-            end = Offset(x = 600f * shimmerTranslate + 1f, y = 0f),
+            end = Offset(x = 1000f, y = 0f),
         )
-        val widthFractions = listOf(0.9f, 0.8f, 0.7f, 0.6f)
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = topPadding),
+                .padding(horizontal = 24.dp, vertical = topPadding)
+                .shimmer(shimmerInstance),
             verticalArrangement = Arrangement.Top,
-            horizontalAlignment = Alignment.Start, // align left
+            horizontalAlignment = Alignment.Start,
         ) {
             repeat(lineCount) {
                 val widthFraction = widthFractions[it % widthFractions.size]
@@ -1212,9 +1218,8 @@ class NovelReaderScreen(
                         .fillMaxWidth(widthFraction)
                         .height(lineHeight)
                         .clip(RoundedCornerShape(cornerRadius))
-                        .background(brush),
+                        .background(shimmerBrush),
                 )
-                // Add extra space after every 4th line for paragraph effect
                 if ((it + 1) % 4 == 0) {
                     Spacer(modifier = Modifier.height(lineSpacing * 1.5f))
                 } else {

@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.LaunchedEffect
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
@@ -13,6 +14,8 @@ import eu.kanade.presentation.browse.SourceFeedScreen
 import eu.kanade.presentation.browse.components.SourceFeedAddDialog
 import eu.kanade.presentation.browse.components.SourceFeedDeleteDialog
 import eu.kanade.presentation.util.Screen
+import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
+import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.ui.browse.source.browse.BrowseSourceScreen
 import eu.kanade.tachiyomi.ui.browse.source.browse.SourceFilterDialog
@@ -21,6 +24,9 @@ import eu.kanade.tachiyomi.util.system.toast
 import exh.md.follows.MangaDexFollowsScreen
 import exh.ui.ifSourcesLoaded
 import exh.util.nullIfBlank
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.interactor.GetRemoteManga
 import tachiyomi.domain.source.model.SavedSearch
@@ -39,6 +45,17 @@ class SourceFeedScreen(val sourceId: Long) : Screen() {
         val state by screenModel.state.collectAsState()
         val navigator = LocalNavigator.currentOrThrow
         val context = LocalContext.current
+
+        // Discord RPC integration for EPUB local source feed
+        val localSourceId = 0L // LocalSource.ID is 0L
+        if (sourceId == localSourceId) {
+            // Only trigger for local source
+            LaunchedEffect(Unit) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    DiscordRPCService.setScreen(context, DiscordScreen.EPUB_LOCAL_FEED)
+                }
+            }
+        }
 
         SourceFeedScreen(
             name = screenModel.source.name,

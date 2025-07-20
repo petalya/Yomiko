@@ -142,7 +142,48 @@ actual class LocalSource(
             .map { mangaDir ->
                 async {
                     SManga.create().apply {
-                        title = mangaDir.name.orEmpty()
+                        val mangaDirFiles = mangaDir.listFiles().orEmpty()
+                        val epubFile = mangaDirFiles.firstOrNull { it.extension.equals("epub", true) }
+                        val comicInfoFile = mangaDirFiles.firstOrNull { it.name == COMIC_INFO_FILE }
+                        if (epubFile != null) {
+                            val epubLastModified = epubFile.lastModified()
+                            val comicInfoLastModified = comicInfoFile?.lastModified() ?: 0L
+                            if (comicInfoFile != null && comicInfoLastModified >= epubLastModified) {
+                                // Use ComicInfo.xml cache
+                                comicInfoFile.openInputStream().use { stream ->
+                                    val comicInfo = AndroidXmlReader(stream, StandardCharsets.UTF_8.name()).use { xmlReader ->
+                                        xml.decodeFromReader<ComicInfo>(xmlReader)
+                                    }
+                                    this.copyFromComicInfo(comicInfo)
+                                }
+                            } else {
+                                // Parse EPUB and update ComicInfo.xml
+                                epubFile.openInputStream()?.use { inputStream ->
+                                    try {
+                                        val epub = eu.kanade.tachiyomi.util.storage.EpubFile(inputStream)
+                                        val book = epub.book
+                                        book.title?.takeIf { it.isNotBlank() }?.let { title = it }
+                                        val authors = book.metadata.authors
+                                        if (authors.isNotEmpty()) {
+                                            author = authors.joinToString(", ") { it.firstname + " " + it.lastname }.trim()
+                                        }
+                                        book.metadata.descriptions.firstOrNull()?.let { desc ->
+                                            description = desc
+                                        }
+                                        // Save ComicInfo.xml
+                                        val comicInfo = this.getComicInfo()
+                                        mangaDir.createFile(COMIC_INFO_FILE)?.openOutputStream()?.use { out ->
+                                            out.write(xml.encodeToString(ComicInfo.serializer(), comicInfo).toByteArray())
+                                        }
+                                    } catch (e: Exception) {
+                                        // fallback to directory name for title, leave author as null
+                                        title = mangaDir.name.orEmpty()
+                                    }
+                                }
+                            }
+                        } else {
+                            title = mangaDir.name.orEmpty()
+                        }
                         url = mangaDir.name.orEmpty()
 
                         // Try to find the cover first before extraction (faster)
@@ -151,7 +192,6 @@ actual class LocalSource(
                             thumbnail_url = existingCover.uri.toString()
                         } else {
                             // Extract EPUB cover if needed - but only check for EPUBs if no cover exists
-                            val mangaDirFiles = mangaDir.listFiles().orEmpty()
                             val hasEpubs = mangaDirFiles.any { it.extension.equals("epub", true) }
                             if (hasEpubs) {
                                 extractCoversFromEpubs(mangaDirFiles.filter { it.extension.equals("epub", true) }, this)
@@ -170,7 +210,8 @@ actual class LocalSource(
         val mangaDirFiles = fileSystem.getFilesInMangaDirectory(manga.url)
         val existingFile = mangaDirFiles
             .firstOrNull { it.name == COMIC_INFO_FILE }
-        val comicInfoArchiveFile = mangaDirFiles.firstOrNull { it.name == COMIC_INFO_ARCHIVE }
+        val comicInfoArchiveFile = mangaDirFiles
+            .firstOrNull { it.name == COMIC_INFO_ARCHIVE }
         val comicInfoArchiveReader = comicInfoArchiveFile?.archiveReader(context)
         val existingComicInfo =
             (existingFile?.openInputStream() ?: comicInfoArchiveReader?.getInputStream(COMIC_INFO_FILE))?.use {

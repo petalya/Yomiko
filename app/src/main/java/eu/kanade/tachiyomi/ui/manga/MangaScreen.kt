@@ -148,14 +148,26 @@ class MangaScreen(
                 }
                 .launchIn(this)
 
-            DiscordRPCService.setScreen(
-                context, DiscordScreen.LIBRARY,
-                ReaderData(
-                    incognitoMode = Injekt.get<GetIncognitoState>().await(successState.manga.source, successState.manga.id),
-                    mangaId = successState.manga.id,
-                    chapterTitle = successState.manga.title,
-                ),
-            )
+            val isEpub = successState.chapters.any { it.chapter.url.contains(".epub") || it.chapter.url.contains("::") }
+            if (successState.source.id == 0L && isEpub) {
+                DiscordRPCService.setScreen(
+                    context, DiscordScreen.EPUB_LOCAL_FEED,
+                    ReaderData(
+                        incognitoMode = Injekt.get<GetIncognitoState>().await(successState.manga.source, successState.manga.id),
+                        mangaId = successState.manga.id,
+                        chapterTitle = successState.manga.title,
+                    ),
+                )
+            } else {
+                DiscordRPCService.setScreen(
+                    context, DiscordScreen.LIBRARY,
+                    ReaderData(
+                        incognitoMode = Injekt.get<GetIncognitoState>().await(successState.manga.source, successState.manga.id),
+                        mangaId = successState.manga.id,
+                        chapterTitle = successState.manga.title,
+                    ),
+                )
+            }
         }
         // SY <--
 

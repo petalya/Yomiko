@@ -62,6 +62,8 @@ fun HistoryScreen(
     onClickExpand: (historyItem: HistoryWithRelations) -> Unit,
     onClickFavorite: (mangaId: Long) -> Unit,
     onDialogChange: (HistoryScreenModel.Dialog?) -> Unit,
+    onOpenEpub: (mangaId: Long, chapterId: Long, chapterUrl: String) -> Unit,
+    onOpenNovel: (mangaId: Long, chapterId: Long) -> Unit,
 ) {
     BackHandler(!state.searchQuery.isNullOrEmpty()) {
         onSearchQueryChange(null)
@@ -109,9 +111,33 @@ fun HistoryScreen(
                     state = state,
                     history = it,
                     contentPadding = contentPadding,
-                    onClickCover = { history -> onClickCover(history.mangaId) },
-                    onClickResume = { history -> onClickResume(history.chapter) },
-                    onClickExpand = { history -> onClickExpand(history) },
+                    onClickCover = { history ->
+                        if (isEpubOrNovel(history)) {
+                            val chapter = history.chapter
+                            if (chapter != null) {
+                                if (chapter.url.contains(".epub") || chapter.url.contains("::")) {
+                                    onOpenEpub(history.mangaId, chapter.id, chapter.url)
+                                } else if (history.coverData.sourceId == 10001L) {
+                                    onOpenNovel(history.mangaId, chapter.id)
+                                }
+                            }
+                        } else {
+                            onClickCover(history.mangaId)
+                        }
+                    },
+                    onClickResume = { history ->
+                        val chapter = history.chapter
+                        if (isEpubOrNovel(history) && chapter != null) {
+                            if (chapter.url.contains(".epub") || chapter.url.contains("::")) {
+                                onOpenEpub(history.mangaId, chapter.id, chapter.url)
+                            } else if (history.coverData.sourceId == 10001L) {
+                                onOpenNovel(history.mangaId, chapter.id)
+                            }
+                        } else {
+                            onClickResume(chapter)
+                        }
+                    },
+                    onClickExpand = { onClickExpand(it) },
                     onClickDelete = { item -> onDialogChange(HistoryScreenModel.Dialog.Delete(item)) },
                     onClickFavorite = { history -> onClickFavorite(history.mangaId) },
                 )
@@ -245,6 +271,13 @@ sealed interface HistoryUiModel {
     ) : HistoryUiModel
 }
 
+// Helper to check if a history item is EPUB or novel
+private fun isEpubOrNovel(history: HistoryWithRelations): Boolean {
+    // EPUB: chapter URL contains .epub or ::
+    // Novel: sourceId == 10001L
+    return (history.chapter?.url?.contains(".epub") == true || history.chapter?.url?.contains("::") == true) || history.coverData.sourceId == 10001L
+}
+
 @PreviewLightDark
 @Composable
 internal fun HistoryScreenPreviews(
@@ -261,6 +294,8 @@ internal fun HistoryScreenPreviews(
             onClickExpand = {},
             onDialogChange = {},
             onClickFavorite = {},
+            onOpenEpub = { _, _, _ -> },
+            onOpenNovel = { _, _ -> },
         )
     }
 }

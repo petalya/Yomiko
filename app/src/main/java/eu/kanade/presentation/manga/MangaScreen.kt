@@ -46,6 +46,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.util.fastAll
 import androidx.compose.ui.util.fastAny
@@ -403,7 +405,7 @@ private fun MangaScreenSmallImpl(
                 onToggleMangaIncognito = onMangaIncognitoToggled,
                 onClickFilter = onFilterClicked,
                 onClickShare = onShareClicked,
-                onClickDownload = onDownloadActionClicked,
+                onClickDownload = onDownloadActionClicked.takeIf { !isEpubManga(state) },
                 onClickEditCategory = onEditCategoryClicked,
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
@@ -512,8 +514,8 @@ private fun MangaScreenSmallImpl(
                             nextUpdate = nextUpdate,
                             isUserIntervalMode = state.manga.fetchInterval < 0,
                             onAddToLibraryClicked = onAddToLibraryClicked,
-                            onWebViewClicked = onWebViewClicked,
-                            onWebViewLongClicked = onWebViewLongClicked,
+                            onWebViewClicked = if (isEpubManga(state)) null else onWebViewClicked,
+                            onWebViewLongClicked = if (isEpubManga(state)) null else onWebViewLongClicked,
                             onTrackingClicked = onTrackingClicked,
                             onEditIntervalClicked = onEditIntervalClicked,
                             onEditCategory = onEditCategoryClicked,
@@ -521,8 +523,8 @@ private fun MangaScreenSmallImpl(
                             onMergeClicked = onMergeClicked.takeUnless { state.showMergeInOverflow },
                             // SY <--
                             showTrackingButton = true,
-                            showNextUpdateTimer = state.source.id != 10001L,
-                            onJumpToChapter = if (state.source.id == 10001L) {
+                            showNextUpdateTimer = !isEpubManga(state),
+                            onJumpToChapter = if (state.source.id == 10001L || isEpubManga(state)) {
                                 { showJumpDialog = true }
                             } else {
                                 null
@@ -646,6 +648,7 @@ private fun MangaScreenSmallImpl(
                             },
                             singleLine = true,
                             placeholder = { Text("e.g. 123") },
+                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
                         )
                     }
                 },
@@ -788,7 +791,7 @@ fun MangaScreenLargeImpl(
                 navigateUp = navigateUp,
                 onClickFilter = onFilterButtonClicked,
                 onClickShare = onShareClicked,
-                onClickDownload = onDownloadActionClicked,
+                onClickDownload = onDownloadActionClicked.takeIf { !isEpubManga(state) },
                 onClickEditCategory = onEditCategoryClicked,
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
@@ -892,8 +895,8 @@ fun MangaScreenLargeImpl(
                             nextUpdate = nextUpdate,
                             isUserIntervalMode = state.manga.fetchInterval < 0,
                             onAddToLibraryClicked = onAddToLibraryClicked,
-                            onWebViewClicked = onWebViewClicked,
-                            onWebViewLongClicked = onWebViewLongClicked,
+                            onWebViewClicked = if (isEpubManga(state)) null else onWebViewClicked,
+                            onWebViewLongClicked = if (isEpubManga(state)) null else onWebViewLongClicked,
                             onTrackingClicked = onTrackingClicked,
                             onEditIntervalClicked = onEditIntervalClicked,
                             onEditCategory = onEditCategoryClicked,
@@ -901,8 +904,8 @@ fun MangaScreenLargeImpl(
                             onMergeClicked = onMergeClicked.takeUnless { state.showMergeInOverflow },
                             // SY <--
                             showTrackingButton = true,
-                            showNextUpdateTimer = state.source.id != 10001L,
-                            onJumpToChapter = if (state.source.id == 10001L) {
+                            showNextUpdateTimer = !isEpubManga(state),
+                            onJumpToChapter = if (state.source.id == 10001L || isEpubManga(state)) {
                                 { showJumpDialog = true }
                             } else {
                                 null
@@ -1018,6 +1021,7 @@ fun MangaScreenLargeImpl(
                             },
                             singleLine = true,
                             placeholder = { Text("e.g. 123") },
+                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number),
                         )
                     }
                 },
@@ -1264,3 +1268,9 @@ fun metadataDescription(source: Source): MetadataDescriptionComposable? {
     }
 }
 // SY <--
+
+// Helper to check if a manga is EPUB
+private fun isEpubManga(state: MangaScreenModel.State.Success): Boolean {
+    // Check if any chapter URL contains .epub or ::
+    return state.chapters.any { it.chapter.url.contains(".epub") || it.chapter.url.contains("::") }
+}

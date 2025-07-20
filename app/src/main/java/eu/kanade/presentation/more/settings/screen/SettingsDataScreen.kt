@@ -92,6 +92,7 @@ import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.io.File
 
 object SettingsDataScreen : SearchableSettings {
 
@@ -311,6 +312,20 @@ object SettingsDataScreen : SearchableSettings {
         val pagePreviewReadableSize = remember(pagePreviewReadableSizeSema) { pagePreviewCache.readableSize }
         // SY <--
 
+        // EPUB cache
+        val epubCacheDir = remember { File(context.cacheDir, "epub_images") }
+        var epubCacheReadableSizeSema by remember { mutableIntStateOf(0) }
+        val epubCacheReadableSize = remember(epubCacheReadableSizeSema) {
+            // Sum sizes of all files in epub_images
+            val imagesSize = epubCacheDir.listFiles()?.sumOf { it.length() } ?: 0L
+            // Sum sizes of all temp EPUB files
+            val tempEpubsSize = context.cacheDir.listFiles()?.filter { it.isFile && it.name.startsWith("epub_") && it.name.endsWith(".epub") }?.sumOf { it.length() } ?: 0L
+            // Sum sizes of all files in externalCacheDir/tmp
+            val tmpDir = File(context.externalCacheDir, "tmp")
+            val tmpSize = tmpDir.listFiles()?.sumOf { it.length() } ?: 0L
+            android.text.format.Formatter.formatFileSize(context, imagesSize + tempEpubsSize + tmpSize)
+        }
+
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_storage_usage),
             preferenceItems = persistentListOf(
@@ -364,6 +379,24 @@ object SettingsDataScreen : SearchableSettings {
                     },
                 ),
                 // SY <--
+                Preference.PreferenceItem.TextPreference(
+                    title = stringResource(MR.strings.pref_clear_epub_cache),
+                    subtitle = stringResource(MR.strings.used_cache, epubCacheReadableSize),
+                    onClick = {
+                        scope.launchNonCancellable {
+                            try {
+                                val deletedFiles = eu.kanade.tachiyomi.ui.reader.epub.EpubReaderViewModel.clearEpubCache(context)
+                                withUIContext {
+                                    context.toast(context.stringResource(MR.strings.cache_deleted, deletedFiles))
+                                    epubCacheReadableSizeSema++
+                                }
+                            } catch (e: Throwable) {
+                                logcat(LogPriority.ERROR, e)
+                                withUIContext { context.toast(MR.strings.cache_delete_error) }
+                            }
+                        }
+                    },
+                ),
                 Preference.PreferenceItem.SwitchPreference(
                     preference = libraryPreferences.autoClearChapterCache(),
                     title = stringResource(MR.strings.pref_auto_clear_chapter_cache),
