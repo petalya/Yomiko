@@ -50,6 +50,6 @@ class VersionRangeMigrationStrategy(
 ) : MigrationStrategy {
 
     override operator fun invoke(migrations: List<Migration>): Deferred<Boolean> {
-        return strategy(migrations.filter { it.isAlways || it.version.toInt() in versions })
+        return strategy(migrations.filter { it.isAlways || versions.any { v -> v.toFloat() == it.version } })
     }
 }
