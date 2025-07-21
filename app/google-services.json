@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "908511526839",
+    "project_id": "yomiko-52e55",
+    "storage_bucket": "yomiko-52e55.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:908511526839:android:b1a6b2265690d975a6f232",
+        "android_client_info": {
+          "package_name": "eu.kanade.Yomiko"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDw3A8uTAfjPO49FnS0551l755wg3LNe8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:908511526839:android:037c62d6b73dd769a6f232",
+        "android_client_info": {
+          "package_name": "eu.kanade.Yomiko.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDw3A8uTAfjPO49FnS0551l755wg3LNe8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
