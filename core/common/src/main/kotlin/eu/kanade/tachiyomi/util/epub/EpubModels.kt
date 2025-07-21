@@ -141,7 +141,7 @@ sealed class EpubContentBlock {
     }
     data class Header(val level: Int, val content: String) : EpubContentBlock()
     data class Link(val href: String, val content: String) : EpubContentBlock()
-    data class ListBlock(val items: List<String>, val ordered: Boolean) : EpubContentBlock()
+    data class ListBlock(val items: List<List<EpubContentBlock>>, val ordered: Boolean) : EpubContentBlock()
     data class Table(val headers: List<String>, val rows: List<List<String>>) : EpubContentBlock()
     data class Embed(val mediaType: String, val src: String, val data: ByteArray? = null) : EpubContentBlock() {
         override fun equals(other: Any?): Boolean {

@@ -49,6 +49,7 @@ import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import kotlin.time.Duration.Companion.days
 import tachiyomi.domain.source.model.Source as DomainSource
+import java.net.URLDecoder
 
 actual class LocalSource(
     private val context: Context,
@@ -476,17 +477,72 @@ actual class LocalSource(
         val epubFile = epubFiles.first()
         try {
             epubFile.openInputStream()?.use { inputStream ->
-                val epub = EpubFile(inputStream)
-                val coverResource = epub.book.coverImage
-                    ?: epub.book.resources.all.firstOrNull {
+                val epub = eu.kanade.tachiyomi.util.storage.EpubFile(inputStream)
+                val book = epub.book
+                // Try epublib's cover extraction first
+                var coverResource = book.coverImage
+                    ?: book.resources.all.firstOrNull {
                         val isImage = it.mediaType?.name?.startsWith("image/") == true
                         val idMatch = it.id?.contains("cover", ignoreCase = true) == true
                         val hrefMatch = it.href?.contains("cover", ignoreCase = true) == true
                         isImage && (idMatch || hrefMatch)
                     }
+                // Robust fallback: look for cover.xhtml in the spine and extract image
+                if (coverResource == null) {
+                    val coverXhtmlResource = book.spine.spineReferences
+                        .mapNotNull { it.resource }
+                        .firstOrNull {
+                            (it.id?.contains("cover", ignoreCase = true) == true ||
+                             it.href?.contains("cover", ignoreCase = true) == true) &&
+                            it.mediaType?.name == "application/xhtml+xml"
+                        }
+                    if (coverXhtmlResource != null) {
+                        val content = String(coverXhtmlResource.data ?: ByteArray(0), Charsets.UTF_8)
+                        val doc = org.jsoup.Jsoup.parse(content)
+                        // Try <img src=...> first
+                        val img = doc.selectFirst("img[src]")
+                        var foundImage: nl.siegmann.epublib.domain.Resource? = null
+                        if (img != null) {
+                            val src = img.attr("src")
+                            if (src.isNotBlank()) {
+                                val basePath = coverXhtmlResource.href.substringBeforeLast('/', "")
+                                val resolvedPath = resolveRelativePath(basePath, src)
+                                val decodedPath = try { URLDecoder.decode(resolvedPath, "UTF-8") } catch (e: Exception) { resolvedPath }
+                                foundImage = book.resources.getByHref(resolvedPath)
+                                    ?: if (decodedPath != resolvedPath) book.resources.getByHref(decodedPath) else null
+                                    ?: findResourceByRelativePath(book, resolvedPath, src)
+                                    ?: if (decodedPath != resolvedPath) findResourceByRelativePath(book, decodedPath, src) else null
+                            }
+                        }
+                        // If not found, try <svg><image xlink:href=...>
+                        if (foundImage == null) {
+                            val svgImage = doc.selectFirst("svg image[xlink:href]")
+                            if (svgImage != null) {
+                                val href = svgImage.attr("xlink:href")
+                                if (href.isNotBlank()) {
+                                    val basePath = coverXhtmlResource.href.substringBeforeLast('/', "")
+                                    val resolvedPath = resolveRelativePath(basePath, href)
+                                    val decodedPath = try { URLDecoder.decode(resolvedPath, "UTF-8") } catch (e: Exception) { resolvedPath }
+                                    foundImage = book.resources.getByHref(resolvedPath)
+                                        ?: if (decodedPath != resolvedPath) book.resources.getByHref(decodedPath) else null
+                                        ?: findResourceByRelativePath(book, resolvedPath, href)
+                                        ?: if (decodedPath != resolvedPath) findResourceByRelativePath(book, decodedPath, href) else null
+                                }
+                            }
+                        }
+                        if (foundImage != null) {
+                            coverResource = foundImage
+                        }
+                    }
+                }
+                // Final fallback: just use the first image in the book
+                if (coverResource == null) {
+                    coverResource = book.resources.all.firstOrNull {
+                        it.mediaType?.name?.startsWith("image/") == true
+                    }
+                }
                 if (coverResource != null) {
                     coverResource.inputStream.use { coverStream ->
-                        // Use the same process as other covers
                         val coverFile = coverManager.update(manga, coverStream)
                         if (coverFile != null) {
                             manga.thumbnail_url = coverFile.uri.toString()
@@ -499,10 +555,54 @@ actual class LocalSource(
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e) { "Error extracting cover from EPUB ${epubFile.name}" }
         }
-
         // Cache the result even if we failed to avoid repeated attempts
         epubCoverCache.put(cacheKey, true)
         return false
+    }
+
+    // Helper functions for robust fallback (copied from EpubParser, without debug or URL decoding)
+    private fun resolveRelativePath(basePath: String, relativePath: String): String {
+        if (relativePath.startsWith("data:") || relativePath.startsWith("http")) {
+            return relativePath
+        }
+        if (relativePath.startsWith("/")) {
+            return relativePath.removePrefix("/")
+        }
+        if (basePath.isEmpty()) return relativePath
+        val baseComponents = basePath.split("/").toMutableList()
+        if (!basePath.contains(".")) {
+            // It's a directory path, nothing to remove
+        } else {
+            baseComponents.removeLastOrNull()
+        }
+        val relComponents = relativePath.split("/").toMutableList()
+        while (relComponents.isNotEmpty() && relComponents[0] == "..") {
+            relComponents.removeAt(0)
+            if (baseComponents.isNotEmpty()) {
+                baseComponents.removeAt(baseComponents.size - 1)
+            }
+        }
+        val resultPath = (baseComponents + relComponents).joinToString("/")
+        return resultPath
+    }
+
+    private fun findResourceByRelativePath(book: nl.siegmann.epublib.domain.Book, resolvedPath: String, originalPath: String): nl.siegmann.epublib.domain.Resource? {
+        val filename = resolvedPath.substringAfterLast('/')
+        val decodedFilename = try { URLDecoder.decode(filename, "UTF-8") } catch (e: Exception) { filename }
+        val resourceByFilename = book.resources.getByHref(filename)
+            ?: if (decodedFilename != filename) book.resources.getByHref(decodedFilename) else null
+        if (resourceByFilename != null) return resourceByFilename
+        val commonImageDirs = listOf("images/", "Images/", "image/", "Image/", "img/", "Img/")
+        for (dir in commonImageDirs) {
+            val pathWithDir = "$dir$filename"
+            val decodedPathWithDir = try { URLDecoder.decode(pathWithDir, "UTF-8") } catch (e: Exception) { pathWithDir }
+            val resourceWithDir = book.resources.getByHref(pathWithDir)
+                ?: if (decodedPathWithDir != pathWithDir) book.resources.getByHref(decodedPathWithDir) else null
+            if (resourceWithDir != null) return resourceWithDir
+        }
+        return book.resources.all.find { resource ->
+            resource.href.endsWith(filename) || (decodedFilename != filename && resource.href.endsWith(decodedFilename))
+        }
     }
 
     /**

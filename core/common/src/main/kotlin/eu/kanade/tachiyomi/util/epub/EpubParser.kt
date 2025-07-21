@@ -30,9 +30,9 @@ class EpubParser {
         val inputStream = FileInputStream(file)
         try {
             try {
-                parse(inputStream)
+                val doc = parse(inputStream)
+                doc
             } catch (e: NullPointerException) {
-                logcat { "[EPUB] NullPointerException in parseFile: ${e.message}\n${e.stackTraceToString()}" }
                 throw IllegalStateException("Malformed EPUB: missing or corrupt resource (NPE)", e)
             }
         } finally {
@@ -73,7 +73,6 @@ class EpubParser {
                 bookId = book.metadata.identifiers.firstOrNull()?.value ?: "unknown",
             )
         } catch (e: NullPointerException) {
-            logcat { "[EPUB] NullPointerException in parse: ${e.message}\n${e.stackTraceToString()}" }
             throw IllegalStateException("Malformed EPUB: missing or corrupt resource (NPE)", e)
         }
     }
@@ -256,6 +255,7 @@ class EpubParser {
                         val resolvedPath = resolveRelativePath(basePath, src)
                         val imageResource = book.resources.getByHref(resolvedPath)
                             // Try alternate paths if direct path fails
+                            ?: if (resolvedPath != src) book.resources.getByHref(resolvedPath) else null
                             ?: findResourceByRelativePath(book, resolvedPath, src)
                         imageResource?.data?.let { data ->
                             // Store with both the original src and the resolved path
@@ -272,6 +272,38 @@ class EpubParser {
                     }
                 }
             }
+            // Extract SVG <image xlink:href=...> images
+            doc.select("svg image[xlink:href]").forEach { svgImage ->
+                val href = svgImage.attr("xlink:href")
+                if (href.isNotEmpty()) {
+                    if (href.startsWith("data:")) {
+                        val base64Data = href.substringAfter("base64,")
+                        if (base64Data.isNotEmpty()) {
+                            try {
+                                val imageData = java.util.Base64.getDecoder().decode(base64Data)
+                                resources[href] = imageData
+                            } catch (e: Exception) {
+                                // Failed to decode base64 data
+                            }
+                        }
+                    } else {
+                        val resolvedPath = resolveRelativePath(basePath, href)
+                        val imageResource = book.resources.getByHref(resolvedPath)
+                            ?: if (resolvedPath != href) book.resources.getByHref(resolvedPath) else null
+                            ?: findResourceByRelativePath(book, resolvedPath, href)
+                        imageResource?.data?.let { data ->
+                            resources[href] = data
+                            if (href != resolvedPath) {
+                                resources[resolvedPath] = data
+                            }
+                            val filename = href.substringAfterLast('/')
+                            if (filename.isNotEmpty()) {
+                                resources[filename] = data
+                            }
+                        }
+                    }
+                }
+            }
 
             // Extract CSS (unchanged)
             doc.select("link[rel=stylesheet]").forEach { link ->
@@ -279,6 +311,7 @@ class EpubParser {
                 if (href.isNotEmpty()) {
                     val resolvedPath = resolveRelativePath(basePath, href)
                     val cssResource = book.resources.getByHref(resolvedPath)
+                        ?: if (resolvedPath != href) book.resources.getByHref(resolvedPath) else null
                     cssResource?.data?.let { data ->
                         resources[href] = data
                     }
@@ -295,9 +328,9 @@ class EpubParser {
      * Tries different variations of the path to handle quirky EPUB files
      */
     private fun findResourceByRelativePath(book: Book, resolvedPath: String, originalPath: String): Resource? {
-        // Try without any directory structure
         val filename = resolvedPath.substringAfterLast('/')
         val resourceByFilename = book.resources.getByHref(filename)
+            ?: if (filename != resolvedPath) book.resources.getByHref(resolvedPath) else null
         if (resourceByFilename != null) return resourceByFilename
 
         // Try looking for the resource in common image directories
@@ -305,12 +338,13 @@ class EpubParser {
         for (dir in commonImageDirs) {
             val pathWithDir = "$dir$filename"
             val resourceWithDir = book.resources.getByHref(pathWithDir)
+                ?: if (pathWithDir != resolvedPath) book.resources.getByHref(resolvedPath) else null
             if (resourceWithDir != null) return resourceWithDir
         }
 
         // Try looking through all resources for a partial match
         return book.resources.all.find { resource ->
-            resource.href.endsWith(filename)
+            resource.href.endsWith(filename) || (resolvedPath != originalPath && resource.href.endsWith(resolvedPath))
         }
     }
 
@@ -504,6 +538,19 @@ class EpubParser {
                         ),
                     )
                 }
+                // Support SVG <image xlink:href=...>
+                "image" -> {
+                    val xlinkHref = child.attr("xlink:href")
+                    if (xlinkHref.isNotEmpty()) {
+                        blocks.add(
+                            EpubContentBlock.Image(
+                                src = xlinkHref,
+                                alt = child.attr("alt"), // SVG images may not have alt, but keep for consistency
+                                data = null,
+                            ),
+                        )
+                    }
+                }
                 "a" -> {
                     blocks.add(
                         EpubContentBlock.Link(
@@ -513,7 +560,11 @@ class EpubParser {
                     )
                 }
                 "ul", "ol" -> {
-                    val items = child.select("li").map { it.text() }
+                    val items = child.select("li").map { li ->
+                        val itemBlocks = mutableListOf<EpubContentBlock>()
+                        parseBlockElements(li, itemBlocks)
+                        itemBlocks.toList()
+                    }
                     blocks.add(
                         EpubContentBlock.ListBlock(
                             items = items,
@@ -556,6 +607,19 @@ class EpubParser {
                             data = null,
                         ),
                     )
+                }
+                // Support SVG <image xlink:href=...>
+                "image" -> {
+                    val xlinkHref = child.attr("xlink:href")
+                    if (xlinkHref.isNotEmpty()) {
+                        blocks.add(
+                            EpubContentBlock.Image(
+                                src = xlinkHref,
+                                alt = child.attr("alt"),
+                                data = null,
+                            ),
+                        )
+                    }
                 }
                 "a" -> {
                     blocks.add(

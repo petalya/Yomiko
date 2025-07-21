@@ -45,6 +45,7 @@ import eu.kanade.tachiyomi.util.epub.EpubContentBlock
 import eu.kanade.tachiyomi.util.epub.EpubReaderSettings
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import eu.kanade.tachiyomi.util.epub.TextAlignment
+import androidx.compose.foundation.clickable
 
 // Data class to hold fullscreen image info
 
@@ -223,6 +224,73 @@ fun EpubReflowableContent(
                                         .fillMaxWidth()
                                         .padding(vertical = 8.dp),
                                 )
+                            }
+                            is EpubContentBlock.ListBlock -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp)
+                                ) {
+                                    block.items.forEachIndexed { idx, itemBlocks ->
+                                        Row(
+                                            verticalAlignment = Alignment.Top,
+                                            modifier = Modifier.padding(bottom = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = if (block.ordered) "${idx + 1}. " else "• ",
+                                                color = textColor,
+                                                fontSize = settings.fontSize.sp,
+                                                fontFamily = fontFamily,
+                                                modifier = Modifier.padding(end = 4.dp)
+                                            )
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                itemBlocks.forEach { itemBlock ->
+                                                    when (itemBlock) {
+                                                        is EpubContentBlock.Text -> BasicText(
+                                                            text = itemBlock.content,
+                                                            style = TextStyle(
+                                                                color = textColor,
+                                                                fontSize = settings.fontSize.sp,
+                                                                fontFamily = fontFamily,
+                                                                textAlign = textAlign,
+                                                                lineHeight = settings.lineSpacing.em,
+                                                            ),
+                                                        )
+                                                        is EpubContentBlock.Paragraph -> BasicText(
+                                                            text = itemBlock.content,
+                                                            style = TextStyle(
+                                                                color = textColor,
+                                                                fontSize = settings.fontSize.sp,
+                                                                fontFamily = fontFamily,
+                                                                textAlign = textAlign,
+                                                                lineHeight = settings.lineSpacing.em,
+                                                                textIndent = TextIndent(firstLine = 1.2.em),
+                                                            ),
+                                                        )
+                                                        is EpubContentBlock.Link -> Text(
+                                                            text = itemBlock.content,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            fontSize = settings.fontSize.sp,
+                                                            fontFamily = fontFamily,
+                                                            textAlign = textAlign,
+                                                            lineHeight = settings.lineSpacing.em,
+                                                            modifier = Modifier
+                                                                .padding(vertical = 2.dp)
+                                                        )
+                                                        else -> NonSelectableBlock(
+                                                            block = itemBlock,
+                                                            settings = settings,
+                                                            textColor = textColor,
+                                                            fontFamily = fontFamily,
+                                                            textAlign = textAlign,
+                                                            onImageClick = onImageClick,
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                             // For non-text blocks, use the existing implementation
                             else -> {
