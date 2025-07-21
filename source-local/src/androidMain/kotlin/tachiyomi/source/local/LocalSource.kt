@@ -46,10 +46,10 @@ import tachiyomi.source.local.metadata.fillChapterMetadata
 import tachiyomi.source.local.metadata.fillMangaMetadata
 import uy.kohesive.injekt.injectLazy
 import java.io.InputStream
+import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import kotlin.time.Duration.Companion.days
 import tachiyomi.domain.source.model.Source as DomainSource
-import java.net.URLDecoder
 
 actual class LocalSource(
     private val context: Context,
@@ -492,9 +492,11 @@ actual class LocalSource(
                     val coverXhtmlResource = book.spine.spineReferences
                         .mapNotNull { it.resource }
                         .firstOrNull {
-                            (it.id?.contains("cover", ignoreCase = true) == true ||
-                             it.href?.contains("cover", ignoreCase = true) == true) &&
-                            it.mediaType?.name == "application/xhtml+xml"
+                            (
+                                it.id?.contains("cover", ignoreCase = true) == true ||
+                                    it.href?.contains("cover", ignoreCase = true) == true
+                                ) &&
+                                it.mediaType?.name == "application/xhtml+xml"
                         }
                     if (coverXhtmlResource != null) {
                         val content = String(coverXhtmlResource.data ?: ByteArray(0), Charsets.UTF_8)
@@ -507,11 +509,19 @@ actual class LocalSource(
                             if (src.isNotBlank()) {
                                 val basePath = coverXhtmlResource.href.substringBeforeLast('/', "")
                                 val resolvedPath = resolveRelativePath(basePath, src)
-                                val decodedPath = try { URLDecoder.decode(resolvedPath, "UTF-8") } catch (e: Exception) { resolvedPath }
+                                val decodedPath = try {
+                                    URLDecoder.decode(resolvedPath, "UTF-8")
+                                } catch (e: Exception) {
+                                    resolvedPath
+                                }
                                 foundImage = book.resources.getByHref(resolvedPath)
-                                    ?: if (decodedPath != resolvedPath) book.resources.getByHref(decodedPath) else null
-                                    ?: findResourceByRelativePath(book, resolvedPath, src)
-                                    ?: if (decodedPath != resolvedPath) findResourceByRelativePath(book, decodedPath, src) else null
+                                    ?: if (decodedPath != resolvedPath) {
+                                        book.resources.getByHref(decodedPath)
+                                    } else {
+                                        null
+                                            ?: findResourceByRelativePath(book, resolvedPath, src)
+                                            ?: if (decodedPath != resolvedPath) findResourceByRelativePath(book, decodedPath, src) else null
+                                    }
                             }
                         }
                         // If not found, try <svg><image xlink:href=...>
@@ -522,11 +532,19 @@ actual class LocalSource(
                                 if (href.isNotBlank()) {
                                     val basePath = coverXhtmlResource.href.substringBeforeLast('/', "")
                                     val resolvedPath = resolveRelativePath(basePath, href)
-                                    val decodedPath = try { URLDecoder.decode(resolvedPath, "UTF-8") } catch (e: Exception) { resolvedPath }
+                                    val decodedPath = try {
+                                        URLDecoder.decode(resolvedPath, "UTF-8")
+                                    } catch (e: Exception) {
+                                        resolvedPath
+                                    }
                                     foundImage = book.resources.getByHref(resolvedPath)
-                                        ?: if (decodedPath != resolvedPath) book.resources.getByHref(decodedPath) else null
-                                        ?: findResourceByRelativePath(book, resolvedPath, href)
-                                        ?: if (decodedPath != resolvedPath) findResourceByRelativePath(book, decodedPath, href) else null
+                                        ?: if (decodedPath != resolvedPath) {
+                                            book.resources.getByHref(decodedPath)
+                                        } else {
+                                            null
+                                                ?: findResourceByRelativePath(book, resolvedPath, href)
+                                                ?: if (decodedPath != resolvedPath) findResourceByRelativePath(book, decodedPath, href) else null
+                                        }
                                 }
                             }
                         }
@@ -588,14 +606,22 @@ actual class LocalSource(
 
     private fun findResourceByRelativePath(book: nl.siegmann.epublib.domain.Book, resolvedPath: String, originalPath: String): nl.siegmann.epublib.domain.Resource? {
         val filename = resolvedPath.substringAfterLast('/')
-        val decodedFilename = try { URLDecoder.decode(filename, "UTF-8") } catch (e: Exception) { filename }
+        val decodedFilename = try {
+            URLDecoder.decode(filename, "UTF-8")
+        } catch (e: Exception) {
+            filename
+        }
         val resourceByFilename = book.resources.getByHref(filename)
             ?: if (decodedFilename != filename) book.resources.getByHref(decodedFilename) else null
         if (resourceByFilename != null) return resourceByFilename
         val commonImageDirs = listOf("images/", "Images/", "image/", "Image/", "img/", "Img/")
         for (dir in commonImageDirs) {
             val pathWithDir = "$dir$filename"
-            val decodedPathWithDir = try { URLDecoder.decode(pathWithDir, "UTF-8") } catch (e: Exception) { pathWithDir }
+            val decodedPathWithDir = try {
+                URLDecoder.decode(pathWithDir, "UTF-8")
+            } catch (e: Exception) {
+                pathWithDir
+            }
             val resourceWithDir = book.resources.getByHref(pathWithDir)
                 ?: if (decodedPathWithDir != pathWithDir) book.resources.getByHref(decodedPathWithDir) else null
             if (resourceWithDir != null) return resourceWithDir

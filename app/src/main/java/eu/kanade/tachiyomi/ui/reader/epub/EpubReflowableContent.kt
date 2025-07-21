@@ -45,7 +45,6 @@ import eu.kanade.tachiyomi.util.epub.EpubContentBlock
 import eu.kanade.tachiyomi.util.epub.EpubReaderSettings
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import eu.kanade.tachiyomi.util.epub.TextAlignment
-import androidx.compose.foundation.clickable
 
 // Data class to hold fullscreen image info
 
@@ -229,19 +228,19 @@ fun EpubReflowableContent(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 8.dp)
+                                        .padding(vertical = 8.dp),
                                 ) {
                                     block.items.forEachIndexed { idx, itemBlocks ->
                                         Row(
                                             verticalAlignment = Alignment.Top,
-                                            modifier = Modifier.padding(bottom = 2.dp)
+                                            modifier = Modifier.padding(bottom = 2.dp),
                                         ) {
                                             Text(
                                                 text = if (block.ordered) "${idx + 1}. " else "• ",
                                                 color = textColor,
                                                 fontSize = settings.fontSize.sp,
                                                 fontFamily = fontFamily,
-                                                modifier = Modifier.padding(end = 4.dp)
+                                                modifier = Modifier.padding(end = 4.dp),
                                             )
                                             Column(modifier = Modifier.weight(1f)) {
                                                 itemBlocks.forEach { itemBlock ->
@@ -275,7 +274,7 @@ fun EpubReflowableContent(
                                                             textAlign = textAlign,
                                                             lineHeight = settings.lineSpacing.em,
                                                             modifier = Modifier
-                                                                .padding(vertical = 2.dp)
+                                                                .padding(vertical = 2.dp),
                                                         )
                                                         else -> NonSelectableBlock(
                                                             block = itemBlock,

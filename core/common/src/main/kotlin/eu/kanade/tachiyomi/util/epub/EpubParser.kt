@@ -255,8 +255,12 @@ class EpubParser {
                         val resolvedPath = resolveRelativePath(basePath, src)
                         val imageResource = book.resources.getByHref(resolvedPath)
                             // Try alternate paths if direct path fails
-                            ?: if (resolvedPath != src) book.resources.getByHref(resolvedPath) else null
-                            ?: findResourceByRelativePath(book, resolvedPath, src)
+                            ?: if (resolvedPath != src) {
+                                book.resources.getByHref(resolvedPath)
+                            } else {
+                                null
+                                    ?: findResourceByRelativePath(book, resolvedPath, src)
+                            }
                         imageResource?.data?.let { data ->
                             // Store with both the original src and the resolved path
                             resources[src] = data
@@ -289,8 +293,12 @@ class EpubParser {
                     } else {
                         val resolvedPath = resolveRelativePath(basePath, href)
                         val imageResource = book.resources.getByHref(resolvedPath)
-                            ?: if (resolvedPath != href) book.resources.getByHref(resolvedPath) else null
-                            ?: findResourceByRelativePath(book, resolvedPath, href)
+                            ?: if (resolvedPath != href) {
+                                book.resources.getByHref(resolvedPath)
+                            } else {
+                                null
+                                    ?: findResourceByRelativePath(book, resolvedPath, href)
+                            }
                         imageResource?.data?.let { data ->
                             resources[href] = data
                             if (href != resolvedPath) {
