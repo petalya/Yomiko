@@ -232,14 +232,17 @@ class EpubReaderScreen(
         LaunchedEffect(state) {
             val progress = when (state) {
                 is EpubReaderState.ReflowSuccess -> (state as EpubReaderState.ReflowSuccess).progress
+                is EpubReaderState.HtmlSuccess -> (state as EpubReaderState.HtmlSuccess).progress
                 else -> 0f
             }
-            if (progress > 0f) {
-                // Wait for content to be measured
-                kotlinx.coroutines.delay(100)
-                if (scrollState.maxValue > 0) {
+            // Wait for content to be measured
+            kotlinx.coroutines.delay(100)
+            if (scrollState.maxValue > 0) {
+                if (progress > 0f) {
                     val target = (progress * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
                     scrollState.animateScrollTo(target)
+                } else {
+                    scrollState.scrollTo(0)
                 }
             }
         }
