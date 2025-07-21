@@ -117,7 +117,7 @@ fun HistoryScreen(
                             if (chapter != null) {
                                 if (chapter.url.contains(".epub") || chapter.url.contains("::")) {
                                     onOpenEpub(history.mangaId, chapter.id, chapter.url)
-                                } else if (history.coverData.sourceId == 10001L) {
+                                } else if (history.coverData.sourceId in 10001L..10100L) {
                                     onOpenNovel(history.mangaId, chapter.id)
                                 }
                             }
@@ -130,7 +130,7 @@ fun HistoryScreen(
                         if (isEpubOrNovel(history) && chapter != null) {
                             if (chapter.url.contains(".epub") || chapter.url.contains("::")) {
                                 onOpenEpub(history.mangaId, chapter.id, chapter.url)
-                            } else if (history.coverData.sourceId == 10001L) {
+                            } else if (history.coverData.sourceId in 10001L..10100L) {
                                 onOpenNovel(history.mangaId, chapter.id)
                             }
                         } else {
@@ -275,7 +275,7 @@ sealed interface HistoryUiModel {
 private fun isEpubOrNovel(history: HistoryWithRelations): Boolean {
     // EPUB: chapter URL contains .epub or ::
     // Novel: sourceId == 10001L
-    return (history.chapter?.url?.contains(".epub") == true || history.chapter?.url?.contains("::") == true) || history.coverData.sourceId == 10001L
+    return (history.chapter?.url?.contains(".epub") == true || history.chapter?.url?.contains("::") == true) || history.coverData.sourceId in 10001L..10100L
 }
 
 @PreviewLightDark

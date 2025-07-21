@@ -1154,7 +1154,7 @@ private fun LazyListScope.sharedChapterItems(
                     },
                     readProgress = when {
                         item.chapter.lastPageRead > 0L && item.chapter.mangaId != null && item.chapter.mangaId != -1L -> {
-                            val isNovel = manga.source == 10001L
+                            val isNovel = manga.source in 10001L..10100L
                             val isEpub = item.chapter.url.contains(".epub") || item.chapter.url.contains("::")
                             if (isNovel || isEpub) {
                                 val percent = (item.chapter.lastPageRead / 10).toInt().coerceIn(0, 100)

@@ -1177,7 +1177,7 @@ class MangaScreenModel(
         val chapters = getUnreadChapters()
 
         // For novels (source ID 10001L), always sort by chapter number in ascending order
-        return if (manga.source == 10001L) {
+        return if (manga.source in 10001L..10100L) {
             chapters.sortedBy { it.chapterNumber }
         } else {
             val chaptersSorted = chapters.sortedWith(getChapterSort(manga))
@@ -1828,7 +1828,7 @@ class MangaScreenModel(
                     .filter { (chapter) -> applyFilter(bookmarkedFilter) { chapter.bookmark } }
                     .filter { applyFilter(downloadedFilter) { it.isDownloaded || isLocalManga } }
                     .let { seq ->
-                        if (manga.source == 10001L) {
+                        if (manga.source in 10001L..10100L) {
                             seq.sortedByDescending { it.chapter.chapterNumber }
                         } else {
                             seq.sortedWith { (chapter1), (chapter2) -> getChapterSort(manga).invoke(chapter1, chapter2) }

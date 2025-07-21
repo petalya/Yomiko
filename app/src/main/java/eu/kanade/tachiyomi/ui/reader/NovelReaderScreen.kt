@@ -302,7 +302,7 @@ class NovelReaderViewModel(
                     return@launch
                 }
                 val loadedChapters = getChaptersByMangaId.await(novelId)
-                val sortedChapters = if (manga!!.source == 10001L) {
+                val sortedChapters = if (manga!!.source in 10001L..10100L) {
                     loadedChapters.sortedBy { chapter -> chapter.chapterNumber }
                 } else {
                     loadedChapters.sortedWith(getChapterSort(manga!!))
