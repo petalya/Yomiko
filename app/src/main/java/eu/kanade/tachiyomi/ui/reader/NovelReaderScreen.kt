@@ -553,6 +553,8 @@ class NovelReaderScreen(
                         val cleanedHtml = s.content
                             .replace(Regex("text-align\\s*:\\s*[^;\"']*;?", RegexOption.IGNORE_CASE), "")
                             .replace(Regex("align\\s*=\\s*\"[^\"]*\"", RegexOption.IGNORE_CASE), "")
+                            // Add a <br> after each closing paragraph tag to create visual separation
+                            .replace("</p>", "</p><br>")
 
                         // Create a complete HTML document with CSS for paragraph indentation
                         val alignedHtml = """
@@ -567,8 +569,8 @@ class NovelReaderScreen(
                                         }
                                         p {
                                             text-indent: 1.2em;
-                                            margin-top: 0.5em;
-                                            margin-bottom: 0.5em;
+                                            margin-top: 0.15em;
+                                            margin-bottom: 0.15em;
                                         }
                                     </style>
                                 </head>
