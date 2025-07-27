@@ -6,7 +6,6 @@ package eu.kanade.tachiyomi.util.epub
 data class EpubDocument(
     val title: String,
     val author: String?,
-    val coverImage: ByteArray?,
     val chapters: List<EpubChapter>,
     val tableOfContents: List<EpubTableOfContentsEntry>,
     val metadata: EpubMetadata,
@@ -20,12 +19,6 @@ data class EpubDocument(
 
         if (title != other.title) return false
         if (author != other.author) return false
-        if (coverImage != null) {
-            if (other.coverImage == null) return false
-            if (!coverImage.contentEquals(other.coverImage)) return false
-        } else if (other.coverImage != null) {
-            return false
-        }
         if (chapters != other.chapters) return false
         if (tableOfContents != other.tableOfContents) return false
         if (metadata != other.metadata) return false
@@ -37,7 +30,6 @@ data class EpubDocument(
     override fun hashCode(): Int {
         var result = title.hashCode()
         result = 31 * result + (author?.hashCode() ?: 0)
-        result = 31 * result + (coverImage?.contentHashCode() ?: 0)
         result = 31 * result + chapters.hashCode()
         result = 31 * result + tableOfContents.hashCode()
         result = 31 * result + metadata.hashCode()

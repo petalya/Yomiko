@@ -41,8 +41,8 @@ android {
     defaultConfig {
         applicationId = "eu.kanade.Yomiko"
 
-        versionCode = 77
-        versionName = "1.2"
+        versionCode = 78
+        versionName = "1.3"
 
         buildConfigField("String", "COMMIT_COUNT", "\"${getCommitCount()}\"")
         buildConfigField("String", "COMMIT_SHA", "\"${getGitSha()}\"")

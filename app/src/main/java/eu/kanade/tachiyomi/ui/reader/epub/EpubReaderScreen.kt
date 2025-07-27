@@ -228,22 +228,39 @@ class EpubReaderScreen(
             }
         }
 
-        // Smooth scroll to last saved progress when chapter loads
+        // Handle scroll position for chapter loading
         LaunchedEffect(state) {
-            val progress = when (state) {
-                is EpubReaderState.ReflowSuccess -> (state as EpubReaderState.ReflowSuccess).progress
-                is EpubReaderState.HtmlSuccess -> (state as EpubReaderState.HtmlSuccess).progress
-                else -> 0f
-            }
-            // Wait for content to be measured
-            kotlinx.coroutines.delay(100)
-            if (scrollState.maxValue > 0) {
-                if (progress > 0f) {
-                    val target = (progress * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
-                    scrollState.animateScrollTo(target)
-                } else {
+            val currentState = state
+            when (currentState) {
+                is EpubReaderState.Loading -> {
+                    // reset scroll to 0 during loading state with delay
+                    kotlinx.coroutines.delay(200) // delay to align with loading animation, surely this doesn't happen again
                     scrollState.scrollTo(0)
                 }
+                is EpubReaderState.ReflowSuccess -> {
+                    val progress = currentState.progress
+                    if (progress > 0f) {
+                        // smooth scroll to saved progress when available
+                        kotlinx.coroutines.delay(100)
+                        if (scrollState.maxValue > 0) {
+                            val target = (progress * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
+                            scrollState.animateScrollTo(target)
+                        }
+                    }
+                }
+                is EpubReaderState.HtmlSuccess -> {
+                    val progress = currentState.progress
+                    if (progress > 0f) {
+                        // Smooth scroll to saved progress when available
+                        kotlinx.coroutines.delay(100)
+                        if (scrollState.maxValue > 0) {
+                            val target = (progress * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
+                            scrollState.animateScrollTo(target)
+                        }
+                    }
+                    // For 0 progress, content already starts at top - no action needed
+                }
+                else -> return@LaunchedEffect
             }
         }
 

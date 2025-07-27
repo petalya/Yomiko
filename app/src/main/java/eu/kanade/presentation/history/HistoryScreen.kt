@@ -112,18 +112,7 @@ fun HistoryScreen(
                     history = it,
                     contentPadding = contentPadding,
                     onClickCover = { history ->
-                        if (isEpubOrNovel(history)) {
-                            val chapter = history.chapter
-                            if (chapter != null) {
-                                if (chapter.url.contains(".epub") || chapter.url.contains("::")) {
-                                    onOpenEpub(history.mangaId, chapter.id, chapter.url)
-                                } else if (history.coverData.sourceId in 10001L..10100L) {
-                                    onOpenNovel(history.mangaId, chapter.id)
-                                }
-                            }
-                        } else {
-                            onClickCover(history.mangaId)
-                        }
+                        onClickCover(history.mangaId)
                     },
                     onClickResume = { history ->
                         val chapter = history.chapter

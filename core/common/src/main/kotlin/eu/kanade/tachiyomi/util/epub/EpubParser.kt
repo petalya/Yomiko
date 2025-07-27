@@ -57,7 +57,6 @@ class EpubParser {
 
             val title = book.title ?: "Unknown"
             val author = book.metadata.authors.firstOrNull()?.let { "${it.firstname} ${it.lastname}".trim() }
-            val coverImage = book.coverImage?.data
             val metadata = extractMetadata(book)
 
             val chapters = extractChapters(book)
@@ -66,7 +65,6 @@ class EpubParser {
             EpubDocument(
                 title = title,
                 author = author,
-                coverImage = coverImage,
                 chapters = chapters,
                 tableOfContents = tocEntries,
                 metadata = metadata,
@@ -239,13 +237,18 @@ class EpubParser {
             doc.select("img").forEach { img ->
                 val src = img.attr("src")
                 if (src.isNotEmpty()) {
+                    val decodedSrc = try {
+                        java.net.URLDecoder.decode(src, "UTF-8")
+                    } catch (e: Exception) {
+                        src
+                    }
                     if (src.startsWith("data:")) {
                         // Handle base64 encoded images
                         val base64Data = src.substringAfter("base64,")
                         if (base64Data.isNotEmpty()) {
                             try {
                                 val imageData = java.util.Base64.getDecoder().decode(base64Data)
-                                resources[src] = imageData
+                                resources[decodedSrc] = imageData
                             } catch (e: Exception) {
                                 // Failed to decode base64 data
                             }
@@ -253,22 +256,26 @@ class EpubParser {
                     } else {
                         // Handle regular image references
                         val resolvedPath = resolveRelativePath(basePath, src)
-                        val imageResource = book.resources.getByHref(resolvedPath)
+                        val decodedResolved = try {
+                            java.net.URLDecoder.decode(resolvedPath, "UTF-8")
+                        } catch (e: Exception) {
+                            resolvedPath
+                        }
+                        val imageResource = book.resources.getByHref(decodedResolved)
                             // Try alternate paths if direct path fails
-                            ?: if (resolvedPath != src) {
-                                book.resources.getByHref(resolvedPath)
+                            ?: if (decodedResolved != decodedSrc) {
+                                book.resources.getByHref(decodedSrc)
                             } else {
                                 null
-                                    ?: findResourceByRelativePath(book, resolvedPath, src)
+                                    ?: findResourceByRelativePath(book, decodedResolved, decodedSrc)
                             }
                         imageResource?.data?.let { data ->
-                            // Store with both the original src and the resolved path
-                            resources[src] = data
-                            if (src != resolvedPath) {
-                                resources[resolvedPath] = data
+                            resources[decodedSrc] = data
+                            if (decodedSrc != decodedResolved) {
+                                resources[decodedResolved] = data
                             }
-                            // Also store by filename for fallback lookup
-                            val filename = src.substringAfterLast('/')
+                            // Also store by decoded filename for fallback lookup
+                            val filename = decodedSrc.substringAfterLast('/')
                             if (filename.isNotEmpty()) {
                                 resources[filename] = data
                             }
@@ -280,31 +287,41 @@ class EpubParser {
             doc.select("svg image[xlink:href]").forEach { svgImage ->
                 val href = svgImage.attr("xlink:href")
                 if (href.isNotEmpty()) {
+                    val decodedHref = try {
+                        java.net.URLDecoder.decode(href, "UTF-8")
+                    } catch (e: Exception) {
+                        href
+                    }
                     if (href.startsWith("data:")) {
                         val base64Data = href.substringAfter("base64,")
                         if (base64Data.isNotEmpty()) {
                             try {
                                 val imageData = java.util.Base64.getDecoder().decode(base64Data)
-                                resources[href] = imageData
+                                resources[decodedHref] = imageData
                             } catch (e: Exception) {
                                 // Failed to decode base64 data
                             }
                         }
                     } else {
                         val resolvedPath = resolveRelativePath(basePath, href)
-                        val imageResource = book.resources.getByHref(resolvedPath)
-                            ?: if (resolvedPath != href) {
-                                book.resources.getByHref(resolvedPath)
+                        val decodedResolved = try {
+                            java.net.URLDecoder.decode(resolvedPath, "UTF-8")
+                        } catch (e: Exception) {
+                            resolvedPath
+                        }
+                        val imageResource = book.resources.getByHref(decodedResolved)
+                            ?: if (decodedResolved != decodedHref) {
+                                book.resources.getByHref(decodedHref)
                             } else {
                                 null
-                                    ?: findResourceByRelativePath(book, resolvedPath, href)
+                                    ?: findResourceByRelativePath(book, decodedResolved, decodedHref)
                             }
                         imageResource?.data?.let { data ->
-                            resources[href] = data
-                            if (href != resolvedPath) {
-                                resources[resolvedPath] = data
+                            resources[decodedHref] = data
+                            if (decodedHref != decodedResolved) {
+                                resources[decodedResolved] = data
                             }
-                            val filename = href.substringAfterLast('/')
+                            val filename = decodedHref.substringAfterLast('/')
                             if (filename.isNotEmpty()) {
                                 resources[filename] = data
                             }

@@ -15,6 +15,9 @@ import eu.kanade.tachiyomi.util.lang.compareToCaseInsensitiveNaturalOrder
 import eu.kanade.tachiyomi.util.storage.EpubFile
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import logcat.LogPriority
@@ -459,123 +462,140 @@ actual class LocalSource(
      * Optimized version that only processes one EPUB at a time to improve feed loading performance
      * Uses a cache to avoid re-processing the same files
      */
-    private fun extractCoversFromEpubs(files: List<UniFile>, manga: SManga): Boolean {
+    private suspend fun extractCoversFromEpubs(files: List<UniFile>, manga: SManga): Boolean {
         val epubFiles = files.filter { it.extension.equals("epub", true) }
         if (epubFiles.isEmpty()) return false
 
         val mangaDir = fileSystem.getMangaDirectory(manga.url) ?: return false
         val mangaDirPath = mangaDir.filePath ?: return false
 
-        // Check cache first to avoid re-processing
         val cacheKey = "${manga.url}:cover"
-        if (epubCoverCache.get(cacheKey) == true) {
-            // We've already tried to extract the cover for this manga
-            return false
-        }
+        if (epubCoverCache.get(cacheKey) == true) return false
 
-        // Only process the first EPUB file instead of all of them for faster loading
-        val epubFile = epubFiles.first()
-        try {
-            epubFile.openInputStream()?.use { inputStream ->
-                val epub = eu.kanade.tachiyomi.util.storage.EpubFile(inputStream)
-                val book = epub.book
-                // Try epublib's cover extraction first
-                var coverResource = book.coverImage
-                    ?: book.resources.all.firstOrNull {
-                        val isImage = it.mediaType?.name?.startsWith("image/") == true
-                        val idMatch = it.id?.contains("cover", ignoreCase = true) == true
-                        val hrefMatch = it.href?.contains("cover", ignoreCase = true) == true
-                        isImage && (idMatch || hrefMatch)
-                    }
-                // Robust fallback: look for cover.xhtml in the spine and extract image
-                if (coverResource == null) {
-                    val coverXhtmlResource = book.spine.spineReferences
-                        .mapNotNull { it.resource }
-                        .firstOrNull {
-                            (
-                                it.id?.contains("cover", ignoreCase = true) == true ||
-                                    it.href?.contains("cover", ignoreCase = true) == true
-                                ) &&
-                                it.mediaType?.name == "application/xhtml+xml"
-                        }
-                    if (coverXhtmlResource != null) {
-                        val content = String(coverXhtmlResource.data ?: ByteArray(0), Charsets.UTF_8)
-                        val doc = org.jsoup.Jsoup.parse(content)
-                        // Try <img src=...> first
-                        val img = doc.selectFirst("img[src]")
-                        var foundImage: nl.siegmann.epublib.domain.Resource? = null
-                        if (img != null) {
-                            val src = img.attr("src")
-                            if (src.isNotBlank()) {
-                                val basePath = coverXhtmlResource.href.substringBeforeLast('/', "")
-                                val resolvedPath = resolveRelativePath(basePath, src)
-                                val decodedPath = try {
-                                    URLDecoder.decode(resolvedPath, "UTF-8")
-                                } catch (e: Exception) {
-                                    resolvedPath
-                                }
-                                foundImage = book.resources.getByHref(resolvedPath)
-                                    ?: if (decodedPath != resolvedPath) {
-                                        book.resources.getByHref(decodedPath)
-                                    } else {
-                                        null
-                                            ?: findResourceByRelativePath(book, resolvedPath, src)
-                                            ?: if (decodedPath != resolvedPath) findResourceByRelativePath(book, decodedPath, src) else null
-                                    }
-                            }
-                        }
-                        // If not found, try <svg><image xlink:href=...>
-                        if (foundImage == null) {
-                            val svgImage = doc.selectFirst("svg image[xlink:href]")
-                            if (svgImage != null) {
-                                val href = svgImage.attr("xlink:href")
-                                if (href.isNotBlank()) {
-                                    val basePath = coverXhtmlResource.href.substringBeforeLast('/', "")
-                                    val resolvedPath = resolveRelativePath(basePath, href)
-                                    val decodedPath = try {
-                                        URLDecoder.decode(resolvedPath, "UTF-8")
+        val semaphore = Semaphore(4)
+        return coroutineScope {
+            val results = epubFiles.map { epubFile ->
+                async {
+                    semaphore.withPermit {
+                        try {
+                            epubFile.openInputStream()?.use { inputStream ->
+                                val epub = eu.kanade.tachiyomi.util.storage.EpubFile(inputStream)
+                                val book = epub.book
+                                // Only use the <guide> method for cover extraction
+                                var coverResource: nl.siegmann.epublib.domain.Resource? = null
+                                var opfResource: nl.siegmann.epublib.domain.Resource? = null
+                                try {
+                                    // Try to get the OPF resource using epublib's internal method if available
+                                    try {
+                                        opfResource = book.javaClass.getMethod("getOpfResource").invoke(book) as? nl.siegmann.epublib.domain.Resource
+                                        logcat { "Custom cover extraction: OPF resource found via getOpfResource: ${opfResource?.href}" }
                                     } catch (e: Exception) {
-                                        resolvedPath
+                                        logcat { "Custom cover extraction: getOpfResource() not available: ${e.message}" }
                                     }
-                                    foundImage = book.resources.getByHref(resolvedPath)
-                                        ?: if (decodedPath != resolvedPath) {
-                                            book.resources.getByHref(decodedPath)
-                                        } else {
-                                            null
-                                                ?: findResourceByRelativePath(book, resolvedPath, href)
-                                                ?: if (decodedPath != resolvedPath) findResourceByRelativePath(book, decodedPath, href) else null
+                                    // Fallback: try to find .opf resource as before
+                                    if (opfResource == null) {
+                                        opfResource = book.resources.all.firstOrNull { it.href.endsWith(".opf", ignoreCase = true) }
+                                        logcat { "Custom cover extraction: OPF resource found by .opf search: ${opfResource?.href}" }
+                                    }
+                                    // If still not found, log all resource hrefs for debugging
+                                    if (opfResource == null) {
+                                        logcat { "Custom cover extraction: OPF resource still not found. Listing all resource hrefs:" }
+                                        book.resources.all.forEach { res ->
+                                            logcat { "Custom cover extraction: resource href: ${res.href}" }
                                         }
+                                    }
+                                    if (opfResource != null) {
+                                        val opfXml = String(opfResource.data ?: ByteArray(0), Charsets.UTF_8)
+                                        val opfDoc = org.jsoup.Jsoup.parse(opfXml, "", org.jsoup.parser.Parser.xmlParser())
+                                        val guideRef = opfDoc.selectFirst("guide > reference[type=cover]")
+                                        logcat { "Custom cover extraction: guideRef found: $guideRef" }
+                                        val coverHref = guideRef?.attr("href")
+                                        logcat { "Custom cover extraction: coverHref: $coverHref" }
+                                        if (!coverHref.isNullOrBlank()) {
+                                            val coverHtmlResource = findImageResource(book, coverHref)
+                                            logcat { "Custom cover extraction: coverHtmlResource: ${coverHtmlResource?.href}" }
+                                            if (coverHtmlResource != null) {
+                                                val html = String(coverHtmlResource.data ?: ByteArray(0), Charsets.UTF_8)
+                                                val htmlDoc = org.jsoup.Jsoup.parse(html)
+                                                val img = htmlDoc.selectFirst("img[src]")
+                                                logcat { "Custom cover extraction: img tag: $img" }
+                                                var src: String? = null
+                                                if (img != null) {
+                                                    src = img.attr("src")
+                                                    logcat { "Custom cover extraction: img src: $src" }
+                                                } else {
+                                                    // Try SVG <image xlink:href="...">
+                                                    val svgImage = htmlDoc.selectFirst("svg image[xlink:href]")
+                                                    logcat { "Custom cover extraction: svg image tag: $svgImage" }
+                                                    if (svgImage != null) {
+                                                        src = svgImage.attr("xlink:href")
+                                                        logcat { "Custom cover extraction: svg image xlink:href: $src" }
+                                                    }
+                                                }
+                                                if (!src.isNullOrBlank()) {
+                                                    val basePath = coverHtmlResource.href.substringBeforeLast('/', "")
+                                                    val resolvedPath = resolveRelativePath(basePath, src)
+                                                    val foundImage = findImageResource(book, resolvedPath)
+                                                    if (foundImage != null) {
+                                                        logcat { "Custom cover extraction: found image resource: ${foundImage.href}" }
+                                                        coverResource = foundImage
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (_: Exception) { /* Ignore and fallback */ }
+                                if (coverResource == null && opfResource != null) {
+                                    // Fallback: look for <item id="cover"> or properties="cover-image" in <manifest>
+                                    logcat { "Custom cover extraction: trying manifest fallback" }
+                                    val opfXml = String(opfResource.data ?: ByteArray(0), Charsets.UTF_8)
+                                    val opfDoc = org.jsoup.Jsoup.parse(opfXml, "", org.jsoup.parser.Parser.xmlParser())
+                                    val manifestItems = opfDoc.select("manifest > item")
+                                    // Try id="cover" (case-insensitive)
+                                    val coverItem = manifestItems.firstOrNull { it.attr("id").equals("cover", ignoreCase = true) }
+                                    // Try properties="cover-image" (EPUB 3)
+                                    val coverImageItem = manifestItems.firstOrNull { it.attr("properties").contains("cover-image", ignoreCase = true) }
+                                    val fallbackItem = coverItem ?: coverImageItem
+                                    logcat { "Custom cover extraction: manifest fallback item: $fallbackItem" }
+                                    val fallbackHref = fallbackItem?.attr("href")
+                                    logcat { "Custom cover extraction: manifest fallback href: $fallbackHref" }
+                                    if (!fallbackHref.isNullOrBlank()) {
+                                        val foundImage = findImageResource(book, fallbackHref)
+                                        if (foundImage != null) {
+                                            logcat { "Custom cover extraction: manifest fallback found image resource: ${foundImage.href}" }
+                                            coverResource = foundImage
+                                        }
+                                    }
+                                }
+                                if (coverResource != null) {
+                                    logcat { "Custom cover extraction: saving cover resource: ${coverResource.href}" }
+                                    coverResource.inputStream.use { coverStream ->
+                                        val coverFile = coverManager.update(manga, coverStream)
+                                        if (coverFile != null) {
+                                            logcat { "Custom cover extraction: cover saved at ${coverFile.uri}" }
+                                            logcat { "Custom cover extraction: manga.thumbnail_url = ${manga.thumbnail_url}" }
+                                            epubCoverCache.put(cacheKey, true)
+                                            return@async true
+                                        }
+                                    }
+                                } else {
+                                    logcat { "Custom cover extraction: NO cover resource found" }
                                 }
                             }
+                        } catch (e: Exception) {
+                            logcat(LogPriority.ERROR, e) { "Error extracting cover from EPUB ${epubFile.name}" }
                         }
-                        if (foundImage != null) {
-                            coverResource = foundImage
-                        }
+                        false // If nothing found
                     }
                 }
-                // Final fallback: just use the first image in the book
-                if (coverResource == null) {
-                    coverResource = book.resources.all.firstOrNull {
-                        it.mediaType?.name?.startsWith("image/") == true
-                    }
-                }
-                if (coverResource != null) {
-                    coverResource.inputStream.use { coverStream ->
-                        val coverFile = coverManager.update(manga, coverStream)
-                        if (coverFile != null) {
-                            manga.thumbnail_url = coverFile.uri.toString()
-                            epubCoverCache.put(cacheKey, true)
-                            return true
-                        }
-                    }
-                }
+            }.awaitAll()
+            if (results.any { it }) {
+                true
+            } else {
+                epubCoverCache.put(cacheKey, true)
+                false
             }
-        } catch (e: Exception) {
-            logcat(LogPriority.ERROR, e) { "Error extracting cover from EPUB ${epubFile.name}" }
         }
-        // Cache the result even if we failed to avoid repeated attempts
-        epubCoverCache.put(cacheKey, true)
-        return false
     }
 
     // Helper functions for robust fallback (copied from EpubParser, without debug or URL decoding)
@@ -631,35 +651,69 @@ actual class LocalSource(
         }
     }
 
+    // Helper function to robustly find an image resource by href or filename (handles URL encoding)
+    private fun findImageResource(book: nl.siegmann.epublib.domain.Book, path: String): nl.siegmann.epublib.domain.Resource? {
+        // Try raw path
+        book.resources.getByHref(path)?.let { return it }
+        // Try decoded path
+        val decoded = try {
+            URLDecoder.decode(path, "UTF-8")
+        } catch (e: Exception) {
+            path
+        }
+        if (decoded != path) book.resources.getByHref(decoded)?.let { return it }
+        // Try matching by filename (case-insensitive)
+        val filename = path.substringAfterLast('/')
+        book.resources.all.firstOrNull { it.href.substringAfterLast('/').equals(filename, ignoreCase = true) }?.let { return it }
+        // Try matching by decoded filename
+        val decodedFilename = try {
+            URLDecoder.decode(filename, "UTF-8")
+        } catch (e: Exception) {
+            filename
+        }
+        if (decodedFilename != filename) {
+            book.resources.all.firstOrNull { it.href.substringAfterLast('/').equals(decodedFilename, ignoreCase = true) }?.let { return it }
+        }
+        // Try matching by removing all spaces and %20 from both reference and resource filenames
+        val normalized = filename.replace(" ", "").replace("%20", "")
+        book.resources.all.firstOrNull {
+            it.href.substringAfterLast('/').replace(" ", "").replace("%20", "").equals(normalized, ignoreCase = true)
+        }?.let { return it }
+        // Try matching by removing all spaces and %20 from decoded filename
+        val normalizedDecoded = decodedFilename.replace(" ", "").replace("%20", "")
+        if (normalizedDecoded != normalized) {
+            book.resources.all.firstOrNull {
+                it.href.substringAfterLast('/').replace(" ", "").replace("%20", "").equals(normalizedDecoded, ignoreCase = true)
+            }?.let { return it }
+        }
+        return null
+    }
+
     /**
      * Preloads covers for EPUB files in the background.
      * This improves user experience by starting the cover extraction process early.
      */
     suspend fun preloadEpubCovers() = withIOContext {
+        val semaphore = Semaphore(4) // Limit to 4 concurrent jobs
         try {
             // Get all manga directories
             val mangaDirs = fileSystem.getFilesInBaseDirectory()
-                .filter { it.isDirectory && !it.name.orEmpty().startsWith('.') }
-                .take(10) // Limit to first 10 to avoid excessive processing
-
-            // Process each directory in parallel with a limit
             mangaDirs.map { mangaDir ->
                 async {
-                    val manga = SManga.create().apply {
-                        title = mangaDir.name.orEmpty()
-                        url = mangaDir.name.orEmpty()
-                    }
-
-                    // Skip if cover already exists
-                    if (coverManager.find(manga.url) != null) return@async
-
-                    // Find EPUB files
-                    val epubFiles = fileSystem.getFilesInMangaDirectory(manga.url)
-                        ?.filter { it.extension.equals("epub", true) }
-                        ?: return@async
-
-                    if (epubFiles.isNotEmpty()) {
-                        extractCoversFromEpubs(epubFiles, manga)
+                    semaphore.withPermit {
+                        val manga = SManga.create().apply {
+                            title = mangaDir.name.orEmpty()
+                            url = mangaDir.name.orEmpty()
+                        }
+                        // Skip if cover already exists
+                        if (coverManager.find(manga.url) != null) return@withPermit
+                        // Find EPUB files
+                        val epubFiles = fileSystem.getFilesInMangaDirectory(manga.url)
+                            ?.filter { it.extension.equals("epub", true) }
+                            ?: return@withPermit
+                        if (epubFiles.isNotEmpty()) {
+                            extractCoversFromEpubs(epubFiles, manga)
+                        }
                     }
                 }
             }.awaitAll()

@@ -22,6 +22,7 @@ import eu.kanade.tachiyomi.util.epub.TextAlignment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,7 +64,12 @@ class EpubReaderViewModel(
     private val upsertHistory: UpsertHistory = Injekt.get()
 
     // Define a coroutine scope for the view model
-    private val coroutineScope = CoroutineScope(Dispatchers.Main)
+    private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var saveProgressJob: Job? = null
+    private var lastSavedProgress = 0f
+    private val readThreshold = 0.9f
+
+    // No longer needed - we use the chapter's actual saved progress
 
     private val _state = MutableStateFlow<EpubReaderState>(EpubReaderState.Loading)
     val state: StateFlow<EpubReaderState> = _state.asStateFlow()
@@ -90,13 +96,6 @@ class EpubReaderViewModel(
 
     // Current chapter in the epub document
     private var currentEpubChapterIndex: Int = 0
-
-    // Debounce job for saving progress
-    private var saveProgressJob: Job? = null
-    private var lastSavedProgress: Float = -1f
-
-    // Progress threshold for marking chapter as read (98%)
-    private val readThreshold = 0.98f
 
     init {
         coroutineScope.launch {
@@ -208,7 +207,28 @@ class EpubReaderViewModel(
                 updateDiscordRPC()
                 Log.d("EpubReaderVM", "After load: currentEpubChapterIndex=$currentEpubChapterIndex, currentChapterIndex=$currentChapterIndex, currentChapterId=$currentChapterId")
                 currentChapterBlocks = epubParser.extractContentBlocks(epubChapter.content).toMutableList()
-                processEmbeddedResources(epubChapter)
+                // --- Enhancement: Add section headings and <hr> for nested TOC entries ---
+                val tocEntry = epub.tableOfContents.find { it.href == epubChapter.href }
+                val allEmbeddedResources = mutableMapOf<String, ByteArray>()
+                allEmbeddedResources.putAll(epubChapter.embeddedResources)
+                if (tocEntry != null && tocEntry.children.isNotEmpty()) {
+                    tocEntry.children.forEach { section ->
+                        // Add <hr> separator (as a blank line or custom block)
+                        currentChapterBlocks.add(EpubContentBlock.Text("\n"))
+                        // Add heading for the section
+                        currentChapterBlocks.add(EpubContentBlock.Paragraph(section.title))
+                        // Find the corresponding chapter for the section
+                        val sectionChapter = epub.chapters.find { it.href == section.href }
+                        if (sectionChapter != null) {
+                            val sectionBlocks = epubParser.extractContentBlocks(sectionChapter.content)
+                            currentChapterBlocks.addAll(sectionBlocks)
+                            allEmbeddedResources.putAll(sectionChapter.embeddedResources)
+                        }
+                    }
+                }
+                // Use a copy of epubChapter with merged resources for image processing
+                val mergedChapter = epubChapter.copy(embeddedResources = allEmbeddedResources)
+                processEmbeddedResources(mergedChapter)
                 if (epubChapter.isHtml) {
                     _state.value = EpubReaderState.ReflowSuccess(
                         bookTitle = epub.title,
@@ -259,13 +279,18 @@ class EpubReaderViewModel(
                         continue
                     }
 
-                    // Try to get the image data directly
-                    var imageData = chapter.embeddedResources[src]
+                    // Always decode the src before lookup
+                    val decodedSrc = try {
+                        java.net.URLDecoder.decode(src, "UTF-8")
+                    } catch (e: Exception) {
+                        src
+                    }
+                    var imageData = chapter.embeddedResources[decodedSrc]
 
                     // If direct path fails, try with various path manipulations
                     if (imageData == null) {
                         // Try with just the filename
-                        val filename = src.substringAfterLast('/')
+                        val filename = decodedSrc.substringAfterLast('/')
                         imageData = chapter.embeddedResources.entries.find { it.key.endsWith(filename) }?.value
                     }
 
@@ -285,8 +310,13 @@ class EpubReaderViewModel(
                 }
                 is EpubContentBlock.Embed -> {
                     val src = block.src
-                    val embedData = chapter.embeddedResources[src]
-                        ?: chapter.embeddedResources.entries.find { it.key.endsWith(src.substringAfterLast('/')) }?.value
+                    val decodedSrc = try {
+                        java.net.URLDecoder.decode(src, "UTF-8")
+                    } catch (e: Exception) {
+                        src
+                    }
+                    val embedData = chapter.embeddedResources[decodedSrc]
+                        ?: chapter.embeddedResources.entries.find { it.key.endsWith(decodedSrc.substringAfterLast('/')) }?.value
 
                     if (embedData != null) {
                         // For image embeds, create a file URI for better handling
@@ -471,6 +501,9 @@ class EpubReaderViewModel(
         _chapters.value = updatedChapters
     }
 
+    /**
+     * Get saved progress for a chapter
+     */
     fun getSavedProgress(chapterId: Long): Float {
         val chapter = _chapters.value.find { it.id == chapterId }
         return if (chapter != null && chapter.lastPageRead > 0) chapter.lastPageRead / 1000f else 0f
