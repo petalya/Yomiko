@@ -24,8 +24,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
-import logcat.LogPriority
-import logcat.logcat
+
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import tachiyomi.core.common.util.lang.withIOContext
@@ -47,8 +46,6 @@ class AnilistApi(val client: OkHttpClient, interceptor: AnilistInterceptor) {
 
     suspend fun addLibManga(track: Track): Track {
         return withIOContext {
-            logcat(LogPriority.DEBUG) { "AnilistApi.addLibManga: Starting binding for track - remote_id=${track.remote_id}, title=${track.title}" }
-
             val query = """
             |mutation AddManga(${'$'}mangaId: Int, ${'$'}progressVolumes: Int, ${'$'}progress: Int, ${'$'}status: MediaListStatus, ${'$'}private: Boolean) {
                 |SaveMediaListEntry (mediaId: ${'$'}mangaId, progressVolumes: ${'$'}progressVolumes, progress: ${'$'}progress, status: ${'$'}status, private: ${'$'}private) {
@@ -71,7 +68,6 @@ class AnilistApi(val client: OkHttpClient, interceptor: AnilistInterceptor) {
             }
 
             val payloadString = payload.toString()
-            logcat(LogPriority.DEBUG) { "AnilistApi.addLibManga: Payload prepared - payload=$payloadString" }
 
             try {
                 val result = with(json) {
@@ -83,18 +79,14 @@ class AnilistApi(val client: OkHttpClient, interceptor: AnilistInterceptor) {
                     )
                         .awaitSuccess()
                         .parseAs<ALAddMangaResult>()
-                        .also {
-                            logcat(LogPriority.DEBUG) { "AnilistApi.addLibManga: Successfully added manga - response=${it.data.entry}" }
-                        }
+
                         .let {
                             track.library_id = it.data.entry.id
                             track
                         }
                 }
-                logcat(LogPriority.INFO) { "AnilistApi.addLibManga: Successfully bound manga - remote_id=${track.remote_id}, library_id=${track.library_id}" }
                 result
             } catch (e: Exception) {
-                logcat(LogPriority.ERROR) { "AnilistApi.addLibManga: Failed to bind manga - remote_id=${track.remote_id}, error=${e.message}" }
                 throw e
             }
         }
