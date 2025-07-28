@@ -210,6 +210,24 @@ fun EpubReaderSettingsSheet(
                     }
                 }
             }
+            // Show Progress Percent toggle
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            ) {
+                Text(
+                    "Show Progress Percent",
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 16.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                androidx.compose.material3.Switch(
+                    checked = settings.showProgressPercent,
+                    onCheckedChange = { viewModel.setShowProgressPercent(it) },
+                    modifier = Modifier.padding(end = 16.dp),
+                )
+            }
         }
     }
 }

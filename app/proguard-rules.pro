@@ -127,6 +127,10 @@
 # XmlUtil
 -keep public enum nl.adaptivity.xmlutil.EventType { *; }
 
+# Firebase
+-keep class com.google.firebase.installations.** { *; }
+-keep interface com.google.firebase.installations.** { *; }
+
 # Google Drive
 -keep class com.google.api.services.** { *; }
 
@@ -269,6 +273,10 @@
 
  # Keep apache http client
  -keep class org.apache.http.** { *; }
+
+# --- Keep epub4j ---
+-keep class io.documentnode.epub4j.** { *; }
+-dontwarn io.documentnode.epub4j.**
 
 # Suggested rules
 -dontwarn com.oracle.svm.core.annotate.AutomaticFeature

@@ -2,7 +2,7 @@ package tachiyomi.source.local.metadata
 
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
-import nl.siegmann.epublib.domain.Book
+import io.documentnode.epub4j.domain.Book
 
 /**
  * Fills manga and chapter metadata using this epub file's metadata.

@@ -13,6 +13,7 @@ class EpubReaderPreferences(
     fun lineSpacing() = preferenceStore.getFloat(PREF_LINE_SPACING, DEFAULT_LINE_SPACING)
     fun textAlignment() = preferenceStore.getEnum(PREF_TEXT_ALIGNMENT, TextAlignment.LEFT)
     fun theme() = preferenceStore.getEnum(PREF_THEME, ReaderTheme.LIGHT)
+    fun showProgressPercent() = preferenceStore.getBoolean(PREF_SHOW_PROGRESS_PERCENT, DEFAULT_SHOW_PROGRESS_PERCENT)
 
     companion object {
         const val PREF_FONT_SIZE = "epub_font_size"
@@ -23,5 +24,7 @@ class EpubReaderPreferences(
 
         const val DEFAULT_FONT_SIZE = 18f
         const val DEFAULT_LINE_SPACING = 1.5f
+        const val PREF_SHOW_PROGRESS_PERCENT = "epub_show_progress_percent"
+        const val DEFAULT_SHOW_PROGRESS_PERCENT = false
     }
 }

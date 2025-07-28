@@ -11,11 +11,11 @@ import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.data.connections.discord.ReaderData
+import eu.kanade.tachiyomi.ui.reader.epub.EpubReaderSettings
 import eu.kanade.tachiyomi.util.epub.EpubChapter
 import eu.kanade.tachiyomi.util.epub.EpubContentBlock
 import eu.kanade.tachiyomi.util.epub.EpubDocument
 import eu.kanade.tachiyomi.util.epub.EpubParser
-import eu.kanade.tachiyomi.util.epub.EpubReaderSettings
 import eu.kanade.tachiyomi.util.epub.EpubTableOfContentsEntry
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import eu.kanade.tachiyomi.util.epub.TextAlignment
@@ -106,7 +106,7 @@ class EpubReaderViewModel(
                 lineSpacing = epubPreferences.lineSpacing().get(),
                 alignment = epubPreferences.textAlignment().get(),
                 theme = epubPreferences.theme().get(),
-                isScrollMode = false, // Not persisted yet
+                showProgressPercent = epubPreferences.showProgressPercent().get(),
             )
             try {
                 // Load manga and chapter data
@@ -152,6 +152,11 @@ class EpubReaderViewModel(
     fun updateSettings(newSettings: EpubReaderSettings) {
         _settings.value = newSettings
         // No need to reload/reprocess chapter for visual-only settings changes
+    }
+
+    fun setShowProgressPercent(enabled: Boolean) {
+        _settings.value = _settings.value.copy(showProgressPercent = enabled)
+        coroutineScope.launch { epubPreferences.showProgressPercent().set(enabled) }
     }
 
     fun setFontSize(size: Float) {

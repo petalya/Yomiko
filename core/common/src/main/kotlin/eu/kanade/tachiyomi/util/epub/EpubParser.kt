@@ -1,11 +1,11 @@
 package eu.kanade.tachiyomi.util.epub
 
 import eu.kanade.tachiyomi.util.storage.EpubFile
+import io.documentnode.epub4j.domain.Book
+import io.documentnode.epub4j.domain.Resource
+import io.documentnode.epub4j.domain.SpineReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import nl.siegmann.epublib.domain.Book
-import nl.siegmann.epublib.domain.Resource
-import nl.siegmann.epublib.domain.SpineReference
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import tachiyomi.core.common.util.system.logcat
@@ -116,7 +116,7 @@ class EpubParser {
         val tocHrefs = mutableListOf<Pair<String, String>>() // Pair<href, title>
 
         // Flatten TOC entries to a list of hrefs and titles (normalized)
-        fun collectToc(entries: List<nl.siegmann.epublib.domain.TOCReference>) {
+        fun collectToc(entries: List<io.documentnode.epub4j.domain.TOCReference>) {
             for (entry in entries) {
                 if (entry.resource == null) {
                     logcat { "[EPUB] Skipped TOC entry with null resource: title='${entry.title}'" }
@@ -459,7 +459,7 @@ class EpubParser {
         return entries
     }
 
-    private fun extractTocChildren(children: List<nl.siegmann.epublib.domain.TOCReference>, level: Int): List<EpubTableOfContentsEntry> {
+    private fun extractTocChildren(children: List<io.documentnode.epub4j.domain.TOCReference>, level: Int): List<EpubTableOfContentsEntry> {
         return children.mapIndexedNotNull { index, tocRef ->
             if (tocRef.resource == null) {
                 logcat { "[EPUB] Skipped TOC child with null resource at level $level: title='${tocRef.title}'" }

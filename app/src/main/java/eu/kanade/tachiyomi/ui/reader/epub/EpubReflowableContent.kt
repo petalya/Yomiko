@@ -41,8 +41,8 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.ui.reader.epub.EpubReaderSettings
 import eu.kanade.tachiyomi.util.epub.EpubContentBlock
-import eu.kanade.tachiyomi.util.epub.EpubReaderSettings
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import eu.kanade.tachiyomi.util.epub.TextAlignment
 
@@ -99,7 +99,7 @@ fun EpubReflowableContent(
 
     Box(
         modifier = modifier
-            .padding(horizontal = settings.margins.dp),
+            .padding(horizontal = 16.dp),
     ) {
         Column(
             modifier = Modifier

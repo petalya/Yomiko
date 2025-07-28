@@ -304,16 +304,43 @@ class EpubReaderScreen(
         // Fullscreen image state
         var fullscreenImage by remember { mutableStateOf<FullscreenImageData?>(null) }
 
+        val progressBarHeight = 40.dp
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(backgroundColor),
         ) {
+            // Stationary progress percentage UI at the bottom of the screen
+            if (readerSettings.showProgressPercent && (state is EpubReaderState.ReflowSuccess || state is EpubReaderState.HtmlSuccess)) {
+                val progress = sliderProgress.value
+                val progressPercent = (progress * 100).toInt().coerceIn(0, 100)
+                // Determine text color based on reader theme
+                val percentTextColor = when (readerSettings.theme) {
+                    ReaderTheme.LIGHT, ReaderTheme.SEPIA, ReaderTheme.MINT -> Color.Black
+                    ReaderTheme.BLUE_GRAY, ReaderTheme.BLACK -> Color.White
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(progressBarHeight)
+                        .background(backgroundColor)
+                        .navigationBarsPadding(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "$progressPercent%",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = percentTextColor,
+                    )
+                }
+            }
+
             // Main content area with fade transition
             AnimatedContent(
                 targetState = state,
+                modifier = Modifier.padding(bottom = if (readerSettings.showProgressPercent && (state is EpubReaderState.ReflowSuccess || state is EpubReaderState.HtmlSuccess)) progressBarHeight else 0.dp),
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
-                modifier = Modifier.fillMaxSize(),
             ) { animatedState ->
                 when (animatedState) {
                     is EpubReaderState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
