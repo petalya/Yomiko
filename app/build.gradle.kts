@@ -316,6 +316,7 @@ dependencies {
     implementation(sylibs.zxing.android.embedded)
 
     implementation("io.documentnode:epub4j-core:4.2.1") {
+        exclude(group = "xmlpull", module = "xmlpull")
         exclude(group = "net.sf.kxml", module = "kxml2")
     }
     implementation("com.valentinilk.shimmer:compose-shimmer:1.3.3")
