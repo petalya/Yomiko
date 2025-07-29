@@ -463,31 +463,29 @@ actual class LocalSource(
      * Uses a cache to avoid re-processing the same files
      */
     private suspend fun extractCoversFromEpubs(files: List<UniFile>, manga: SManga): Boolean {
-        
-    val epubFiles = files.filter { it.extension.equals("epub", true) }
+        val epubFiles = files.filter { it.extension.equals("epub", true) }
 
-    if (epubFiles.isEmpty()) {
-        return false
-    }
+        if (epubFiles.isEmpty()) {
+            return false
+        }
 
-    val mangaDir = fileSystem.getMangaDirectory(manga.url) ?: run {
-        return false
-    }
+        val mangaDir = fileSystem.getMangaDirectory(manga.url) ?: run {
+            return false
+        }
 
-    val cacheKey = "${manga.url}:cover"
-    val cached = epubCoverCache.get(cacheKey)
-    if (cached == true) return false
+        val cacheKey = "${manga.url}:cover"
+        val cached = epubCoverCache.get(cacheKey)
+        if (cached == true) return false
 
-    val semaphore = Semaphore(2)
-    return coroutineScope {
-        val results = epubFiles.map { epubFile ->
-            async {
-                semaphore.withPermit {
-                    try {
-                        epubFile.openInputStream()?.use { inputStream ->
-                            val epub = eu.kanade.tachiyomi.util.storage.EpubFile(inputStream)
-                            val book = epub.book
-
+        val semaphore = Semaphore(2)
+        return coroutineScope {
+            val results = epubFiles.map { epubFile ->
+                async {
+                    semaphore.withPermit {
+                        try {
+                            epubFile.openInputStream()?.use { inputStream ->
+                                val epub = eu.kanade.tachiyomi.util.storage.EpubFile(inputStream)
+                                val book = epub.book
 
                                 var coverResource: io.documentnode.epub4j.domain.Resource? = null
                                 var opfResource: io.documentnode.epub4j.domain.Resource? = null
@@ -545,7 +543,7 @@ actual class LocalSource(
                                             opfDoc = null
                                             opfXml = null
                                         }
-                                    } 
+                                    }
                                 } catch (e: Exception) {
                                     // Swallow exception in guide reference processing
                                 }
@@ -577,8 +575,8 @@ actual class LocalSource(
                                 if (coverResource != null) {
                                     // Check if this is an HTML/XHTML file that needs parsing
                                     val isHtmlCover = coverResource.href.endsWith(".xhtml", true) ||
-                                                     coverResource.href.endsWith(".html", true) ||
-                                                     coverResource.mediaType?.toString()?.contains("html") == true
+                                        coverResource.href.endsWith(".html", true) ||
+                                        coverResource.mediaType?.toString()?.contains("html") == true
 
                                     if (isHtmlCover) {
                                         val actualImageResource = extractImageFromHtmlCover(coverResource, book)
@@ -611,7 +609,6 @@ actual class LocalSource(
                                     coverResource = null
                                     opfResource = null
                                 }
-
                             }
                         } catch (e: Exception) {
                             // Swallow exception to continue processing others
@@ -691,22 +688,22 @@ actual class LocalSource(
 
             // Try multiple selectors for cover image
             val imgSelectors = listOf(
-                "img[src]",                    // Standard img with src
-                "img[data-src]",               // Lazy-loaded images
-                "img[data-original-src]",      // Some EPUB generators
-                "img[data-cover]",             // Cover-specific images
-                "img[alt~=cover]",             // Alt text containing "cover"
+                "img[src]", // Standard img with src
+                "img[data-src]", // Lazy-loaded images
+                "img[data-original-src]", // Some EPUB generators
+                "img[data-cover]", // Cover-specific images
+                "img[alt~=cover]", // Alt text containing "cover"
                 "img[alt~=Cover]",
-                "img[title~=cover]",           // Title containing "cover"
+                "img[title~=cover]", // Title containing "cover"
                 "img[title~=Cover]",
-                "img.cover",                   // CSS class "cover"
-                "img#cover",                   // ID "cover"
-                "img[src*=cover]",             // src containing "cover"
+                "img.cover", // CSS class "cover"
+                "img#cover", // ID "cover"
+                "img[src*=cover]", // src containing "cover"
                 "img[src*=Cover]",
-                "img[src*=image]",             // src containing "image"
+                "img[src*=image]", // src containing "image"
                 "img[src*=Image]",
-                "img[src*=img]",               // src containing "img"
-                "img[src*=Img]"
+                "img[src*=img]", // src containing "img"
+                "img[src*=Img]",
             )
 
             for (selector in imgSelectors) {
