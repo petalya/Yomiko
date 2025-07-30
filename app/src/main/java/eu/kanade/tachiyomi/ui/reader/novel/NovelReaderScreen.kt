@@ -474,11 +474,13 @@ class NovelReaderScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 90.dp, start = 16.dp, end = 16.dp, top = 8.dp), // above bottom bar
+                            .padding(start = 16.dp, end = 16.dp, top = 8.dp)
+                            .navigationBarsPadding()
+                            .padding(bottom = 72.dp), // above bottom bar
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val percent = (sliderProgress * 100).toInt()
-                        Text("$percent%", modifier = Modifier.padding(end = 8.dp))
+                        Text("$percent%", modifier = Modifier.padding(end = 8.dp), color = presetColorScheme.text)
                         Slider(
                             value = sliderProgress,
                             onValueChange = { newProgress ->
@@ -495,7 +497,7 @@ class NovelReaderScreen(
                             valueRange = 0f..1f,
                             modifier = Modifier.weight(1f),
                         )
-                        Text("100%", modifier = Modifier.padding(start = 8.dp))
+                        Text("100%", modifier = Modifier.padding(start = 8.dp), color = presetColorScheme.text)
                     }
                 }
                 // Bottom bar anchored to the bottom, hides/shows with barsVisible

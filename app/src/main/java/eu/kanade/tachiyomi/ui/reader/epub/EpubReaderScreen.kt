@@ -474,11 +474,20 @@ class EpubReaderScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 90.dp, start = 16.dp, end = 16.dp, top = 8.dp), // above bottom bar
+                        .padding(start = 16.dp, end = 16.dp, top = 8.dp)
+                        .navigationBarsPadding()
+                        .padding(bottom = 72.dp), // above bottom bar
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val percent = (sliderProgress.floatValue * 100).toInt()
-                    Text("$percent%", modifier = Modifier.padding(end = 8.dp))
+                    val textColor = when (readerSettings.theme) {
+                        ReaderTheme.LIGHT -> Color(0xFF222222)
+                        ReaderTheme.SEPIA -> Color(0xFF6B4F1D)
+                        ReaderTheme.MINT -> Color(0xFF2B3A35)
+                        ReaderTheme.BLUE_GRAY -> Color(0xFFE6E6F2)
+                        ReaderTheme.BLACK -> Color(0xFFECECEC)
+                    }
+                    Text("$percent%", modifier = Modifier.padding(end = 8.dp), color = textColor)
                     Slider(
                         value = sliderProgress.floatValue,
                         onValueChange = { newProgress ->
@@ -495,7 +504,7 @@ class EpubReaderScreen(
                         valueRange = 0f..1f,
                         modifier = Modifier.weight(1f),
                     )
-                    Text("100%", modifier = Modifier.padding(start = 8.dp))
+                    Text("100%", modifier = Modifier.padding(start = 8.dp), color = textColor)
                 }
             }
 

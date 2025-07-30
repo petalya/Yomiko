@@ -144,7 +144,7 @@ class EpubParser {
             if ((currentTOC != null && accumulatedContent.isNotEmpty()) || accumulatedContent.isNotEmpty()) {
                 // Wrap accumulated body content in a single HTML document
                 val mergedBody = accumulatedContent.toString()
-                val finalContent = "<html><body>" + mergedBody + "</body></html>"
+                val finalContent = "<html><body>$mergedBody</body></html>"
                 chapters.add(
                     EpubChapter(
                         id = chapterId.ifEmpty { "chapter_$chapterPosition" },
@@ -213,7 +213,7 @@ class EpubParser {
                 // Extract only the <body> content using Jsoup, ignoring xmlns and namespaces
                 val doc = Jsoup.parse(content)
                 val body = doc.body().html()
-                val finalBody = if (body.isNullOrBlank()) content else body
+                val finalBody = body.ifBlank { content }
                 accumulatedContent.append(finalBody)
                 accumulatedResources.putAll(extractEmbeddedResources(resource, book))
             } else {
@@ -230,7 +230,7 @@ class EpubParser {
         try {
             val content = String(resource.data ?: return emptyMap(), Charsets.UTF_8)
             // Always parse the whole document for <img> tags, not just <body>
-            val doc = org.jsoup.Jsoup.parse(content, "", org.jsoup.parser.Parser.xmlParser())
+            val doc = Jsoup.parse(content, "", org.jsoup.parser.Parser.xmlParser())
             val basePath = resource.href.substringBeforeLast('/', "")
 
             // Extract images from the entire document
@@ -412,23 +412,6 @@ class EpubParser {
         return resultPath
     }
 
-    private fun getChapterTitle(resource: Resource, index: Int): String? {
-        val data = resource.data ?: return null
-        try {
-            val html = String(data, Charsets.UTF_8)
-            val doc = Jsoup.parse(html)
-
-            // Try to find a title in the HTML
-            val title = doc.select("title").firstOrNull()?.text()
-                ?: doc.select("h1").firstOrNull()?.text()
-                ?: doc.select("h2").firstOrNull()?.text()
-
-            return title?.takeIf { it.isNotBlank() } ?: "Chapter ${index + 1}"
-        } catch (e: Exception) {
-            return "Chapter ${index + 1}"
-        }
-    }
-
     private fun shouldIncludeInChapters(spineRef: SpineReference, resource: Resource): Boolean {
         if (resource.mediaType == null) return false
         val mediaType = resource.mediaType.name
@@ -518,8 +501,7 @@ class EpubParser {
 
     private fun parseBlockElements(element: Element, blocks: MutableList<EpubContentBlock>) {
         for (child in element.children()) {
-            val tag = child.tagName().lowercase()
-            when (tag) {
+            when (val tag = child.tagName().lowercase()) {
                 "p" -> {
                     val text = child.wholeText().trim()
                     if (text.isNotEmpty()) {
