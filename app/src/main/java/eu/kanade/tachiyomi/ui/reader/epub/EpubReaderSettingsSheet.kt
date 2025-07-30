@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.reader.epub
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,10 +19,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
+import androidx.compose.material.icons.automirrored.filled.FormatAlignRight
 import androidx.compose.material.icons.filled.FormatAlignCenter
 import androidx.compose.material.icons.filled.FormatAlignJustify
-import androidx.compose.material.icons.filled.FormatAlignLeft
-import androidx.compose.material.icons.filled.FormatAlignRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,7 +35,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +51,7 @@ import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderPreferences
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import eu.kanade.tachiyomi.util.epub.TextAlignment
 
+@SuppressLint("DefaultLocale")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EpubReaderSettingsSheet(
@@ -58,7 +60,7 @@ fun EpubReaderSettingsSheet(
 ) {
     val settings by viewModel.settings.collectAsState()
     val haptic = LocalHapticFeedback.current
-    val lastSliderValue = remember { mutableStateOf(settings.fontSize) }
+    val lastSliderValue = remember { mutableFloatStateOf(settings.fontSize) }
     val colorSchemes = NovelReaderPreferences.PresetColorSchemes
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -79,9 +81,9 @@ fun EpubReaderSettingsSheet(
                     value = settings.fontSize,
                     onValueChange = {
                         viewModel.setFontSize(it)
-                        if (lastSliderValue.value.toInt() != it.toInt()) {
+                        if (lastSliderValue.floatValue.toInt() != it.toInt()) {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            lastSliderValue.value = it
+                            lastSliderValue.floatValue = it
                         }
                     },
                     valueRange = 10f..30f,
@@ -93,7 +95,7 @@ fun EpubReaderSettingsSheet(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Text("Color", modifier = Modifier.weight(1f).padding(start = 16.dp), style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.weight(2f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    val themes = ReaderTheme.values()
+                    val themes = ReaderTheme.entries.toTypedArray()
                     colorSchemes.forEachIndexed { idx, scheme ->
                         val theme = themes.getOrNull(idx)
                         Box(
@@ -122,7 +124,7 @@ fun EpubReaderSettingsSheet(
                 Row(Modifier.weight(2f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     IconButton(onClick = { viewModel.setTextAlignment(TextAlignment.LEFT) }) {
                         Icon(
-                            imageVector = Icons.Default.FormatAlignLeft,
+                            imageVector = Icons.AutoMirrored.Filled.FormatAlignLeft,
                             contentDescription = "Left",
                             tint = if (settings.alignment == TextAlignment.LEFT) MaterialTheme.colorScheme.primary else Color.Gray,
                         )
@@ -143,7 +145,7 @@ fun EpubReaderSettingsSheet(
                     }
                     IconButton(onClick = { viewModel.setTextAlignment(TextAlignment.RIGHT) }) {
                         Icon(
-                            imageVector = Icons.Default.FormatAlignRight,
+                            imageVector = Icons.AutoMirrored.Filled.FormatAlignRight,
                             contentDescription = "Right",
                             tint = if (settings.alignment == TextAlignment.RIGHT) MaterialTheme.colorScheme.primary else Color.Gray,
                         )

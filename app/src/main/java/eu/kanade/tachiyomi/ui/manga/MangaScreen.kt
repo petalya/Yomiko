@@ -187,7 +187,7 @@ class MangaScreen(
                 if (isEpub) {
                     navigator.push(eu.kanade.tachiyomi.ui.reader.epub.EpubReaderScreen(manga.id, chapter.id, chapter.url))
                 } else if (source.id == 0L || (source.id in 10001L..10100L)) {
-                    navigator.push(eu.kanade.tachiyomi.ui.reader.NovelReaderScreen(manga.id, chapter.id))
+                    navigator.push(eu.kanade.tachiyomi.ui.reader.novel.NovelReaderScreen(manga.id, chapter.id))
                 } else {
                     openChapter(context, chapter)
                 }
@@ -410,7 +410,7 @@ class MangaScreen(
                 else -> chapters.last() // All read, open last
             }
             if (nextChapter != null) {
-                navigator.push(eu.kanade.tachiyomi.ui.reader.NovelReaderScreen(manga.id, nextChapter.id))
+                navigator.push(eu.kanade.tachiyomi.ui.reader.novel.NovelReaderScreen(manga.id, nextChapter.id))
             }
         } else {
             if (unreadChapter == null) return

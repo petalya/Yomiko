@@ -1,60 +1,45 @@
 // SPDX-License-Identifier: Apache-2.0
-package eu.kanade.tachiyomi.ui.reader
+package eu.kanade.tachiyomi.ui.reader.novel
 
 import android.app.Activity
-import android.content.Context
 import android.util.Log
 import android.view.View
 import android.view.WindowInsetsController
-import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -66,6 +51,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,10 +60,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -86,327 +69,35 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichText
-import com.valentinilk.shimmer.ShimmerBounds
-import com.valentinilk.shimmer.rememberShimmer
-import com.valentinilk.shimmer.shimmer
-import eu.kanade.domain.chapter.model.toSChapter
-import eu.kanade.domain.connections.service.ConnectionsPreferences
 import eu.kanade.presentation.components.AdaptiveSheet
-import eu.kanade.presentation.components.AppBar
-import eu.kanade.presentation.components.AppBarTitle
 import eu.kanade.presentation.manga.components.ChapterDownloadAction
 import eu.kanade.presentation.manga.components.MangaChapterListItem
 import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
-import eu.kanade.tachiyomi.data.connections.discord.ReaderData
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.model.Download
-import eu.kanade.tachiyomi.source.CatalogueSource
-import eu.kanade.tachiyomi.ui.reader.NovelReaderSettingsBottomSheet
 import eu.kanade.tachiyomi.ui.reader.chapter.ReaderChapterItem
 import eu.kanade.tachiyomi.ui.reader.model.getChapterWebUrl
 import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderSettingsScreenModel
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.toast
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import tachiyomi.domain.chapter.interactor.GetChaptersByMangaId
-import tachiyomi.domain.chapter.model.Chapter
-import tachiyomi.domain.chapter.repository.ChapterRepository
-import tachiyomi.domain.chapter.service.getChapterSort
-import tachiyomi.domain.history.interactor.UpsertHistory
-import tachiyomi.domain.history.model.HistoryUpdate
 import tachiyomi.domain.library.model.ChapterSwipeAction
-import tachiyomi.domain.manga.interactor.GetManga
-import tachiyomi.domain.manga.model.Manga
-import tachiyomi.domain.manga.model.asMangaCover
-import tachiyomi.domain.source.service.SourceManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.time.format.DateTimeFormatter
 
-// --- State ---
-sealed class NovelReaderState {
-    object Loading : NovelReaderState()
-    data class Success(
-        val novelTitle: String,
-        val chapterTitle: String,
-        val content: String,
-        val hasNext: Boolean = false,
-        val hasPrev: Boolean = false,
-        val progress: Float = 0f,
-        val bookmarked: Boolean = false,
-    ) : NovelReaderState()
-    data class Error(val message: String) : NovelReaderState()
-}
-
-data class NovelReaderChapterItem(
-    val chapter: Chapter,
-    val manga: Manga,
-    val isCurrent: Boolean,
-    val downloadState: Download.State,
-    val downloadProgress: Int,
-)
-
-class NovelReaderViewModel(
-    private val novelId: Long,
-    private val initialChapterId: Long,
-) : ScreenModel {
-    private val chapterRepo: ChapterRepository = Injekt.get()
-    private val getManga: GetManga = Injekt.get()
-    private val getChaptersByMangaId: GetChaptersByMangaId = Injekt.get()
-    internal val sourceManager: SourceManager = Injekt.get()
-    private val upsertHistory: UpsertHistory = Injekt.get()
-    private val _state = MutableStateFlow<NovelReaderState>(NovelReaderState.Loading)
-    val state: StateFlow<NovelReaderState> = _state.asStateFlow()
-
-    var chapters by mutableStateOf<List<Chapter>>(emptyList())
-        private set
-    var manga: Manga? = null
-        private set
-    internal var currentChapterIndex: Int = -1
-    val currentChapterId: Long?
-        get() = chapters.getOrNull(currentChapterIndex)?.id
-
-    // Robust download state tracking
-    private val _downloadedChapterIds = MutableStateFlow<Set<Long>>(emptySet())
-    val downloadedChapterIds: StateFlow<Set<Long>> = _downloadedChapterIds.asStateFlow()
-
-    // Debounce job for saving progress
-    private var saveProgressJob: kotlinx.coroutines.Job? = null
-    private var lastSavedProgress: Float = -1f
-
-    fun updateScrollProgressDebounced(progress: Float) {
-        val chapterId = currentChapterId ?: return
-        if (kotlin.math.abs(progress - lastSavedProgress) < 0.001) return
-        lastSavedProgress = progress
-        saveProgressJob?.cancel()
-        saveProgressJob = CoroutineScope(Dispatchers.IO).launch {
-            delay(500) // 0.5s debounce
-            val percentInt = (progress * 1000).toLong()
-            chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapterId, lastPageRead = percentInt))
-            recordHistory(chapterId)
-        }
-        val current = state.value
-        if (current is NovelReaderState.Success) {
-            _state.value = current.copy(progress = progress)
-        }
-    }
-    fun getSavedProgress(chapterId: Long): Float {
-        val chapter = chapters.find { it.id == chapterId }
-        return if (chapter != null && chapter.lastPageRead > 0) chapter.lastPageRead / 1000f else 0f
-    }
-    fun toggleBookmark(chapter: Chapter) {
-        val idx = chapters.indexOfFirst { it.id == chapter.id }
-        if (idx == -1) return
-        val newValue = !chapters[idx].bookmark
-        chapters = chapters.toMutableList().apply {
-            this[idx] = chapters[idx].copy(bookmark = newValue)
-        }
-        CoroutineScope(Dispatchers.IO).launch {
-            chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapter.id, bookmark = newValue))
-        }
-        // Optionally update state if current chapter is affected
-        val currentState = state.value
-        if (currentState is NovelReaderState.Success && idx == currentChapterIndex) {
-            _state.value = currentState.copy(bookmarked = newValue)
-        }
-    }
-    fun isBookmarked(chapterId: Long): Boolean = chapters.find { it.id == chapterId }?.bookmark == true
-    fun nextChapter() {
-        // For novels (source ID 10001L), we want to go to the next chapter in the sorted list
-        // which should be the next higher chapter number
-        if (currentChapterIndex < chapters.lastIndex) {
-            currentChapterIndex++
-            _state.value = NovelReaderState.Loading
-            loadCurrentChapter(chapters)
-            updateDiscordRPC()
-        }
-    }
-
-    fun prevChapter() {
-        // For novels (source ID 10001L), we want to go to the previous chapter in the sorted list
-        // which should be the previous lower chapter number
-        if (currentChapterIndex > 0) {
-            currentChapterIndex--
-            _state.value = NovelReaderState.Loading
-            loadCurrentChapter(chapters)
-            updateDiscordRPC()
-        }
-    }
-    fun jumpToChapter(index: Int) {
-        if (index in chapters.indices) {
-            currentChapterIndex = index
-            _state.value = NovelReaderState.Loading
-            loadCurrentChapter(chapters)
-            updateDiscordRPC()
-        }
-    }
-    fun markChapterDownloaded(chapterId: Long) {
-        _downloadedChapterIds.value = _downloadedChapterIds.value + chapterId
-    }
-    fun unmarkChapterDownloaded(chapterId: Long) {
-        _downloadedChapterIds.value = _downloadedChapterIds.value - chapterId
-    }
-    fun markCurrentChapterReadIfNeeded() {
-        val idx = currentChapterIndex
-        val chapter = chapters.getOrNull(idx) ?: return
-        if (!chapter.read) {
-            chapters = chapters.toMutableList().apply {
-                this[idx] = chapter.copy(read = true)
-            }
-            CoroutineScope(Dispatchers.IO).launch {
-                chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapter.id, read = true))
-            }
-        }
-    }
-    fun toggleRead(chapter: Chapter) {
-        val idx = chapters.indexOfFirst { it.id == chapter.id }
-        if (idx != -1) {
-            val newRead = !chapters[idx].read
-            chapters = chapters.toMutableList().apply {
-                this[idx] = chapters[idx].copy(read = newRead)
-            }
-            CoroutineScope(Dispatchers.IO).launch {
-                chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapter.id, read = newRead))
-            }
-        }
-    }
-    private fun recordHistory(chapterId: Long) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val now = java.util.Date()
-            upsertHistory.await(HistoryUpdate(chapterId, now, 0L))
-        }
-    }
-    init {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                manga = getManga.await(novelId)
-                if (manga == null) {
-                    _state.value = NovelReaderState.Error("Novel not found")
-                    return@launch
-                }
-                val loadedChapters = getChaptersByMangaId.await(novelId)
-                val sortedChapters = if (manga!!.source in 10001L..10100L) {
-                    loadedChapters.sortedBy { chapter -> chapter.chapterNumber }
-                } else {
-                    loadedChapters.sortedWith(getChapterSort(manga!!))
-                }
-                if (sortedChapters.isEmpty()) {
-                    _state.value = NovelReaderState.Error("No chapters found")
-                    return@launch
-                }
-                currentChapterIndex = sortedChapters.indexOfFirst { chapter -> chapter.id == initialChapterId }.takeIf { idx -> idx != -1 } ?: 0
-                chapters = sortedChapters
-                loadCurrentChapter(sortedChapters)
-            } catch (e: Exception) {
-                _state.value = NovelReaderState.Error(e.message ?: "Unknown error")
-            }
-        }
-    }
-    internal fun loadCurrentChapter(chapters: List<Chapter>) {
-        val chapter = chapters.getOrNull(currentChapterIndex)
-        val manga = manga
-        if (chapter == null || manga == null) {
-            _state.value = NovelReaderState.Error("Chapter not found")
-            return
-        }
-        val savedProgress = if (chapter.lastPageRead > 0) chapter.lastPageRead / 1000f else 0f
-        CoroutineScope(Dispatchers.IO).launch {
-            _state.value = NovelReaderState.Loading
-            delay(600) // Reduced delay for skeleton UI
-            try {
-                val source = sourceManager.get(manga.source) as? CatalogueSource
-                if (source == null) {
-                    _state.value = NovelReaderState.Error("Source not found")
-                    return@launch
-                }
-                val sChapter = chapter.toSChapter()
-                val pages = source.getPageList(sChapter)
-                val content = if (pages.size == 1 && isHtmlOrTextContent(pages[0].imageUrl)) {
-                    pages[0].imageUrl ?: pages[0].url ?: "No content found."
-                } else {
-                    "This chapter is not in a supported novel format."
-                }
-                val progress = if (chapter.lastPageRead > 0) chapter.lastPageRead / 1000f else 0f
-                _state.value = NovelReaderState.Success(
-                    novelTitle = manga.title,
-                    chapterTitle = chapter.name,
-                    content = content,
-                    hasNext = currentChapterIndex < chapters.lastIndex,
-                    hasPrev = currentChapterIndex > 0,
-                    progress = progress,
-                    bookmarked = chapter.bookmark,
-                )
-                updateDiscordRPC()
-                recordHistory(chapter.id)
-            } catch (e: Exception) {
-                _state.value = NovelReaderState.Error(e.message ?: "Failed to load chapter content")
-            }
-        }
-    }
-
-    private fun isHtmlOrTextContent(content: String?): Boolean {
-        if (content == null) return false
-        val trimmed = content.trim()
-        return trimmed.startsWith("<html", ignoreCase = true) ||
-            trimmed.startsWith("<!DOCTYPE html", ignoreCase = true) ||
-            (!trimmed.startsWith("http://") && !trimmed.startsWith("https://"))
-    }
-
-    private fun updateDiscordRPC() {
-        val connectionsPreferences = Injekt.get<ConnectionsPreferences>()
-        val chapter = chapters.getOrNull(currentChapterIndex)
-        val context = Injekt.get<Context>()
-        val chapterNumberFloat = chapter?.chapterNumber?.toFloat() ?: -1f
-        CoroutineScope(Dispatchers.IO).launch {
-            val latestManga = getManga.await(novelId)
-            val mangaCover = latestManga?.asMangaCover()
-            val coverUrl = mangaCover?.url
-            if (latestManga != null && chapter != null && connectionsPreferences.enableDiscordRPC().get() && coverUrl != null) {
-                DiscordRPCService.setReaderActivity(
-                    context = context,
-                    readerData = ReaderData(
-                        incognitoMode = latestManga.incognitoMode,
-                        mangaId = latestManga.id,
-                        mangaTitle = latestManga.title,
-                        thumbnailUrl = coverUrl,
-                        chapterNumber = Pair(chapterNumberFloat, chapters.size),
-                        chapterTitle = if (connectionsPreferences.useChapterTitles().get()) chapter.name else chapter.chapterNumber.toString(),
-                    ),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SetSystemBarsColor(navigationBarColor: Color) {
-    val context = LocalContext.current as? ComponentActivity ?: return
-    val isDarkMode = isSystemInDarkTheme()
-    DisposableEffect(isDarkMode, navigationBarColor) {
-        context.window.navigationBarColor = navigationBarColor.toArgb()
-        onDispose { }
-    }
-}
-
+@Suppress("NAME_SHADOWING")
 class NovelReaderScreen(
-    val novelId: Long,
+    private val novelId: Long,
     val chapterId: Long,
 ) : Screen {
     @Composable
@@ -415,14 +106,42 @@ class NovelReaderScreen(
         val state by viewModel.state.collectAsState()
         val chapters = viewModel.chapters
         val context = LocalContext.current
-        val view = LocalView.current
+        LocalView.current
+        val window = remember { (context as? Activity)?.window }
+        val navBarColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f).toArgb()
+        // Save previous navigation bar color
+        val prevNavBarColor = remember { window?.navigationBarColor }
+        // Set navigation bar color to match EPUB reader style
+        LaunchedEffect(Unit) {
+            window?.navigationBarColor = navBarColor
+        }
         val navigator = LocalNavigator.current
-        var showSettings by remember { mutableStateOf(false) }
-        var showChapterList by remember { mutableStateOf(false) }
+
+        // Restore system bars and behavior on exit (match EPUB reader)
+        DisposableEffect(Unit) {
+            onDispose {
+                // Restore previous navigation bar color
+                window?.navigationBarColor = prevNavBarColor ?: window?.navigationBarColor ?: 0
+                window?.let { win ->
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                        win.insetsController?.let { controller ->
+                            controller.show(
+                                android.view.WindowInsets.Type.statusBars() or
+                                    android.view.WindowInsets.Type.navigationBars(),
+                            )
+                            controller.systemBarsBehavior =
+                                WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                        }
+                    } else {
+                        @Suppress("DEPRECATION")
+                        win.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                    }
+                }
+            }
+        }
         val scrollState = rememberScrollState()
         // Download manager for chapter downloads
-        val downloadManager = remember { Injekt.get<DownloadManager>() }
-        val downloadQueue by downloadManager.queueState.collectAsState()
+        remember { Injekt.get<DownloadManager>() }
         val coroutineScope = rememberCoroutineScope()
         val settingsModel = rememberScreenModel { NovelReaderSettingsScreenModel() }
         val fontSize by settingsModel.fontSize.collectAsState()
@@ -441,8 +160,8 @@ class NovelReaderScreen(
         // Collapsible bars state
         var barsVisible by remember { mutableStateOf(true) }
         // Hide-on-scroll state
-        var lastScrollOffset by remember { mutableStateOf(0) }
-        var accumulatedScroll by remember { mutableStateOf(0) }
+        var lastScrollOffset by remember { mutableIntStateOf(0) }
+        var accumulatedScroll by remember { mutableIntStateOf(0) }
         val hideThresholdPx = with(LocalDensity.current) { 24.dp.roundToPx() }
         LaunchedEffect(scrollState.value) {
             val delta = scrollState.value - lastScrollOffset
@@ -465,8 +184,8 @@ class NovelReaderScreen(
         // Chapter list bottom sheet state
         var showChapterListSheet by remember { mutableStateOf(false) }
         var showSettingsSheet by remember { mutableStateOf(false) }
-        val chapterListSheetState = rememberModalBottomSheetState()
-        val settingsSheetState = rememberModalBottomSheetState()
+        rememberModalBottomSheetState()
+        rememberModalBottomSheetState()
         // Reset scroll position when chapter changes
         LaunchedEffect(viewModel.currentChapterId) {
             // Always start from top when chapter changes
@@ -485,45 +204,39 @@ class NovelReaderScreen(
             }
         }
         // Immersive mode: hide/show system bars with reader bars
-        LaunchedEffect(barsVisible) {
+        // Handle system UI bars based on loading state and barsVisible state
+        LaunchedEffect(barsVisible, state is NovelReaderState.Loading) {
             val activity = context as? Activity ?: return@LaunchedEffect
+            val isLoading = state is NovelReaderState.Loading
+            val window = activity.window
+
+            // Set up window insets controller behavior
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                val controller = activity.window.insetsController
-                if (barsVisible) {
+                window.insetsController?.systemBarsBehavior =
+                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+
+            // Determine if we should show system bars
+            val shouldShowBars = !isLoading && barsVisible
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                val controller = window.insetsController
+                if (shouldShowBars) {
                     controller?.show(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
                 } else {
                     controller?.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
-                    controller?.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 }
             } else {
                 @Suppress("DEPRECATION")
-                val flags = if (barsVisible) {
+                window.decorView.systemUiVisibility = if (shouldShowBars) {
                     View.SYSTEM_UI_FLAG_VISIBLE
                 } else {
-                    (
-                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                            or View.SYSTEM_UI_FLAG_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        )
-                }
-                @Suppress("DEPRECATION")
-                activity.window.decorView.systemUiVisibility = flags
-            }
-        }
-        // Always restore system bars when leaving the reader
-        DisposableEffect(Unit) {
-            onDispose {
-                val activity = context as? Activity ?: return@onDispose
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                    val controller = activity.window.insetsController
-                    controller?.show(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
-                } else {
-                    @Suppress("DEPRECATION")
-                    activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                        View.SYSTEM_UI_FLAG_FULLSCREEN or
+                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 }
             }
         }
-        SetSystemBarsColor(MaterialTheme.colorScheme.surface)
         Surface(modifier = Modifier.fillMaxSize(), color = presetColorScheme.background) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // Chapter content (tap to toggle bars)
@@ -548,7 +261,6 @@ class NovelReaderScreen(
                             NovelReaderPreferences.TextAlignment.Center -> "center"
                             NovelReaderPreferences.TextAlignment.Right -> "right"
                             NovelReaderPreferences.TextAlignment.Justify -> "justify"
-                            else -> "left"
                         }
                         val cleanedHtml = s.content
                             .replace(Regex("text-align\\s*:\\s*[^;\"']*;?", RegexOption.IGNORE_CASE), "")
@@ -619,7 +331,6 @@ class NovelReaderScreen(
                             }
                         }
 
-                        @OptIn(ExperimentalAnimationApi::class)
                         AnimatedContent(
                             targetState = contentReady,
                             transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -649,7 +360,7 @@ class NovelReaderScreen(
                                         NovelReaderPreferences.TextAlignment.Center -> TextAlign.Center
                                         NovelReaderPreferences.TextAlignment.Right -> TextAlign.Right
                                         NovelReaderPreferences.TextAlignment.Justify -> TextAlign.Justify
-                                        else -> TextAlign.Left // fallback for safety
+                                        // fallback for safety
                                     }
                                     val resolvedLineHeight = (lineSpacing / 100f) * fontSize.sp.value
 
@@ -670,7 +381,7 @@ class NovelReaderScreen(
                                     }
                                     // Footer at the end of the chapter
                                     Spacer(modifier = Modifier.height(32.dp))
-                                    val currentChapterNumber = viewModel.currentChapterIndex + 1
+                                    viewModel.currentChapterIndex + 1
                                     val currentChapterTitle = s.chapterTitle
                                     val hasNext = s.hasNext
                                     val nextChapter = chapters.getOrNull(viewModel.currentChapterIndex + 1)
@@ -726,8 +437,8 @@ class NovelReaderScreen(
                 // Top bar overlays content, does NOT push it down
                 androidx.compose.animation.AnimatedVisibility(
                     visible = barsVisible && (state !is NovelReaderState.Loading),
-                    enter = androidx.compose.animation.fadeIn(),
-                    exit = androidx.compose.animation.fadeOut(),
+                    enter = fadeIn(),
+                    exit = fadeOut(),
                     modifier = Modifier.align(Alignment.TopCenter),
                 ) {
                     NovelReaderTopBar(
@@ -747,13 +458,13 @@ class NovelReaderScreen(
                 var sliderInUse by remember { mutableStateOf(false) }
                 androidx.compose.animation.AnimatedVisibility(
                     visible = (barsVisible || sliderInUse) && (state !is NovelReaderState.Loading),
-                    enter = androidx.compose.animation.fadeIn(),
-                    exit = androidx.compose.animation.fadeOut(),
+                    enter = fadeIn(),
+                    exit = fadeOut(),
                     modifier = Modifier.align(Alignment.BottomCenter),
                 ) {
                     val coroutineScope = rememberCoroutineScope()
                     val maxScroll = scrollState.maxValue
-                    var sliderProgress by remember { mutableStateOf(if (maxScroll > 0) scrollState.value.toFloat() / maxScroll else 0f) }
+                    var sliderProgress by remember { mutableFloatStateOf(if (maxScroll > 0) scrollState.value.toFloat() / maxScroll else 0f) }
                     // Sync slider with scroll unless dragging
                     LaunchedEffect(scrollState.value, maxScroll, barsVisible) {
                         if (!sliderInUse) {
@@ -790,8 +501,8 @@ class NovelReaderScreen(
                 // Bottom bar anchored to the bottom, hides/shows with barsVisible
                 androidx.compose.animation.AnimatedVisibility(
                     visible = barsVisible && (state !is NovelReaderState.Loading),
-                    enter = androidx.compose.animation.fadeIn(),
-                    exit = androidx.compose.animation.fadeOut(),
+                    enter = fadeIn(),
+                    exit = fadeOut(),
                     modifier = Modifier.align(Alignment.BottomCenter),
                 ) {
                     Row(
@@ -813,7 +524,13 @@ class NovelReaderScreen(
                             Icon(
                                 Icons.Filled.SkipPrevious,
                                 contentDescription = "Previous chapter",
-                                tint = if (hasPrevChapter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                tint = if (hasPrevChapter) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(
+                                        alpha = 0.5f,
+                                    )
+                                },
                             )
                         }
                         IconButton(onClick = { showChapterListSheet = true }) {
@@ -827,10 +544,6 @@ class NovelReaderScreen(
                                     try {
                                         // Get the source and construct the chapter URL
                                         val source = viewModel.sourceManager.getOrStub(manga.source)
-                                        if (source == null) {
-                                            context.toast("Source not found")
-                                            return@IconButton
-                                        }
 
                                         // For online sources, use the chapter URL directly
                                         val chapterUrl = getChapterWebUrl(manga, chapter, source)
@@ -877,7 +590,13 @@ class NovelReaderScreen(
                             Icon(
                                 Icons.Filled.SkipNext,
                                 contentDescription = "Next chapter",
-                                tint = if (hasNextChapter) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                tint = if (hasNextChapter) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(
+                                        alpha = 0.5f,
+                                    )
+                                },
                             )
                         }
                     }
@@ -885,7 +604,7 @@ class NovelReaderScreen(
                 // Chapter list bottom sheet
                 if (showChapterListSheet) {
                     val manga = viewModel.manga
-                    val context = LocalContext.current
+                    LocalContext.current
                     val downloadManager: DownloadManager = Injekt.get()
                     val downloadQueue by downloadManager.queueState.collectAsState()
                     val downloadProgressMap = remember { mutableStateMapOf<Long, Int>() }
@@ -901,7 +620,7 @@ class NovelReaderScreen(
                     val downloadStates by remember(downloadQueue) {
                         derivedStateOf {
                             downloadQueue.associate { download ->
-                                download.chapter.id to (download.status to (download.progress ?: 0))
+                                download.chapter.id to (download.status to download.progress)
                             }
                         }
                     }
@@ -958,7 +677,7 @@ class NovelReaderScreen(
                                     items = chapterItems,
                                     key = { "chapter-${it.chapter.id}" },
                                 ) { chapterItem ->
-                                    val progress = downloadProgressMap[chapterItem.chapter.id] ?: 0
+                                    downloadProgressMap[chapterItem.chapter.id] ?: 0
 
 // Get the current download state for this chapter
                                     val (downloadState, downloadProgress) = remember(
@@ -967,7 +686,7 @@ class NovelReaderScreen(
                                         downloadProgressMap[chapterItem.chapter.id],
                                     ) {
                                         val state = downloadStates[chapterItem.chapter.id]
-                                        val progress = downloadProgressMap[chapterItem.chapter.id] ?: 0
+                                        downloadProgressMap[chapterItem.chapter.id] ?: 0
                                         val isDownloaded = downloadManager.isChapterDownloaded(
                                             chapterItem.chapter.name,
                                             chapterItem.chapter.scanlator,
@@ -1036,10 +755,6 @@ class NovelReaderScreen(
                                                         downloadProgressMap.remove(chapterItem.chapter.id)
                                                     }
                                                 }
-
-                                                else -> {
-                                                    /* no-op for exhaustiveness */
-                                                }
                                             }
                                         },
                                         onChapterSwipe = { action ->
@@ -1047,9 +762,11 @@ class NovelReaderScreen(
                                                 ChapterSwipeAction.ToggleRead -> {
                                                     viewModel.toggleRead(chapterItem.chapter)
                                                 }
+
                                                 ChapterSwipeAction.ToggleBookmark -> {
                                                     viewModel.toggleBookmark(chapterItem.chapter)
                                                 }
+
                                                 else -> {}
                                             }
                                         },
@@ -1062,165 +779,14 @@ class NovelReaderScreen(
             }
 
             // Loading state handling
-            val isLoading = state is NovelReaderState.Loading
+            state is NovelReaderState.Loading
 
-            // Always hide bars when loading
-            LaunchedEffect(isLoading) {
-                if (isLoading) {
-                    barsVisible = false
-                } else {
-                    barsVisible = true
-                }
-            }
-
-            // Hide system UI during loading, restore after
-            LaunchedEffect(isLoading) {
-                val activity = context as? Activity ?: return@LaunchedEffect
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                    val controller = activity.window.insetsController
-                    if (isLoading) {
-                        controller?.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
-                    } else {
-                        controller?.show(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
-                        controller?.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                    }
-                } else {
-                    @Suppress("DEPRECATION")
-                    if (isLoading) {
-                        activity.window.decorView.systemUiVisibility = (
-                            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                                View.SYSTEM_UI_FLAG_FULLSCREEN or
-                                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            )
-                    } else {
-                        activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
-                    }
-                }
-            }
-
-            // Observe download queue and update downloadedChapterIds in ViewModel
-            LaunchedEffect(downloadQueue) {
-                downloadQueue.forEach { download ->
-                    if (download.status == Download.State.DOWNLOADED) {
-                        viewModel.markChapterDownloaded(download.chapter.id)
-                    }
-                }
-            }
-        }
-
-        // Settings bottom sheet (outside of main Box)
-        if (showSettingsSheet) {
-            NovelReaderSettingsBottomSheet(
-                model = settingsModel,
-                onDismiss = { showSettingsSheet = false },
-            )
-        }
-    }
-
-    @Composable
-    fun NovelReaderTopBar(
-        title: String,
-        chapterTitle: String,
-        bookmarked: Boolean,
-        onBack: () -> Unit,
-        onBookmark: () -> Unit,
-    ) {
-        AppBar(
-            titleContent = {
-                AppBarTitle(title = title, subtitle = chapterTitle)
-            },
-            navigateUp = onBack,
-            actions = {
-                IconButton(onClick = onBookmark) {
-                    Icon(
-                        if (bookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                        contentDescription = "Bookmark",
-                    )
-                }
-            },
-            backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-        )
-    }
-
-    @Composable
-    fun NovelReaderBottomBar(
-        hasPrev: Boolean,
-        hasNext: Boolean,
-        progress: Float,
-        onPrev: () -> Unit,
-        onNext: () -> Unit,
-        onSliderChange: (Float) -> Unit,
-        onChapterList: () -> Unit,
-    ) {
-        NavigationBar(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-        ) {
-            NavigationBarItem(
-                selected = false,
-                onClick = onPrev,
-                icon = { Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous") },
-                enabled = hasPrev,
-            )
-            NavigationBarItem(
-                selected = false,
-                onClick = onChapterList,
-                icon = { Icon(Icons.Filled.MoreVert, contentDescription = "Chapters") },
-                enabled = true,
-            )
-            NavigationBarItem(
-                selected = false,
-                onClick = onNext,
-                icon = { Icon(Icons.Filled.SkipNext, contentDescription = "Next") },
-                enabled = hasNext,
-            )
-            Slider(
-                value = progress,
-                onValueChange = onSliderChange,
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-            )
-        }
-    }
-
-    @Composable
-    fun EpubShimmerSkeletonLoader(
-        modifier: Modifier = Modifier,
-        lineCount: Int = 24,
-        lineHeight: Dp = 18.dp,
-        lineSpacing: Dp = 18.dp,
-        topPadding: Dp = 64.dp,
-        cornerRadius: Dp = 8.dp,
-        baseColor: Color = MaterialTheme.colorScheme.surfaceVariant,
-        highlightColor: Color = MaterialTheme.colorScheme.primary,
-    ) {
-        val shimmerInstance = rememberShimmer(shimmerBounds = ShimmerBounds.View)
-        val widthFractions = listOf(0.9f, 0.8f, 0.7f, 0.6f)
-        val shimmerBrush = Brush.linearGradient(
-            colors = listOf(baseColor, highlightColor, baseColor),
-            start = Offset.Zero,
-            end = Offset(x = 1000f, y = 0f),
-        )
-        Column(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = topPadding)
-                .shimmer(shimmerInstance),
-            verticalArrangement = Arrangement.Top,
-            horizontalAlignment = Alignment.Start,
-        ) {
-            repeat(lineCount) {
-                val widthFraction = widthFractions[it % widthFractions.size]
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(widthFraction)
-                        .height(lineHeight)
-                        .clip(RoundedCornerShape(cornerRadius))
-                        .background(shimmerBrush),
+            // Settings bottom sheet (outside of main Box)
+            if (showSettingsSheet) {
+                NovelReaderSettingsBottomSheet(
+                    model = settingsModel,
+                    onDismiss = { showSettingsSheet = false },
                 )
-                if ((it + 1) % 4 == 0) {
-                    Spacer(modifier = Modifier.height(lineSpacing * 1.5f))
-                } else {
-                    Spacer(modifier = Modifier.height(lineSpacing))
-                }
             }
         }
     }

@@ -61,6 +61,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,11 +77,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -122,14 +121,16 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.ByteArrayOutputStream
 
+@Suppress("NAME_SHADOWING")
 class EpubReaderScreen(
     private val mangaId: Long,
     private val chapterId: Long,
     private val chapterUrl: String = "",
 ) : Screen {
+    @SuppressLint("SetJavaScriptEnabled")
     @Composable
     override fun Content() {
-        val viewModel = rememberScreenModel { EpubReaderViewModel(mangaId, chapterId, chapterUrl) }
+        val viewModel = rememberScreenModel { EpubReaderViewModel(mangaId, chapterId) }
         val state by viewModel.state.collectAsState()
         val readerSettings by viewModel.settings.collectAsState()
         val chapters = viewModel.chapters
@@ -137,24 +138,32 @@ class EpubReaderScreen(
         val coroutineScope = rememberCoroutineScope()
         var barsVisible by remember { mutableStateOf(true) }
         val navigator = LocalNavigator.current
-        val settingsModel = rememberScreenModel { NovelReaderSettingsScreenModel() }
-        val fontSize by settingsModel.fontSize.collectAsState()
-        val textAlignment by settingsModel.textAlignment.collectAsState()
-        val lineSpacing by settingsModel.lineSpacing.collectAsState()
-        val colorSchemeIndex by settingsModel.colorSchemeIndex.collectAsState()
-        val fontFamilyPref by settingsModel.fontFamily.collectAsState()
+        rememberScreenModel { NovelReaderSettingsScreenModel() }
 
-        // Set system UI colors - ensure it matches the bottom bar
-        val surfaceColor = MaterialTheme.colorScheme.surface
+        // Set system UI colors - ensure consistent transparency
+        MaterialTheme.colorScheme.surface
         val view = LocalView.current
         val window = remember { view.context.getActivity()?.window }
         val windowInsetsController = remember { window?.let { WindowCompat.getInsetsController(it, view) } }
 
-        // Set navigation bar color
-        val bottomBarColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+        // Set transparent navigation bar color (0.92f alpha for transparency)
+        MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
 
-        // Apply immersive mode based on bars visibility
+        // Apply transparent navigation bar on first load using modern API
         LaunchedEffect(Unit) {
+            window?.let { win ->
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    val controller = win.insetsController
+                    controller?.setSystemBarsAppearance(
+                        0,
+                        WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                    )
+                    // Set semi-transparent navigation bar background
+                    win.isNavigationBarContrastEnforced = false
+                }
+                // Use WindowCompat for backward compatibility
+                WindowCompat.setDecorFitsSystemWindows(win, false)
+            }
             windowInsetsController?.let {
                 // Always enable immersive mode when entering the reader
                 it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -185,7 +194,7 @@ class EpubReaderScreen(
                     it.show(WindowInsetsCompat.Type.systemBars())
                     it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 }
-                window?.navigationBarColor = bottomBarColor.toArgb()
+                // Let system handle navigation bar appearance on exit
             }
         }
 
@@ -213,10 +222,10 @@ class EpubReaderScreen(
         }
 
         // derived slider progress
-        var sliderProgress = remember { mutableStateOf(0f) }
+        val sliderProgress = remember { mutableFloatStateOf(0f) }
         LaunchedEffect(scrollState.value) {
             if (scrollState.maxValue > 0) {
-                sliderProgress.value = scrollState.value.toFloat() / scrollState.maxValue
+                sliderProgress.floatValue = scrollState.value.toFloat() / scrollState.maxValue
             }
         }
 
@@ -230,8 +239,7 @@ class EpubReaderScreen(
 
         // Handle scroll position for chapter loading
         LaunchedEffect(state) {
-            val currentState = state
-            when (currentState) {
+            when (val currentState = state) {
                 is EpubReaderState.Loading -> {
                     // reset scroll to 0 during loading state with delay
                     kotlinx.coroutines.delay(200) // delay to align with loading animation, surely this doesn't happen again
@@ -264,9 +272,10 @@ class EpubReaderScreen(
             }
         }
 
-        // Hide system UI bars during loading
+        // Hide system UI bars during loading - maintain transparency
         LaunchedEffect(state is EpubReaderState.Loading) {
-            val activity = view.context.getActivity() as? android.app.Activity ?: return@LaunchedEffect
+            val activity = view.context.getActivity() ?: return@LaunchedEffect
+
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                 val controller = activity.window.insetsController
                 if (state is EpubReaderState.Loading) {
@@ -280,8 +289,7 @@ class EpubReaderScreen(
                 if (state is EpubReaderState.Loading) {
                     activity.window.decorView.systemUiVisibility = (
                         android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                            android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
-                            android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
                         )
                 } else {
                     activity.window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
@@ -290,8 +298,8 @@ class EpubReaderScreen(
         }
 
         // Bottom sheets state
-        var showChapterListSheet = remember { mutableStateOf(false) }
-        var showSettingsSheet = remember { mutableStateOf(false) }
+        val showChapterListSheet = remember { mutableStateOf(false) }
+        val showSettingsSheet = remember { mutableStateOf(false) }
 
         val backgroundColor = when (readerSettings.theme) {
             ReaderTheme.LIGHT -> Color.White
@@ -312,7 +320,7 @@ class EpubReaderScreen(
         ) {
             // Stationary progress percentage UI at the bottom of the screen
             if (readerSettings.showProgressPercent && (state is EpubReaderState.ReflowSuccess || state is EpubReaderState.HtmlSuccess)) {
-                val progress = sliderProgress.value
+                val progress = sliderProgress.floatValue
                 val progressPercent = (progress * 100).toInt().coerceIn(0, 100)
                 // Determine text color based on reader theme
                 val percentTextColor = when (readerSettings.theme) {
@@ -368,7 +376,7 @@ class EpubReaderScreen(
                                     contentBlocks = animatedState.contentBlocks,
                                     settings = readerSettings,
                                     modifier = Modifier.fillMaxWidth(),
-                                    chapterTitle = animatedState.chapterTitle ?: "",
+                                    chapterTitle = animatedState.chapterTitle,
                                     onTap = { _ -> barsVisible = !barsVisible },
                                     onImageClick = { imageData -> fullscreenImage = imageData },
                                 )
@@ -403,14 +411,6 @@ class EpubReaderScreen(
                                         "UTF-8",
                                         null,
                                     )
-
-                                    @SuppressLint("ClickableViewAccessibility")
-                                    setOnTouchListener { _, event ->
-                                        if (event.action == MotionEvent.ACTION_UP) {
-                                            barsVisible = !barsVisible
-                                        }
-                                        false
-                                    }
                                 }
                             },
                         )
@@ -425,7 +425,7 @@ class EpubReaderScreen(
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.TopCenter),
             ) {
-                val s = when (state) {
+                when (state) {
                     is EpubReaderState.ReflowSuccess -> state as EpubReaderState.ReflowSuccess
                     is EpubReaderState.HtmlSuccess -> state as EpubReaderState.HtmlSuccess
                     else -> return@AnimatedVisibility
@@ -477,15 +477,15 @@ class EpubReaderScreen(
                         .padding(bottom = 90.dp, start = 16.dp, end = 16.dp, top = 8.dp), // above bottom bar
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val percent = (sliderProgress.value * 100).toInt()
+                    val percent = (sliderProgress.floatValue * 100).toInt()
                     Text("$percent%", modifier = Modifier.padding(end = 8.dp))
                     Slider(
-                        value = sliderProgress.value,
+                        value = sliderProgress.floatValue,
                         onValueChange = { newProgress ->
                             sliderInUse = true
-                            sliderProgress.value = newProgress
+                            sliderProgress.floatValue = newProgress
                             if (maxScroll > 0) {
-                                val target = (sliderProgress.value * maxScroll).toInt()
+                                val target = (sliderProgress.floatValue * maxScroll).toInt()
                                 coroutineScope.launch { scrollState.scrollTo(target) }
                             }
                         },
@@ -528,15 +528,15 @@ class EpubReaderScreen(
                         // Next chapter button
                         IconButton(
                             onClick = { viewModel.nextChapter() },
-                            enabled = when (val currentState = s) {
-                                is EpubReaderState.ReflowSuccess -> currentState.hasNext
-                                is EpubReaderState.HtmlSuccess -> currentState.hasNext
+                            enabled = when (s) {
+                                is EpubReaderState.ReflowSuccess -> s.hasNext
+                                is EpubReaderState.HtmlSuccess -> s.hasNext
                                 else -> false
                             },
                             modifier = Modifier.alpha(
-                                if (when (val currentState = s) {
-                                        is EpubReaderState.ReflowSuccess -> currentState.hasNext
-                                        is EpubReaderState.HtmlSuccess -> currentState.hasNext
+                                if (when (s) {
+                                        is EpubReaderState.ReflowSuccess -> s.hasNext
+                                        is EpubReaderState.HtmlSuccess -> s.hasNext
                                         else -> false
                                     }
                                 ) {
@@ -546,9 +546,9 @@ class EpubReaderScreen(
                                 },
                             ),
                         ) {
-                            val hasNext = when (val currentState = s) {
-                                is EpubReaderState.ReflowSuccess -> currentState.hasNext
-                                is EpubReaderState.HtmlSuccess -> currentState.hasNext
+                            val hasNext = when (s) {
+                                is EpubReaderState.ReflowSuccess -> s.hasNext
+                                is EpubReaderState.HtmlSuccess -> s.hasNext
                                 else -> false
                             }
                             Icon(
@@ -574,15 +574,15 @@ class EpubReaderScreen(
                         // Previous chapter button (moved to the right)
                         IconButton(
                             onClick = { viewModel.prevChapter() },
-                            enabled = when (val currentState = s) {
-                                is EpubReaderState.ReflowSuccess -> currentState.hasPrev
-                                is EpubReaderState.HtmlSuccess -> currentState.hasPrev
+                            enabled = when (s) {
+                                is EpubReaderState.ReflowSuccess -> s.hasPrev
+                                is EpubReaderState.HtmlSuccess -> s.hasPrev
                                 else -> false
                             },
                             modifier = Modifier.alpha(
-                                if (when (val currentState = s) {
-                                        is EpubReaderState.ReflowSuccess -> currentState.hasPrev
-                                        is EpubReaderState.HtmlSuccess -> currentState.hasPrev
+                                if (when (s) {
+                                        is EpubReaderState.ReflowSuccess -> s.hasPrev
+                                        is EpubReaderState.HtmlSuccess -> s.hasPrev
                                         else -> false
                                     }
                                 ) {
@@ -592,9 +592,9 @@ class EpubReaderScreen(
                                 },
                             ),
                         ) {
-                            val hasPrev = when (val currentState = s) {
-                                is EpubReaderState.ReflowSuccess -> currentState.hasPrev
-                                is EpubReaderState.HtmlSuccess -> currentState.hasPrev
+                            val hasPrev = when (s) {
+                                is EpubReaderState.ReflowSuccess -> s.hasPrev
+                                is EpubReaderState.HtmlSuccess -> s.hasPrev
                                 else -> false
                             }
                             Icon(
@@ -624,7 +624,7 @@ class EpubReaderScreen(
                 val downloadStates = remember(downloadQueue) {
                     derivedStateOf {
                         downloadQueue.associate { download ->
-                            download.chapter.id to (download.status to (download.progress ?: 0))
+                            download.chapter.id to (download.status to download.progress)
                         }
                     }
                 }
@@ -655,7 +655,7 @@ class EpubReaderScreen(
                             items = chapterItems,
                             key = { "chapter-${it.chapter.id}" },
                         ) { chapterItem ->
-                            val progress = downloadProgressMap[chapterItem.chapter.id] ?: 0
+                            downloadProgressMap[chapterItem.chapter.id] ?: 0
 
                             // Get the current download state for this chapter
                             val (downloadState, downloadProgress) = remember(
@@ -664,7 +664,7 @@ class EpubReaderScreen(
                                 downloadProgressMap[chapterItem.chapter.id],
                             ) {
                                 val state = downloadStates.value[chapterItem.chapter.id]
-                                val progress = downloadProgressMap[chapterItem.chapter.id] ?: 0
+                                downloadProgressMap[chapterItem.chapter.id] ?: 0
                                 val isDownloaded = viewModel.manga?.let { manga ->
                                     downloadManager.isChapterDownloaded(
                                         chapterItem.chapter.name,
@@ -767,15 +767,6 @@ private fun TocItem(
     }
 }
 
-// Helper function to determine if a color is light
-private fun isColorLight(color: Color): Boolean {
-    val red = color.red * 255
-    val green = color.green * 255
-    val blue = color.blue * 255
-    // Using standard formula to determine if a color is "light"
-    return (red * 0.299 + green * 0.587 + blue * 0.114) > 128
-}
-
 @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
 @Composable
 private fun WebContent(html: String, onTap: () -> Unit) {
@@ -822,7 +813,7 @@ private fun WebContent(html: String, onTap: () -> Unit) {
         factory = {
             WebView(context).apply {
                 settings.javaScriptEnabled = true // Enable JavaScript to prevent text selection
-                settings.setDisplayZoomControls(false)
+                settings.displayZoomControls = false
                 settings.setSupportZoom(false)
                 settings.textZoom = 100
                 settings.cacheMode = WebSettings.LOAD_NO_CACHE
@@ -875,7 +866,7 @@ private fun WebContent(html: String, onTap: () -> Unit) {
 // Helper function to load a font resource as base64 string
 private fun android.content.Context.loadFontAsBase64(fontResId: Int): String {
     return try {
-        val typeface = ResourcesCompat.getFont(this, fontResId)
+        ResourcesCompat.getFont(this, fontResId)
         val file = ResourcesCompat.getFont(this, fontResId)?.let {
             resources.openRawResource(fontResId)
         }
@@ -895,29 +886,6 @@ private fun android.content.Context.loadFontAsBase64(fontResId: Int): String {
     } catch (e: Exception) {
         e.printStackTrace()
         ""
-    }
-}
-
-// Extension function to convert Color to CSS color string
-private fun Color.toCssColor(): String {
-    return String.format(
-        "#%02X%02X%02X",
-        (red * 255).toInt(),
-        (green * 255).toInt(),
-        (blue * 255).toInt(),
-    )
-}
-
-// Extract body content from HTML
-private fun extractBodyContent(html: String): String {
-    val bodyStart = html.indexOf("<body")
-    val bodyContentStart = html.indexOf(">", bodyStart) + 1
-    val bodyEnd = html.lastIndexOf("</body>")
-
-    return if (bodyStart >= 0 && bodyEnd > bodyContentStart) {
-        html.substring(bodyContentStart, bodyEnd)
-    } else {
-        html // Return the original if we can't extract the body
     }
 }
 
@@ -984,7 +952,7 @@ fun EpubShimmerSkeletonLoader(
     }
 }
 
-@SuppressLint("UnusedBoxWithConstraintsScope")
+@SuppressLint("UnusedBoxWithConstraintsScope", "UseKtx")
 @Composable
 private fun FullscreenImageOverlay(
     imageData: FullscreenImageData,
@@ -1002,7 +970,7 @@ private fun FullscreenImageOverlay(
         animationSpec = tween(durationMillis = 120), label = "fullscreenImageBgAlpha",
     )
     // Dismiss on back
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) onDismiss()
@@ -1061,7 +1029,7 @@ private fun FullscreenImageOverlay(
                             onDragCancel = {
                                 scope.launch { offsetY.animateTo(0f, tween(220)) }
                             },
-                            onDrag = { change, dragAmount ->
+                            onDrag = { _, dragAmount ->
                                 scope.launch { offsetY.snapTo(offsetY.value + dragAmount.y) }
                             },
                         )

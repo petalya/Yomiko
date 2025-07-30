@@ -9,7 +9,7 @@ sealed class EpubReaderState {
     /**
      * Initial loading state
      */
-    object Loading : EpubReaderState()
+    data object Loading : EpubReaderState()
 
     /**
      * Error state with a message

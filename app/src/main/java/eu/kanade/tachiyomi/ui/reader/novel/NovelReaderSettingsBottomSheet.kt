@@ -1,5 +1,6 @@
-package eu.kanade.tachiyomi.ui.reader
+package eu.kanade.tachiyomi.ui.reader.novel
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,10 +19,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
+import androidx.compose.material.icons.automirrored.filled.FormatAlignRight
 import androidx.compose.material.icons.filled.FormatAlignCenter
 import androidx.compose.material.icons.filled.FormatAlignJustify
-import androidx.compose.material.icons.filled.FormatAlignLeft
-import androidx.compose.material.icons.filled.FormatAlignRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,7 +35,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +52,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderSettingsScreenModel
 
+@SuppressLint("DefaultLocale")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NovelReaderSettingsBottomSheet(
@@ -61,10 +63,10 @@ fun NovelReaderSettingsBottomSheet(
     val textAlignment by model.textAlignment.collectAsState()
     val lineSpacing by model.lineSpacing.collectAsState()
     val colorSchemeIndex by model.colorSchemeIndex.collectAsState()
-    val colorScheme = model.colorScheme
+    model.colorScheme
     val fontFamily by model.fontFamily.collectAsState()
     val haptic = LocalHapticFeedback.current
-    val lastSliderValue = remember { mutableStateOf(fontSize.toFloat()) }
+    val lastSliderValue = remember { mutableFloatStateOf(fontSize.toFloat()) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -86,9 +88,9 @@ fun NovelReaderSettingsBottomSheet(
                     value = fontSize.toFloat(),
                     onValueChange = {
                         model.setFontSize(it.toInt())
-                        if (lastSliderValue.value.toInt() != it.toInt()) {
+                        if (lastSliderValue.floatValue.toInt() != it.toInt()) {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            lastSliderValue.value = it
+                            lastSliderValue.floatValue = it
                         }
                     },
                     valueRange = 12f..32f,
@@ -124,7 +126,7 @@ fun NovelReaderSettingsBottomSheet(
                 Text("Text align", modifier = Modifier.weight(1f).padding(start = 16.dp), style = MaterialTheme.typography.bodyMedium)
                 Row(Modifier.weight(2f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     AlignmentButton(
-                        icon = Icons.Default.FormatAlignLeft,
+                        icon = Icons.AutoMirrored.Filled.FormatAlignLeft,
                         selected = textAlignment == NovelReaderPreferences.TextAlignment.Left,
                         onClick = { model.setTextAlignment(NovelReaderPreferences.TextAlignment.Left) },
                         contentDescription = "Left",
@@ -142,7 +144,7 @@ fun NovelReaderSettingsBottomSheet(
                         contentDescription = "Justify",
                     )
                     AlignmentButton(
-                        icon = Icons.Default.FormatAlignRight,
+                        icon = Icons.AutoMirrored.Filled.FormatAlignRight,
                         selected = textAlignment == NovelReaderPreferences.TextAlignment.Right,
                         onClick = { model.setTextAlignment(NovelReaderPreferences.TextAlignment.Right) },
                         contentDescription = "Right",

@@ -41,7 +41,6 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.ui.reader.epub.EpubReaderSettings
 import eu.kanade.tachiyomi.util.epub.EpubContentBlock
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import eu.kanade.tachiyomi.util.epub.TextAlignment
@@ -66,7 +65,7 @@ fun EpubReflowableContent(
     onTap: ((Offset) -> Unit)? = null,
     onImageClick: ((imageData: FullscreenImageData) -> Unit)? = null,
 ) {
-    val backgroundColor = when (settings.theme) {
+    when (settings.theme) {
         ReaderTheme.LIGHT -> Color.White
         ReaderTheme.SEPIA -> Color(0xFFFFE4C7)
         ReaderTheme.MINT -> Color(0xFFDDE7E3)

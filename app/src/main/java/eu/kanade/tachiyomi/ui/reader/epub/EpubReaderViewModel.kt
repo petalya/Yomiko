@@ -3,20 +3,17 @@ package eu.kanade.tachiyomi.ui.reader.epub
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
 import cafe.adriel.voyager.core.model.ScreenModel
 import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.data.connections.discord.ReaderData
-import eu.kanade.tachiyomi.ui.reader.epub.EpubReaderSettings
 import eu.kanade.tachiyomi.util.epub.EpubChapter
 import eu.kanade.tachiyomi.util.epub.EpubContentBlock
 import eu.kanade.tachiyomi.util.epub.EpubDocument
 import eu.kanade.tachiyomi.util.epub.EpubParser
-import eu.kanade.tachiyomi.util.epub.EpubTableOfContentsEntry
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
 import eu.kanade.tachiyomi.util.epub.TextAlignment
 import kotlinx.coroutines.CoroutineScope
@@ -43,7 +40,6 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.File
 import java.io.FileOutputStream
-import java.io.InputStream
 import java.util.UUID
 import kotlin.math.absoluteValue
 
@@ -54,7 +50,6 @@ import kotlin.math.absoluteValue
 class EpubReaderViewModel(
     private val mangaId: Long,
     private val initialChapterId: Long,
-    private val initialChapterUrl: String,
 ) : ScreenModel {
     private val chapterRepo: ChapterRepository = Injekt.get()
     private val getManga: GetManga = Injekt.get()
@@ -149,11 +144,6 @@ class EpubReaderViewModel(
         }
     }
 
-    fun updateSettings(newSettings: EpubReaderSettings) {
-        _settings.value = newSettings
-        // No need to reload/reprocess chapter for visual-only settings changes
-    }
-
     fun setShowProgressPercent(enabled: Boolean) {
         _settings.value = _settings.value.copy(showProgressPercent = enabled)
         coroutineScope.launch { epubPreferences.showProgressPercent().set(enabled) }
@@ -182,10 +172,6 @@ class EpubReaderViewModel(
     fun setTheme(theme: ReaderTheme) {
         _settings.value = _settings.value.copy(theme = theme)
         coroutineScope.launch { epubPreferences.theme().set(theme) }
-    }
-
-    fun toggleScrollMode() {
-        _settings.value = _settings.value.copy(isScrollMode = !_settings.value.isScrollMode)
     }
 
     /**
@@ -237,7 +223,7 @@ class EpubReaderViewModel(
                 if (epubChapter.isHtml) {
                     _state.value = EpubReaderState.ReflowSuccess(
                         bookTitle = epub.title,
-                        chapterTitle = epubChapter.title ?: "Chapter " + (currentEpubChapterIndex + 1),
+                        chapterTitle = epubChapter.title ?: ("Chapter " + (currentEpubChapterIndex + 1)),
                         contentBlocks = currentChapterBlocks,
                         hasPrev = currentChapterIndex > 0,
                         hasNext = currentChapterIndex < _chapters.value.size - 1,
@@ -246,7 +232,7 @@ class EpubReaderViewModel(
                 } else {
                     _state.value = EpubReaderState.HtmlSuccess(
                         bookTitle = epub.title,
-                        chapterTitle = epubChapter.title ?: "Chapter " + (currentEpubChapterIndex + 1),
+                        chapterTitle = epubChapter.title ?: ("Chapter " + (currentEpubChapterIndex + 1)),
                         content = epubChapter.content,
                         hasPrev = currentChapterIndex > 0,
                         hasNext = currentChapterIndex < _chapters.value.size - 1,
@@ -273,8 +259,7 @@ class EpubReaderViewModel(
         val epubImagesDir = File(cacheDir, "epub_images").also { it.mkdirs() }
 
         for (i in currentChapterBlocks.indices) {
-            val block = currentChapterBlocks[i]
-            when (block) {
+            when (val block = currentChapterBlocks[i]) {
                 is EpubContentBlock.Image -> {
                     val src = block.src
 
@@ -401,7 +386,7 @@ class EpubReaderViewModel(
             currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
             _state.value = EpubReaderState.Loading
             coroutineScope.launch {
-                kotlinx.coroutines.delay(600)
+                delay(600)
                 loadChapter(_chapters.value[currentChapterIndex])
             }
         }
@@ -416,7 +401,7 @@ class EpubReaderViewModel(
             currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
             _state.value = EpubReaderState.Loading
             coroutineScope.launch {
-                kotlinx.coroutines.delay(600)
+                delay(600)
                 loadChapter(_chapters.value[currentChapterIndex])
             }
         }
@@ -431,24 +416,8 @@ class EpubReaderViewModel(
             currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
             _state.value = EpubReaderState.Loading
             coroutineScope.launch {
-                kotlinx.coroutines.delay(600)
+                delay(600)
                 loadChapter(_chapters.value[currentChapterIndex])
-            }
-        }
-    }
-
-    /**
-     * Jump to a specific table of contents entry
-     */
-    fun jumpToTableOfContentsEntry(href: String) {
-        val epub = parsedEpub ?: return
-
-        // Find which chapter contains this TOC entry
-        val targetChapterIndex = epub.chapters.indexOfFirst { it.href == href }
-        if (targetChapterIndex >= 0) {
-            currentEpubChapterIndex = targetChapterIndex
-            currentChapterId?.let { id ->
-                chapters.find { it.id == id }?.let { loadChapter(it) }
             }
         }
     }
@@ -549,7 +518,7 @@ class EpubReaderViewModel(
 
         // Strip file:// scheme
         if (path.startsWith("file://")) {
-            path = Uri.parse(path).path ?: path.removePrefix("file://")
+            path = path.toUri().path ?: path.removePrefix("file://")
         }
 
         // For absolute filesystem paths just return them
@@ -568,7 +537,7 @@ class EpubReaderViewModel(
     private fun openEpubInputStream(path: String): java.io.InputStream? {
         return when {
             path.startsWith("content://") -> {
-                val uri = Uri.parse(path)
+                val uri = path.toUri()
                 Injekt.get<Context>().contentResolver.openInputStream(uri)
             }
             path.startsWith("/") -> {
@@ -588,10 +557,6 @@ class EpubReaderViewModel(
         }
     }
 
-    fun getTableOfContents(): List<EpubTableOfContentsEntry> {
-        return parsedEpub?.tableOfContents ?: emptyList()
-    }
-
     private fun recordHistory(chapterId: Long) {
         CoroutineScope(Dispatchers.IO).launch {
             val now = java.util.Date()
@@ -602,12 +567,12 @@ class EpubReaderViewModel(
     private fun updateDiscordRPC() {
         val connectionsPreferences = Injekt.get<eu.kanade.domain.connections.service.ConnectionsPreferences>()
         val chapter = _chapters.value.getOrNull(currentChapterIndex)
-        val context = Injekt.get<android.content.Context>()
+        val context = Injekt.get<Context>()
         val chapterNumberFloat = chapter?.chapterNumber?.toFloat() ?: -1f
         CoroutineScope(Dispatchers.IO).launch {
             val latestManga = getManga.await(mangaId)
             val mangaCover = latestManga?.asMangaCover()
-            val coverUrl = mangaCover?.url as? String
+            val coverUrl = mangaCover?.url
             val epubIconUrl = "emojis/1396447904264359997.webp?quality=lossless"
             if (latestManga != null && chapter != null && connectionsPreferences.enableDiscordRPC().get()) {
                 if (latestManga.source == 0L) {

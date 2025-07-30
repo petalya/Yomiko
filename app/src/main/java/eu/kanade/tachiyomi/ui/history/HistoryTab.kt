@@ -97,7 +97,7 @@ data object HistoryTab : Tab {
                 navigator.push(eu.kanade.tachiyomi.ui.reader.epub.EpubReaderScreen(mangaId, chapterId, chapterUrl))
             },
             onOpenNovel = { mangaId, chapterId ->
-                navigator.push(eu.kanade.tachiyomi.ui.reader.NovelReaderScreen(mangaId, chapterId))
+                navigator.push(eu.kanade.tachiyomi.ui.reader.novel.NovelReaderScreen(mangaId, chapterId))
             },
         )
 
