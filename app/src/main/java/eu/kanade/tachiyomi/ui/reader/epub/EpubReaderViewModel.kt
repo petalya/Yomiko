@@ -7,6 +7,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.net.toUri
 import cafe.adriel.voyager.core.model.ScreenModel
 import com.hippo.unifile.UniFile
+import eu.kanade.domain.source.interactor.GetIncognitoState
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.data.connections.discord.ReaderData
@@ -57,6 +59,7 @@ class EpubReaderViewModel(
     private val epubParser = EpubParser()
     private val epubPreferences = EpubReaderPreferences(Injekt.get())
     private val upsertHistory: UpsertHistory = Injekt.get()
+    private val getIncognitoState: GetIncognitoState = Injekt.get()
 
     // Define a coroutine scope for the view model
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -77,6 +80,8 @@ class EpubReaderViewModel(
 
     var manga: Manga? = null
         private set
+
+    internal val incognitoMode: Boolean by lazy { getIncognitoState.await(manga?.source, manga?.id) }
 
     var currentChapterId: Long? = null
         private set
@@ -426,6 +431,7 @@ class EpubReaderViewModel(
      * Toggle read state for a chapter
      */
     fun toggleRead(chapter: Chapter) {
+        if (incognitoMode) return
         CoroutineScope(Dispatchers.IO).launch {
             val newReadState = !chapter.read
             chapterRepo.update(ChapterUpdate(id = chapter.id, read = newReadState))
@@ -439,6 +445,7 @@ class EpubReaderViewModel(
      * Toggle bookmark state for a chapter
      */
     fun toggleBookmark(chapter: Chapter) {
+        if (incognitoMode) return
         CoroutineScope(Dispatchers.IO).launch {
             val newBookmark = !chapter.bookmark
             chapterRepo.update(ChapterUpdate(id = chapter.id, bookmark = newBookmark))
@@ -457,10 +464,12 @@ class EpubReaderViewModel(
         saveProgressJob = CoroutineScope(Dispatchers.IO).launch {
             delay(500) // 0.5s debounce
             val percentInt = (progress * 1000).toLong()
-            chapterRepo.update(ChapterUpdate(id = chapterId, lastPageRead = percentInt))
+            if (!incognitoMode) {
+                chapterRepo.update(ChapterUpdate(id = chapterId, lastPageRead = percentInt))
+            }
             recordHistory(chapterId)
             // Mark as read if progress exceeds threshold
-            if (progress >= readThreshold) {
+            if (!incognitoMode && progress >= readThreshold) {
                 val chapter = _chapters.value.find { it.id == chapterId }
                 if (chapter != null && !chapter.read) {
                     chapterRepo.update(ChapterUpdate(id = chapterId, read = true))
@@ -558,6 +567,7 @@ class EpubReaderViewModel(
     }
 
     private fun recordHistory(chapterId: Long) {
+        if (incognitoMode) return
         CoroutineScope(Dispatchers.IO).launch {
             val now = java.util.Date()
             upsertHistory.await(HistoryUpdate(chapterId, now, 0L))
@@ -574,8 +584,24 @@ class EpubReaderViewModel(
             val mangaCover = latestManga?.asMangaCover()
             val coverUrl = mangaCover?.url
             val epubIconUrl = "emojis/1396447904264359997.webp?quality=lossless"
+
             if (latestManga != null && chapter != null && connectionsPreferences.enableDiscordRPC().get()) {
-                if (latestManga.source == 0L) {
+                if (incognitoMode) {
+                    // Show simplified status when incognito mode is enabled
+                    DiscordRPCService.setScreen(
+                        context = context,
+                        discordScreen = DiscordScreen.EPUB_LOCAL_FEED,
+                        readerData = ReaderData(
+                            incognitoMode = true,
+                            mangaId = latestManga.id,
+                            mangaTitle = context.getString(R.string.epub_incognito_title),
+                            thumbnailUrl = epubIconUrl,
+                            chapterNumber = Pair(-1f, -1),
+                            chapterTitle = context.getString(R.string.epub_incognito_subtitle),
+                        ),
+                    )
+                    return@launch
+                } else if (latestManga.source == 0L) {
                     // Use EPUB local feed icon for local source EPUBs
                     DiscordRPCService.setScreen(
                         context = context,

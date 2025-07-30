@@ -7,7 +7,10 @@ import androidx.compose.runtime.setValue
 import cafe.adriel.voyager.core.model.ScreenModel
 import eu.kanade.domain.chapter.model.toSChapter
 import eu.kanade.domain.connections.service.ConnectionsPreferences
+import eu.kanade.domain.source.interactor.GetIncognitoState
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
+import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.data.connections.discord.ReaderData
 import eu.kanade.tachiyomi.source.CatalogueSource
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +42,7 @@ class NovelReaderViewModel(
     private val getChaptersByMangaId: GetChaptersByMangaId = Injekt.get()
     internal val sourceManager: SourceManager = Injekt.get()
     private val upsertHistory: UpsertHistory = Injekt.get()
+    private val getIncognitoState: GetIncognitoState = Injekt.get()
     private val _state = MutableStateFlow<NovelReaderState>(NovelReaderState.Loading)
     val state: StateFlow<NovelReaderState> = _state.asStateFlow()
 
@@ -46,6 +50,8 @@ class NovelReaderViewModel(
         private set
     var manga: Manga? = null
         private set
+
+    internal val incognitoMode: Boolean by lazy { getIncognitoState.await(manga?.source, manga?.id) }
     internal var currentChapterIndex: Int = -1
     val currentChapterId: Long?
         get() = chapters.getOrNull(currentChapterIndex)?.id
@@ -64,7 +70,9 @@ class NovelReaderViewModel(
         saveProgressJob = CoroutineScope(Dispatchers.IO).launch {
             delay(500) // 0.5s debounce
             val percentInt = (progress * 1000).toLong()
-            chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapterId, lastPageRead = percentInt))
+            if (!incognitoMode) {
+                chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapterId, lastPageRead = percentInt))
+            }
             recordHistory(chapterId)
         }
         val current = state.value
@@ -83,12 +91,14 @@ class NovelReaderViewModel(
         chapters = chapters.toMutableList().apply {
             this[idx] = chapters[idx].copy(bookmark = newValue)
         }
-        CoroutineScope(Dispatchers.IO).launch {
-            chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapter.id, bookmark = newValue))
+        if (!incognitoMode) {
+            CoroutineScope(Dispatchers.IO).launch {
+                chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapter.id, bookmark = newValue))
+            }
         }
         // Optionally update state if current chapter is affected
         val currentState = state.value
-        if (currentState is NovelReaderState.Success && idx == currentChapterIndex) {
+        if (currentState is NovelReaderState.Success && currentState.chapterTitle == chapter.name) {
             _state.value = currentState.copy(bookmarked = newValue)
         }
     }
@@ -130,8 +140,10 @@ class NovelReaderViewModel(
             chapters = chapters.toMutableList().apply {
                 this[idx] = chapter.copy(read = true)
             }
-            CoroutineScope(Dispatchers.IO).launch {
-                chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapter.id, read = true))
+            if (!incognitoMode) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapter.id, read = true))
+                }
             }
         }
     }
@@ -142,12 +154,15 @@ class NovelReaderViewModel(
             chapters = chapters.toMutableList().apply {
                 this[idx] = chapters[idx].copy(read = newRead)
             }
-            CoroutineScope(Dispatchers.IO).launch {
-                chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapter.id, read = newRead))
+            if (!incognitoMode) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapter.id, read = newRead))
+                }
             }
         }
     }
     private fun recordHistory(chapterId: Long) {
+        if (incognitoMode) return
         CoroutineScope(Dispatchers.IO).launch {
             val now = java.util.Date()
             upsertHistory.await(HistoryUpdate(chapterId, now, 0L))
@@ -240,17 +255,35 @@ class NovelReaderViewModel(
             val mangaCover = latestManga?.asMangaCover()
             val coverUrl = mangaCover?.url
             if (latestManga != null && chapter != null && connectionsPreferences.enableDiscordRPC().get() && coverUrl != null) {
-                DiscordRPCService.setReaderActivity(
-                    context = context,
-                    readerData = ReaderData(
-                        incognitoMode = latestManga.incognitoMode,
-                        mangaId = latestManga.id,
-                        mangaTitle = latestManga.title,
-                        thumbnailUrl = coverUrl,
-                        chapterNumber = Pair(chapterNumberFloat, chapters.size),
-                        chapterTitle = if (connectionsPreferences.useChapterTitles().get()) chapter.name else chapter.chapterNumber.toString(),
-                    ),
-                )
+                val incognito = getIncognitoState.await(latestManga.source, latestManga.id)
+
+                if (incognito) {
+                    // Show simplified status when incognito mode is enabled
+                    DiscordRPCService.setScreen(
+                        context = context,
+                        discordScreen = DiscordScreen.MANGA,
+                        readerData = ReaderData(
+                            incognitoMode = true,
+                            mangaId = latestManga.id,
+                            mangaTitle = context.getString(R.string.novel_incognito_title),
+                            thumbnailUrl = coverUrl,
+                            chapterNumber = Pair(-1f, -1),
+                            chapterTitle = context.getString(R.string.novel_incognito_subtitle),
+                        ),
+                    )
+                } else {
+                    DiscordRPCService.setReaderActivity(
+                        context = context,
+                        readerData = ReaderData(
+                            incognitoMode = incognito,
+                            mangaId = latestManga.id,
+                            mangaTitle = latestManga.title,
+                            thumbnailUrl = coverUrl,
+                            chapterNumber = Pair(chapterNumberFloat, chapters.size),
+                            chapterTitle = if (connectionsPreferences.useChapterTitles().get()) chapter.name else chapter.chapterNumber.toString(),
+                        ),
+                    )
+                }
             }
         }
     }

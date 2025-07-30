@@ -1,4 +1,10 @@
 <resources>
     <string name="browsing_epub_feed">Browsing EPUB Feed</string>
     <string name="label_epub_feed">EPUB Feed</string>
+    <string name="novel">Novel</string>
+    <string name="reading">Reading</string>
+    <string name="novel_incognito_title">Reading</string>
+    <string name="novel_incognito_subtitle">Novel</string>
+    <string name="epub_incognito_title">Reading an EPUB</string>
+    <string name="epub_incognito_subtitle">Enjoying a good novel..</string>
 </resources>

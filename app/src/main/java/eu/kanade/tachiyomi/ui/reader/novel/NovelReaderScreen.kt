@@ -80,6 +80,7 @@ import eu.kanade.presentation.components.AdaptiveSheet
 import eu.kanade.presentation.manga.components.ChapterDownloadAction
 import eu.kanade.presentation.manga.components.MangaChapterListItem
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.ui.reader.chapter.ReaderChapterItem
@@ -88,6 +89,8 @@ import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderPreferences
 import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderSettingsScreenModel
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.toast
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tachiyomi.domain.library.model.ChapterSwipeAction
@@ -120,6 +123,11 @@ class NovelReaderScreen(
         // Restore system bars and behavior on exit (match EPUB reader)
         DisposableEffect(Unit) {
             onDispose {
+                // Restore previous Discord RPC screen
+                CoroutineScope(Dispatchers.IO).launch {
+                    DiscordRPCService.setScreen(context, DiscordRPCService.lastUsedScreen)
+                }
+
                 // Restore previous navigation bar color
                 window?.navigationBarColor = prevNavBarColor ?: window?.navigationBarColor ?: 0
                 window?.let { win ->

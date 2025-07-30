@@ -27,7 +27,6 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import eu.kanade.domain.manga.model.hasCustomCover
 import eu.kanade.domain.manga.model.toSManga
-import eu.kanade.domain.source.interactor.GetIncognitoState
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.components.NavigatorAdaptiveSheet
@@ -42,9 +41,6 @@ import eu.kanade.presentation.manga.components.SetIntervalDialog
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
-import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
-import eu.kanade.tachiyomi.data.connections.discord.ReaderData
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.isLocalOrStub
 import eu.kanade.tachiyomi.source.online.HttpSource
@@ -147,27 +143,6 @@ class MangaScreen(
                     )
                 }
                 .launchIn(this)
-
-            val isEpub = successState.chapters.any { it.chapter.url.contains(".epub") || it.chapter.url.contains("::") }
-            if (successState.source.id == 0L && isEpub) {
-                DiscordRPCService.setScreen(
-                    context, DiscordScreen.EPUB_LOCAL_FEED,
-                    ReaderData(
-                        incognitoMode = Injekt.get<GetIncognitoState>().await(successState.manga.source, successState.manga.id),
-                        mangaId = successState.manga.id,
-                        chapterTitle = successState.manga.title,
-                    ),
-                )
-            } else {
-                DiscordRPCService.setScreen(
-                    context, DiscordScreen.LIBRARY,
-                    ReaderData(
-                        incognitoMode = Injekt.get<GetIncognitoState>().await(successState.manga.source, successState.manga.id),
-                        mangaId = successState.manga.id,
-                        chapterTitle = successState.manga.title,
-                    ),
-                )
-            }
         }
         // SY <--
 

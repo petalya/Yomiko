@@ -108,12 +108,15 @@ import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarTitle
 import eu.kanade.presentation.manga.components.MangaChapterListItem
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderSettingsScreenModel
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
 import eu.kanade.tachiyomi.util.epub.EpubTableOfContentsEntry
 import eu.kanade.tachiyomi.util.epub.ReaderTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.library.model.ChapterSwipeAction
@@ -130,6 +133,7 @@ class EpubReaderScreen(
     @SuppressLint("SetJavaScriptEnabled")
     @Composable
     override fun Content() {
+        val context = LocalContext.current
         val viewModel = rememberScreenModel { EpubReaderViewModel(mangaId, chapterId) }
         val state by viewModel.state.collectAsState()
         val readerSettings by viewModel.settings.collectAsState()
@@ -190,6 +194,10 @@ class EpubReaderScreen(
         // Restore system UI when leaving the screen
         DisposableEffect(Unit) {
             onDispose {
+                // Restore previous Discord RPC screen
+                CoroutineScope(Dispatchers.IO).launch {
+                    DiscordRPCService.setScreen(context, DiscordRPCService.lastUsedScreen)
+                }
                 windowInsetsController?.let {
                     it.show(WindowInsetsCompat.Type.systemBars())
                     it.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
