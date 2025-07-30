@@ -97,6 +97,8 @@ class EpubReaderViewModel(
     // Current chapter in the epub document
     private var currentEpubChapterIndex: Int = 0
 
+    private var chapterReadStartTime: Long? = null
+
     init {
         coroutineScope.launch {
             // Load persisted settings from preferences
@@ -183,6 +185,7 @@ class EpubReaderViewModel(
      * Load a specific chapter from the book
      */
     private fun loadChapter(chapter: Chapter) {
+        restartReadTimer()
         Log.d("EpubReaderVM", "loadChapter called: chapterId=${chapter.id}, chapterIndex=${_chapters.value.indexOf(chapter)}")
         coroutineScope.launch {
             try {
@@ -382,10 +385,24 @@ class EpubReaderViewModel(
         }
     }
 
+    fun restartReadTimer() {
+        chapterReadStartTime = System.currentTimeMillis()
+    }
+
+    fun flushReadTimer() {
+        val chapterId = currentChapterId ?: return
+        val startTime = chapterReadStartTime ?: return
+        val now = System.currentTimeMillis()
+        val duration = now - startTime
+        recordHistory(chapterId, duration)
+        chapterReadStartTime = null
+    }
+
     /**
      * Navigate to previous chapter or previous internal chapter
      */
     fun prevChapter() {
+        flushReadTimer()
         if (currentChapterIndex > 0) {
             currentChapterIndex--
             currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
@@ -401,6 +418,7 @@ class EpubReaderViewModel(
      * Navigate to next chapter or next internal chapter
      */
     fun nextChapter() {
+        flushReadTimer()
         if (currentChapterIndex < _chapters.value.size - 1) {
             currentChapterIndex++
             currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
@@ -416,6 +434,7 @@ class EpubReaderViewModel(
      * Jump to a specific chapter from the chapters list
      */
     fun jumpToChapter(index: Int) {
+        flushReadTimer()
         if (index in _chapters.value.indices) {
             currentChapterIndex = index
             currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
@@ -566,11 +585,11 @@ class EpubReaderViewModel(
         }
     }
 
-    private fun recordHistory(chapterId: Long) {
+    private fun recordHistory(chapterId: Long, sessionReadDuration: Long = 0L) {
         if (incognitoMode) return
         CoroutineScope(Dispatchers.IO).launch {
             val now = java.util.Date()
-            upsertHistory.await(HistoryUpdate(chapterId, now, 0L))
+            upsertHistory.await(HistoryUpdate(chapterId, now, sessionReadDuration))
         }
     }
 

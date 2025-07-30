@@ -21,7 +21,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import tachiyomi.domain.chapter.interactor.GetChaptersByMangaId
+import tachiyomi.domain.chapter.interactor.UpdateChapter
 import tachiyomi.domain.chapter.model.Chapter
+import tachiyomi.domain.chapter.model.toChapterUpdate
 import tachiyomi.domain.chapter.repository.ChapterRepository
 import tachiyomi.domain.chapter.service.getChapterSort
 import tachiyomi.domain.history.interactor.UpsertHistory
@@ -43,6 +45,7 @@ class NovelReaderViewModel(
     internal val sourceManager: SourceManager = Injekt.get()
     private val upsertHistory: UpsertHistory = Injekt.get()
     private val getIncognitoState: GetIncognitoState = Injekt.get()
+    private val updateChapter: UpdateChapter = Injekt.get()
     private val _state = MutableStateFlow<NovelReaderState>(NovelReaderState.Loading)
     val state: StateFlow<NovelReaderState> = _state.asStateFlow()
 
@@ -61,6 +64,8 @@ class NovelReaderViewModel(
     // Debounce job for saving progress
     private var saveProgressJob: kotlinx.coroutines.Job? = null
     private var lastSavedProgress: Float = -1f
+
+    private var chapterReadStartTime: Long? = null
 
     fun updateScrollProgressDebounced(progress: Float) {
         val chapterId = currentChapterId ?: return
@@ -103,7 +108,21 @@ class NovelReaderViewModel(
         }
     }
 
+    fun restartReadTimer() {
+        chapterReadStartTime = System.currentTimeMillis()
+    }
+
+    fun flushReadTimer() {
+        val chapterId = currentChapterId ?: return
+        val startTime = chapterReadStartTime ?: return
+        val now = System.currentTimeMillis()
+        val duration = now - startTime
+        recordHistory(chapterId, duration)
+        chapterReadStartTime = null
+    }
+
     fun nextChapter() {
+        flushReadTimer()
         // For novels (source ID 10001L), we want to go to the next chapter in the sorted list
         // which should be the next higher chapter number
         if (currentChapterIndex < chapters.lastIndex) {
@@ -115,6 +134,7 @@ class NovelReaderViewModel(
     }
 
     fun prevChapter() {
+        flushReadTimer()
         // For novels (source ID 10001L), we want to go to the previous chapter in the sorted list
         // which should be the previous lower chapter number
         if (currentChapterIndex > 0) {
@@ -125,6 +145,7 @@ class NovelReaderViewModel(
         }
     }
     fun jumpToChapter(index: Int) {
+        flushReadTimer()
         if (index in chapters.indices) {
             currentChapterIndex = index
             _state.value = NovelReaderState.Loading
@@ -161,11 +182,13 @@ class NovelReaderViewModel(
             }
         }
     }
-    private fun recordHistory(chapterId: Long) {
+    private fun recordHistory(chapterId: Long, sessionReadDuration: Long = 0L) {
         if (incognitoMode) return
+        val chapter = chapters.find { it.id == chapterId } ?: return
         CoroutineScope(Dispatchers.IO).launch {
             val now = java.util.Date()
-            upsertHistory.await(HistoryUpdate(chapterId, now, 0L))
+            updateChapter.await(chapter.toChapterUpdate())
+            upsertHistory.await(HistoryUpdate(chapterId, now, sessionReadDuration))
         }
     }
     init {
@@ -195,6 +218,7 @@ class NovelReaderViewModel(
         }
     }
     private fun loadCurrentChapter(chapters: List<Chapter>) {
+        restartReadTimer()
         val chapter = chapters.getOrNull(currentChapterIndex)
         val manga = manga
         if (chapter == null || manga == null) {
@@ -230,7 +254,6 @@ class NovelReaderViewModel(
                     bookmarked = chapter.bookmark,
                 )
                 updateDiscordRPC()
-                recordHistory(chapter.id)
             } catch (e: Exception) {
                 _state.value = NovelReaderState.Error(e.message ?: "Failed to load chapter content")
             }

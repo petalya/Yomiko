@@ -751,6 +751,13 @@ class EpubReaderScreen(
                 onDismiss = { fullscreenImage = null },
             )
         }
+
+        // Flush read timer when leaving the screen
+        DisposableEffect(viewModel) {
+            onDispose {
+                viewModel.flushReadTimer()
+            }
+        }
     }
 }
 

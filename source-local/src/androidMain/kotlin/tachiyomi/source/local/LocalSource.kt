@@ -2,7 +2,6 @@ package tachiyomi.source.local
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.util.Log
 import android.util.LruCache
 import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.source.CatalogueSource
@@ -540,9 +539,7 @@ actual class LocalSource(
                                             }
                                         }
                                     }
-                                } catch (e: Exception) {
-                                    Log.e("LocalSource", "Error processing guide reference", e)
-                                    // Swallow exception in guide reference processing
+                                } catch (_: Exception) {
                                 }
 
                                 if (coverResource == null && opfResource != null) {
