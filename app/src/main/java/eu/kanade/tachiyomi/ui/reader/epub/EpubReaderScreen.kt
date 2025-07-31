@@ -250,7 +250,7 @@ class EpubReaderScreen(
             when (val currentState = state) {
                 is EpubReaderState.Loading -> {
                     // reset scroll to 0 during loading state with delay
-                    kotlinx.coroutines.delay(200) // delay to align with loading animation, surely this doesn't happen again
+                    kotlinx.coroutines.delay(300) // delay to align with loading animation, surely this doesn't happen again
                     scrollState.scrollTo(0)
                 }
                 is EpubReaderState.ReflowSuccess -> {
