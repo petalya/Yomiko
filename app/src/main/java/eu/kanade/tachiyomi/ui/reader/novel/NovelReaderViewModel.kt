@@ -77,6 +77,14 @@ class NovelReaderViewModel(
             val percentInt = (progress * 1000).toLong()
             if (!incognitoMode) {
                 chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapterId, lastPageRead = percentInt))
+                
+                // Update the local chapters list to reflect the new progress
+                val chapterIndex = chapters.indexOfFirst { it.id == chapterId }
+                if (chapterIndex != -1) {
+                    chapters = chapters.toMutableList().apply {
+                        this[chapterIndex] = this[chapterIndex].copy(lastPageRead = percentInt)
+                    }
+                }
             }
             recordHistory(chapterId)
         }
@@ -225,8 +233,6 @@ class NovelReaderViewModel(
             _state.value = NovelReaderState.Error("Chapter not found")
             return
         }
-        @Suppress("UNUSED_EXPRESSION")
-        if (chapter.lastPageRead > 0) chapter.lastPageRead / 1000f else 0f
         CoroutineScope(Dispatchers.IO).launch {
             _state.value = NovelReaderState.Loading
             delay(600) // Reduced delay for skeleton UI

@@ -194,11 +194,6 @@ class NovelReaderScreen(
         var showSettingsSheet by remember { mutableStateOf(false) }
         rememberModalBottomSheetState()
         rememberModalBottomSheetState()
-        // Reset scroll position when chapter changes
-        LaunchedEffect(viewModel.currentChapterId) {
-            // Always start from top when chapter changes
-            scrollState.scrollTo(0)
-        }
         // Save scroll progress as percent as the user scrolls
         LaunchedEffect(scrollState.value, viewModel.currentChapterId) {
             val max = scrollState.maxValue
@@ -209,6 +204,18 @@ class NovelReaderScreen(
                 if (percent >= 0.98f) {
                     viewModel.markCurrentChapterReadIfNeeded()
                 }
+            }
+        }
+
+        // Handle scroll position reset during loading
+        LaunchedEffect(state) {
+            when (state) {
+                is NovelReaderState.Loading -> {
+                    // Reset scroll to 0 during loading state with delay
+                    delay(300) // Delay to align with loading animation
+                    scrollState.scrollTo(0)
+                }
+                else -> return@LaunchedEffect
             }
         }
         // Immersive mode: hide/show system bars with reader bars
@@ -302,7 +309,6 @@ class NovelReaderScreen(
 
                         var contentReady by remember { mutableStateOf(false) }
                         var currentChapterId by remember { mutableStateOf(viewModel.currentChapterId) }
-                        val savedProgress = viewModel.getSavedProgress(viewModel.currentChapterId ?: 0)
 
                         // Handle content loading and scroll position restoration
                         LaunchedEffect(s.content, textAlignment, viewModel.currentChapterId) {
@@ -318,23 +324,22 @@ class NovelReaderScreen(
                             richTextState.setHtml(alignedHtml)
                             contentReady = true
 
-                            // After content is loaded, restore scroll position
-                            // Only restore scroll if we have saved progress and either:
-                            // 1. This is the initial load (savedProgress > 0)
-                            // 2. We're changing chapters (chapterChanged)
-                            if (savedProgress > 0) {
-                                // Wait for layout to be complete
-                                delay(50)
-
-                                // Calculate target position based on saved progress
-                                val targetPosition = (scrollState.maxValue * savedProgress).toInt()
-                                if (targetPosition > 0) {
-                                    // Scroll to position
-                                    scrollState.scrollTo(targetPosition)
-
-                                    // Smooth scroll to ensure we're at the exact position
-                                    delay(50)
-                                    scrollState.animateScrollTo(targetPosition)
+                            // After content is ready, restore scroll position
+                            val progress = s.progress
+                            if (progress > 0f) {
+                                // Wait longer for layout to be complete
+                                delay(200)
+                                
+                                // Retry scroll restoration with multiple attempts
+                                var attempts = 0
+                                while (attempts < 5 && scrollState.maxValue <= 0) {
+                                    delay(100)
+                                    attempts++
+                                }
+                                
+                                if (scrollState.maxValue > 0) {
+                                    val target = (progress * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
+                                    scrollState.animateScrollTo(target)
                                 }
                             }
                         }
