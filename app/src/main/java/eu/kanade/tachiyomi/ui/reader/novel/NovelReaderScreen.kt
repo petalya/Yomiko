@@ -329,14 +329,14 @@ class NovelReaderScreen(
                             if (progress > 0f) {
                                 // Wait longer for layout to be complete
                                 delay(200)
-                                
+
                                 // Retry scroll restoration with multiple attempts
                                 var attempts = 0
                                 while (attempts < 5 && scrollState.maxValue <= 0) {
                                     delay(100)
                                     attempts++
                                 }
-                                
+
                                 if (scrollState.maxValue > 0) {
                                     val target = (progress * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
                                     scrollState.animateScrollTo(target)

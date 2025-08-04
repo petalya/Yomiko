@@ -77,7 +77,7 @@ class NovelReaderViewModel(
             val percentInt = (progress * 1000).toLong()
             if (!incognitoMode) {
                 chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapterId, lastPageRead = percentInt))
-                
+
                 // Update the local chapters list to reflect the new progress
                 val chapterIndex = chapters.indexOfFirst { it.id == chapterId }
                 if (chapterIndex != -1) {
