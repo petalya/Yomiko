@@ -5,8 +5,10 @@ import android.annotation.SuppressLint
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.util.Base64
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.ViewGroup
+import android.view.Window
 import android.view.WindowInsetsController
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -58,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -66,6 +69,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +82,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -123,6 +128,8 @@ import tachiyomi.domain.library.model.ChapterSwipeAction
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.ByteArrayOutputStream
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 @Suppress("NAME_SHADOWING")
 class EpubReaderScreen(
@@ -140,15 +147,16 @@ class EpubReaderScreen(
         val chapters = viewModel.chapters
         val scrollState = rememberScrollState()
         val coroutineScope = rememberCoroutineScope()
+        var webViewRef by remember { mutableStateOf<WebView?>(null) }
         var barsVisible by remember { mutableStateOf(true) }
         val navigator = LocalNavigator.current
         rememberScreenModel { NovelReaderSettingsScreenModel() }
 
         // Set system UI colors - ensure consistent transparency
         MaterialTheme.colorScheme.surface
-        val view = LocalView.current
-        val window = remember { view.context.getActivity()?.window }
-        val windowInsetsController = remember { window?.let { WindowCompat.getInsetsController(it, view) } }
+        val localView = LocalView.current
+        val window = remember { localView.context.getActivity()?.window }
+        val windowInsetsController = remember { window?.let { WindowCompat.getInsetsController(it, localView) } }
 
         // Set transparent navigation bar color (0.92f alpha for transparency)
         MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
@@ -217,16 +225,79 @@ class EpubReaderScreen(
                 // Scrolling down, hide bars
                 if (barsVisible) barsVisible = false
                 accumulatedScroll = 0
-            } else if (delta < 0 && kotlin.math.abs(accumulatedScroll) > hideThresholdPx) {
-                // Scrolling up, show bars
-                if (!barsVisible) barsVisible = true
-                accumulatedScroll = 0
             } else if (scrollState.value <= hideThresholdPx) {
                 // Near top, always show bars
                 if (!barsVisible) barsVisible = true
                 accumulatedScroll = 0
             }
             lastScrollOffset = scrollState.value
+        }
+
+        // Volume keys: scroll by one screen height
+        val view = LocalView.current
+        val scrollDownByScreen: State<() -> Unit> = rememberUpdatedState(newValue = {
+            val heightPx = (view.height * 0.90f).toInt()
+            if (heightPx > 0) {
+                when (state) {
+                    is EpubReaderState.ReflowSuccess -> {
+                        val max = scrollState.maxValue
+                        val target = (scrollState.value + heightPx).coerceIn(0, max)
+                        coroutineScope.launch { scrollState.animateScrollTo(target) }
+                    }
+                    is EpubReaderState.HtmlSuccess -> {
+                        webViewRef?.scrollBy(0, heightPx)
+                    }
+                    else -> {}
+                }
+            }
+        })
+        val scrollUpByScreen: State<() -> Unit> = rememberUpdatedState(newValue = {
+            val heightPx = (view.height * 0.90f).toInt()
+            if (heightPx > 0) {
+                when (state) {
+                    is EpubReaderState.ReflowSuccess -> {
+                        val target = (scrollState.value - heightPx).coerceIn(0, scrollState.maxValue)
+                        coroutineScope.launch { scrollState.animateScrollTo(target) }
+                    }
+                    is EpubReaderState.HtmlSuccess -> {
+                        webViewRef?.scrollBy(0, -heightPx)
+                    }
+                    else -> {}
+                }
+            }
+        })
+        DisposableEffect(window) {
+            val prev = window?.callback
+            if (prev == null) {
+                onDispose { }
+            } else {
+                val newCallback = object : Window.Callback by prev {
+                    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                        if (!readerSettings.volumeButtonScroll) return prev.dispatchKeyEvent(event)
+                        when (event.keyCode) {
+                            KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                                if (event.action == KeyEvent.ACTION_UP) {
+                                    scrollDownByScreen.value.invoke()
+                                }
+                                return true // consume both down and up to prevent system UI volume
+                            }
+                            KeyEvent.KEYCODE_VOLUME_UP -> {
+                                if (event.action == KeyEvent.ACTION_UP) {
+                                    scrollUpByScreen.value.invoke()
+                                }
+                                return true // consume both down and up to prevent system UI volume
+                            }
+                        }
+                        return prev.dispatchKeyEvent(event)
+                    }
+                }
+                window?.callback = newCallback
+                onDispose {
+                    if (window?.callback === newCallback) {
+                        window?.callback = prev
+                    }
+                }
+            }
         }
 
         // derived slider progress
@@ -326,7 +397,7 @@ class EpubReaderScreen(
                 .fillMaxSize()
                 .background(backgroundColor),
         ) {
-            // Stationary progress percentage UI at the bottom of the screen
+            // Stationary progress percentage and optional battery/time at the bottom of the screen
             if (readerSettings.showProgressPercent && (state is EpubReaderState.ReflowSuccess || state is EpubReaderState.HtmlSuccess)) {
                 val progress = sliderProgress.floatValue
                 val progressPercent = (progress * 100).toInt().coerceIn(0, 100)
@@ -340,15 +411,57 @@ class EpubReaderScreen(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .height(progressBarHeight)
-                        .background(backgroundColor)
-                        .navigationBarsPadding(),
-                    contentAlignment = Alignment.Center,
+                        .background(backgroundColor),
                 ) {
-                    Text(
-                        text = "$progressPercent%",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = percentTextColor,
-                    )
+                    if (readerSettings.showBatteryAndTime) {
+                        val ctx = LocalContext.current
+                        val timeFormatter = remember { DateTimeFormatter.ofPattern("h:mm a") }
+                        var timeText by remember { mutableStateOf(LocalTime.now().format(timeFormatter)) }
+                        var batteryPct by remember { mutableStateOf(-1) }
+                        // Update once a minute
+                        LaunchedEffect(readerSettings.showBatteryAndTime) {
+                            while (readerSettings.showBatteryAndTime) {
+                                timeText = LocalTime.now().format(timeFormatter)
+                                val intent = android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED)
+                                val status = ctx.registerReceiver(null, intent)
+                                val level = status?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                                val scale = status?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+                                batteryPct = if (level >= 0 && scale > 0) ((level.toFloat() / scale) * 100).toInt().coerceIn(0, 100) else -1
+                                kotlinx.coroutines.delay(30_000L)
+                            }
+                        }
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // Center: progress percent stays fixed center
+                            Text(
+                                text = "$progressPercent%",
+                                color = percentTextColor,
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.align(Alignment.Center),
+                            )
+                            // Left: Battery percentage
+                            Text(
+                                text = if (batteryPct >= 0) "$batteryPct%" else "--%",
+                                color = percentTextColor,
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp),
+                            )
+                            // Right: current time
+                            Text(
+                                text = timeText,
+                                color = percentTextColor,
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
+                            )
+                        }
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "$progressPercent%",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = percentTextColor,
+                            )
+                        }
+                    }
                 }
             }
 
@@ -419,8 +532,9 @@ class EpubReaderScreen(
                                         "UTF-8",
                                         null,
                                     )
-                                }
+                                }.also { created -> webViewRef = created }
                             },
+                            update = { wv -> webViewRef = wv },
                         )
                     }
                 }
@@ -472,6 +586,10 @@ class EpubReaderScreen(
 
             // Progress bar above bottom bar, hides/shows with barsVisible or while interacting
             var sliderInUse by remember { mutableStateOf(false) }
+            // Measure bottom bar height for dynamic slider padding
+            val density = LocalDensity.current
+            var bottomBarHeightDp by remember { mutableStateOf(72.dp) }
+            val sliderExtraBottomPadding = 16.dp
             AnimatedVisibility(
                 visible = (barsVisible || sliderInUse) && (state !is EpubReaderState.Loading),
                 enter = fadeIn(),
@@ -484,7 +602,7 @@ class EpubReaderScreen(
                         .fillMaxWidth()
                         .padding(start = 16.dp, end = 16.dp, top = 8.dp)
                         .navigationBarsPadding()
-                        .padding(bottom = 72.dp), // above bottom bar
+                        .padding(bottom = bottomBarHeightDp + sliderExtraBottomPadding), // above bottom bar dynamically with slight offset
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val percent = (sliderProgress.floatValue * 100).toInt()
@@ -538,7 +656,10 @@ class EpubReaderScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(8.dp),
+                            .padding(8.dp)
+                            .onGloballyPositioned { layoutCoordinates ->
+                                bottomBarHeightDp = with(density) { layoutCoordinates.size.height.toDp() }
+                            },
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

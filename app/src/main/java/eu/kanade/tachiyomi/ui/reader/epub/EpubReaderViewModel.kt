@@ -109,6 +109,8 @@ class EpubReaderViewModel(
                 alignment = epubPreferences.textAlignment().get(),
                 theme = epubPreferences.theme().get(),
                 showProgressPercent = epubPreferences.showProgressPercent().get(),
+                volumeButtonScroll = epubPreferences.volumeButtonScroll().get(),
+                showBatteryAndTime = epubPreferences.showBatteryAndTime().get(),
             )
             try {
                 // Load manga and chapter data
@@ -179,6 +181,16 @@ class EpubReaderViewModel(
     fun setTheme(theme: ReaderTheme) {
         _settings.value = _settings.value.copy(theme = theme)
         coroutineScope.launch { epubPreferences.theme().set(theme) }
+    }
+
+    fun setVolumeButtonScroll(enabled: Boolean) {
+        _settings.value = _settings.value.copy(volumeButtonScroll = enabled)
+        coroutineScope.launch { epubPreferences.volumeButtonScroll().set(enabled) }
+    }
+
+    fun setShowBatteryAndTime(enabled: Boolean) {
+        _settings.value = _settings.value.copy(showBatteryAndTime = enabled)
+        coroutineScope.launch { epubPreferences.showBatteryAndTime().set(enabled) }
     }
 
     /**

@@ -25,6 +25,15 @@ class NovelReaderPreferences(
     // Font family
     fun fontFamily() = preferenceStore.getEnum(PREF_FONT_FAMILY, FontFamilyPref.ORIGINAL)
 
+    // Show stationary progress percent at bottom of screen
+    fun showProgressPercent() = preferenceStore.getBoolean(PREF_SHOW_PROGRESS_PERCENT, DEFAULT_SHOW_PROGRESS_PERCENT)
+
+    // Volume buttons scroll content
+    fun volumeButtonScroll() = preferenceStore.getBoolean(PREF_VOLUME_BUTTON_SCROLL, DEFAULT_VOLUME_BUTTON_SCROLL)
+
+    // Show battery and time in bottom bar
+    fun showBatteryAndTime() = preferenceStore.getBoolean(PREF_SHOW_BATTERY_AND_TIME, DEFAULT_SHOW_BATTERY_AND_TIME)
+
     data class ReaderColorScheme(val background: Color, val text: Color)
 
     fun colorSchemeIndex() = preferenceStore.getInt(PREF_COLOR_SCHEME_INDEX, DEFAULT_COLOR_SCHEME_INDEX)
@@ -53,12 +62,18 @@ class NovelReaderPreferences(
         const val PREF_LINE_SPACING = "novel_line_spacing"
         const val PREF_COLOR_SCHEME_INDEX = "novel_color_scheme_index"
         const val PREF_FONT_FAMILY = "novel_font_family"
+        const val PREF_SHOW_PROGRESS_PERCENT = "novel_show_progress_percent"
+        const val PREF_VOLUME_BUTTON_SCROLL = "novel_volume_button_scroll"
+        const val PREF_SHOW_BATTERY_AND_TIME = "novel_show_battery_and_time"
 
         const val DEFAULT_FONT_SIZE = 18 // sp
         const val DEFAULT_TEXT_COLOR = 0xFFE6E6F2.toInt() // light text
         const val DEFAULT_BACKGROUND_COLOR = 0xFF2B2B38.toInt() // blue gray bg
         const val DEFAULT_LINE_SPACING = 150 // 1.5x
         const val DEFAULT_COLOR_SCHEME_INDEX = 3 // Default to Blue gray bg, light text
+        const val DEFAULT_SHOW_PROGRESS_PERCENT = false
+        const val DEFAULT_VOLUME_BUTTON_SCROLL = false
+        const val DEFAULT_SHOW_BATTERY_AND_TIME = false
 
         // Preset colors for readability
         val PresetTextColors = listOf(

@@ -13,5 +13,7 @@ data class EpubReaderSettings(
     val alignment: TextAlignment = TextAlignment.LEFT,
     val theme: ReaderTheme = ReaderTheme.LIGHT,
     val isScrollMode: Boolean = false,
-    val showProgressPercent: Boolean = false, // NEW: show progress % UI
+    val showProgressPercent: Boolean = false,
+    val volumeButtonScroll: Boolean = false,
+    val showBatteryAndTime: Boolean = false,
 )

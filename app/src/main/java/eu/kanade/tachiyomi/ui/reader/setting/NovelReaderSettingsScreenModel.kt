@@ -35,6 +35,15 @@ class NovelReaderSettingsScreenModel(
     private val _fontFamily = MutableStateFlow(preferences.fontFamily().get())
     val fontFamily: StateFlow<NovelReaderPreferences.FontFamilyPref> = _fontFamily.asStateFlow()
 
+    private val _showProgressPercent = MutableStateFlow(preferences.showProgressPercent().get())
+    val showProgressPercent: StateFlow<Boolean> = _showProgressPercent.asStateFlow()
+
+    private val _volumeButtonScroll = MutableStateFlow(preferences.volumeButtonScroll().get())
+    val volumeButtonScroll: StateFlow<Boolean> = _volumeButtonScroll.asStateFlow()
+
+    private val _showBatteryAndTime = MutableStateFlow(preferences.showBatteryAndTime().get())
+    val showBatteryAndTime: StateFlow<Boolean> = _showBatteryAndTime.asStateFlow()
+
     fun setFontSize(size: Int) {
         _fontSize.value = size
         scope.launch { preferences.fontSize().set(size) }
@@ -59,5 +68,20 @@ class NovelReaderSettingsScreenModel(
     fun setFontFamily(font: NovelReaderPreferences.FontFamilyPref) {
         _fontFamily.value = font
         scope.launch { preferences.fontFamily().set(font) }
+    }
+
+    fun setShowProgressPercent(enabled: Boolean) {
+        _showProgressPercent.value = enabled
+        scope.launch { preferences.showProgressPercent().set(enabled) }
+    }
+
+    fun setVolumeButtonScroll(enabled: Boolean) {
+        _volumeButtonScroll.value = enabled
+        scope.launch { preferences.volumeButtonScroll().set(enabled) }
+    }
+
+    fun setShowBatteryAndTime(enabled: Boolean) {
+        _showBatteryAndTime.value = enabled
+        scope.launch { preferences.showBatteryAndTime().set(enabled) }
     }
 }

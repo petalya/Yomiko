@@ -3,7 +3,9 @@ package eu.kanade.tachiyomi.ui.reader.novel
 
 import android.app.Activity
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
+import android.view.Window
 import android.view.WindowInsetsController
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -57,12 +59,14 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -157,6 +161,9 @@ class NovelReaderScreen(
         val lineSpacing by settingsModel.lineSpacing.collectAsState()
         val presetColorScheme by settingsModel.colorScheme.collectAsState()
         val fontFamilyPref by settingsModel.fontFamily.collectAsState()
+        val showProgressPercent by settingsModel.showProgressPercent.collectAsState()
+        val showBatteryAndTime by settingsModel.showBatteryAndTime.collectAsState()
+        val volumeButtonScroll by settingsModel.volumeButtonScroll.collectAsState()
         val fontFamily = when (fontFamilyPref) {
             NovelReaderPreferences.FontFamilyPref.ORIGINAL -> null
             NovelReaderPreferences.FontFamilyPref.LORA -> FontFamily(Font(R.font.lora))
@@ -177,10 +184,6 @@ class NovelReaderScreen(
             if (delta > 0 && accumulatedScroll > hideThresholdPx) {
                 // Scrolling down, hide bars
                 if (barsVisible) barsVisible = false
-                accumulatedScroll = 0
-            } else if (delta < 0 && kotlin.math.abs(accumulatedScroll) > hideThresholdPx) {
-                // Scrolling up, show bars
-                if (!barsVisible) barsVisible = true
                 accumulatedScroll = 0
             } else if (scrollState.value <= hideThresholdPx) {
                 // Near top, always show bars
@@ -254,6 +257,67 @@ class NovelReaderScreen(
         }
         Surface(modifier = Modifier.fillMaxSize(), color = presetColorScheme.background) {
             Box(modifier = Modifier.fillMaxSize()) {
+                val progressBarHeight = 40.dp
+                // Track bottom bar height to position the slider above it
+                val density = LocalDensity.current
+                var bottomBarHeightDp by remember { mutableStateOf(72.dp) }
+                val sliderExtraBottomPadding = 16.dp
+
+                // Volume keys: scroll by one screen height (90%)
+                val view = LocalView.current
+                val scrollDownByScreen = rememberUpdatedState(newValue = {
+                    val heightPx = (view.height * 0.90f).toInt()
+                    if (heightPx > 0) {
+                        val max = scrollState.maxValue
+                        if (max > 0) {
+                            val target = (scrollState.value + heightPx).coerceIn(0, max)
+                            coroutineScope.launch { scrollState.animateScrollTo(target) }
+                        }
+                    }
+                })
+                val scrollUpByScreen = rememberUpdatedState(newValue = {
+                    val heightPx = (view.height * 0.90f).toInt()
+                    if (heightPx > 0) {
+                        val max = scrollState.maxValue
+                        if (max > 0) {
+                            val target = (scrollState.value - heightPx).coerceIn(0, max)
+                            coroutineScope.launch { scrollState.animateScrollTo(target) }
+                        }
+                    }
+                })
+                DisposableEffect(window, volumeButtonScroll) {
+                    val prev = window?.callback
+                    if (prev == null) {
+                        onDispose { }
+                    } else {
+                        val newCallback = object : Window.Callback by prev {
+                            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                                if (!volumeButtonScroll) return prev.dispatchKeyEvent(event)
+                                when (event.keyCode) {
+                                    KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                                        if (event.action == KeyEvent.ACTION_UP) {
+                                            scrollDownByScreen.value.invoke()
+                                        }
+                                        return true
+                                    }
+                                    KeyEvent.KEYCODE_VOLUME_UP -> {
+                                        if (event.action == KeyEvent.ACTION_UP) {
+                                            scrollUpByScreen.value.invoke()
+                                        }
+                                        return true
+                                    }
+                                }
+                                return prev.dispatchKeyEvent(event)
+                            }
+                        }
+                        window?.callback = newCallback
+                        onDispose {
+                            if (window?.callback === newCallback) {
+                                window?.callback = prev
+                            }
+                        }
+                    }
+                }
                 // Chapter content (tap to toggle bars)
                 when (state) {
                     is NovelReaderState.Loading -> Box(
@@ -361,7 +425,7 @@ class NovelReaderScreen(
                                             top = 115.dp,
                                             start = 20.dp,
                                             end = 20.dp,
-                                            bottom = 16.dp,
+                                            bottom = if (showProgressPercent && contentReady) progressBarHeight else 16.dp,
                                         )
                                         .pointerInput(barsVisible) {
                                             detectTapGestures(onTap = { barsVisible = !barsVisible })
@@ -445,6 +509,46 @@ class NovelReaderScreen(
                                 }
                             }
                         }
+
+                        // Stationary progress percentage UI at the bottom of the screen, synced with content readiness
+                        if (showProgressPercent && contentReady) {
+                            val maxScroll = scrollState.maxValue
+                            val progress = if (maxScroll > 0) scrollState.value.toFloat() / maxScroll else 0f
+                            val progressPercent = (progress * 100).toInt().coerceIn(0, 100)
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .height(progressBarHeight)
+                                    .background(presetColorScheme.background),
+                            ) {
+                                if (showBatteryAndTime) {
+                                    val ctx = LocalContext.current
+                                    var timeText by remember { mutableStateOf(java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))) }
+                                    var batteryPct by remember { mutableStateOf(-1) }
+                                    LaunchedEffect(showBatteryAndTime) {
+                                        while (showBatteryAndTime) {
+                                            timeText = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+                                            val intent = android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED)
+                                            val status = ctx.registerReceiver(null, intent)
+                                            val level = status?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                                            val scale = status?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+                                            batteryPct = if (level >= 0 && scale > 0) ((level.toFloat() / scale) * 100).toInt().coerceIn(0, 100) else -1
+                                            kotlinx.coroutines.delay(30_000L)
+                                        }
+                                    }
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        Text(text = if (batteryPct >= 0) "$batteryPct%" else "--%", color = presetColorScheme.text, style = MaterialTheme.typography.labelLarge, modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp))
+                                        Text(text = "$progressPercent%", color = presetColorScheme.text, style = MaterialTheme.typography.labelLarge, modifier = Modifier.align(Alignment.Center))
+                                        Text(text = timeText, color = presetColorScheme.text, style = MaterialTheme.typography.labelLarge, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp))
+                                    }
+                                } else {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text(text = "$progressPercent%", style = MaterialTheme.typography.labelLarge, color = presetColorScheme.text)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 // Top bar overlays content, does NOT push it down
@@ -489,7 +593,7 @@ class NovelReaderScreen(
                             .fillMaxWidth()
                             .padding(start = 16.dp, end = 16.dp, top = 8.dp)
                             .navigationBarsPadding()
-                            .padding(bottom = 72.dp), // above bottom bar
+                            .padding(bottom = bottomBarHeightDp + sliderExtraBottomPadding), // above bottom bar dynamically with slight offset
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val percent = (sliderProgress * 100).toInt()
@@ -525,7 +629,10 @@ class NovelReaderScreen(
                             .fillMaxWidth()
                             .navigationBarsPadding()
                             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
-                            .padding(8.dp),
+                            .padding(8.dp)
+                            .onGloballyPositioned { coordinates ->
+                                bottomBarHeightDp = with(density) { coordinates.size.height.toDp() }
+                            },
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
