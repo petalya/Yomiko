@@ -93,7 +93,6 @@ object AboutScreen : Screen() {
         val navigator = LocalNavigator.currentOrThrow
         var updateCheckState by remember { mutableStateOf(UpdateCheckState.NotChecked) }
 
-
         Scaffold(
             topBar = { scrollBehavior ->
                 AppBar(
@@ -289,7 +288,6 @@ object AboutScreen : Screen() {
                 }
             }
         }
-
     }
 
     /**
