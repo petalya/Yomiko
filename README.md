@@ -1,12 +1,5 @@
-| Preview Builds | Release Builds | Mihon Support Server |
-|-------|----------|----------|
-| [![Preview](https://github.com/jobobby04/TachiyomiSYPreview/workflows/Remote%20Dispatch%20Build%20App/badge.svg)](https://github.com/jobobby04/TachiyomiSYPreview/releases) | [![stable release](https://img.shields.io/github/release/jobobby04/tachiyomisy.svg?maxAge=3600&label=download)](https://github.com/jobobby04/tachiyomisy/releases/latest) | [![Discord](https://img.shields.io/discord/1195734228319617024.svg?label=discord&labelColor=7289da&color=2c2f33&style=flat)](https://discord.gg/mihon) |
-
-
-# ![app icon](./.github/readme-images/app-icon.png)TachiyomiSY
-Mihon is a free and open source manga reader for Android 6.0 and above. This version of Mihon, TachiyomiSY was based off TachiyomiAZ. This version is meant to push forward in the ways of usability and features. TachiyomiSY tries to push forward where it can, but staying in a place where it can easily grab updates and features from the main app, it tries to make new features, or take features from other forks like J2K and Neko.
-
-![screenshots of app](./.github/readme-images/screens.png)
+# ![app icon](./.github/readme-images/yomiko-icon.png)Yomiko
+Yomiko is a fork of TachiyomiSY-with-discord-RPC, which is based on Mihon. This version introduces novel and EPUB support, along with minor UI enhancements. Credit goes to the original developers for their outstanding work, which made this version possible.
 
 ## Features
 
@@ -34,7 +27,6 @@ Features of TachiyomiSY include:
 * Smart background for reading modes like LTR or Vertical, changes the background based on the page color
 * Force disable webtoon zoom
 * Continue reading button in library
-* Hentai features enable/disable, in advanced settings
 * Quick clean titles
 * Source migration, migrate all your manga from one source to another
 * Saving searches
@@ -47,79 +39,17 @@ Features of TachiyomiSY include:
 * Merge multiple of the same manga from different sources
 * Drag and drop library sorting
 * Library search engine, includes exclude, quotes as absolute, and a bunch of other ways to search
-* New E-Hentai/ExHentai features, such as language settings and watched list settings
 * Enhanced views for internal and integrated sources
 * Enhanced usability for internal and delegated sources
 
-Custom sources:
-* E-Hentai/ExHentai
+Features of Yomiko include:
+* Built-in readers (EPUB + Novel)
+  - EPUB: Reflowable & HTML modes; fullscreen images
+  - Novel: Compose RichText renderer with HTML cleanup + CSS injection for indent and paragraph spacing
+  - Shared: immersive UI; font family/size and theme options; progress percentage with optional battery/time; text alignment and line spacing; volume-button scrolling
+* Yomiko theme
 
-Additional features for some extensions, features include custom description, opening in app, batch add to library, and a bunch of other things based on the source:
-* 8Muses (EroMuse)
-* HBrowse
-* Mangadex
-* NHentai
-* Puruin
-* Tsumino
 
 ## Download
-Get the app from our [releases page](https://github.com/jobobby04/tachiyomisy/releases/latest).
+Get the app from our [releases page](https://github.com/petalya/yomiko).
 
-If you want to try new features before they get to the stable release, you can download the preview version [here](https://github.com/jobobby04/tachiyomisypreview/releases).
-
-## Translation
-Feel free to translate the project on [Weblate](https://hosted.weblate.org/projects/mihon/tachiyomisy/)
-
-<details><summary>Translation Progress</summary>
-<a href="https://hosted.weblate.org/engage/mihon/">
-<img src="https://hosted.weblate.org/widgets/mihon/-/tachiyomisy/multi-auto.svg" alt="Translation status" />
-</a>
-</details>
-
-## Issues, Feature Requests and Contributing
-
-Please make sure to read the full guidelines. Your issue may be closed without warning if you do not.
-
-<details><summary>Issues</summary>
-
-1. **Before reporting a new issue, take a look at the [FAQ](https://mihon.app/docs/faq/general), the [changelog](https://github.com/jobobby04/tachiyomisy/releases) and the already opened [issues](https://github.com/jobobby04/tachiyomisy/issues).**
-2. If you are unsure, ask here: [![Discord](https://img.shields.io/discord/1195734228319617024.svg)](https://discord.gg/mihon)
-
-</details>
-
-<details><summary>Bugs</summary>
-
-* Include version (More → About → Version)
-* If not latest, try updating, it may have already been solved
-* Preview version is equal to the number of commits as seen on the main page
-* Include steps to reproduce (if not obvious from description)
-* Include screenshot (if needed)
-* If it could be device-dependent, try reproducing on another device (if possible)
-* Don't group unrelated requests into one issue
-
-Use the [issue forms](https://github.com/jobobby04/TachiyomiSY/issues/new/choose) to submit a bug.
-
-</details>
-
-<details><summary>Feature Requests</summary>
-
-* Write a detailed issue, explaining what it should do or how. Avoid writing just "like X app does"
-* Include screenshot (if needed)
-
-Source requests are not accepted.
-</details>
-
-<details><summary>Contributing</summary>
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
-</details>
-
-<details><summary>Code of Conduct</summary>
-
-See [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
-</details>
-
-## FAQ
-
-[See our website.](https://mihon.app/)
-You can also reach out to us on [Discord](https://discord.gg/mihon).
