@@ -534,7 +534,7 @@ class NovelReaderScreen(
                                             val level = status?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
                                             val scale = status?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
                                             batteryPct = if (level >= 0 && scale > 0) ((level.toFloat() / scale) * 100).toInt().coerceIn(0, 100) else -1
-                                            kotlinx.coroutines.delay(30_000L)
+                                    kotlinx.coroutines.delay(3_000L)
                                         }
                                     }
                                     Box(modifier = Modifier.fillMaxSize()) {
