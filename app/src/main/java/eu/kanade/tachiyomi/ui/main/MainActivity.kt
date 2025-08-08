@@ -59,7 +59,6 @@ import eu.kanade.presentation.components.DownloadedOnlyBannerBackgroundColor
 import eu.kanade.presentation.components.IncognitoModeBannerBackgroundColor
 import eu.kanade.presentation.components.IndexingBannerBackgroundColor
 import eu.kanade.presentation.more.settings.screen.ConfigureExhDialog
-import eu.kanade.presentation.more.settings.screen.about.WhatsNewDialog
 import eu.kanade.presentation.more.settings.screen.browse.ExtensionReposScreen
 import eu.kanade.presentation.more.settings.screen.data.RestoreBackupScreen
 import eu.kanade.presentation.util.AssistContentScreen
@@ -326,13 +325,6 @@ class MainActivity : BaseActivity() {
                 }
             }
             // SY <--
-
-            var showChangelog by remember { mutableStateOf(false) } // hide 'what\'s new' screen
-            if (showChangelog) {
-                // SY -->
-                WhatsNewDialog(onDismissRequest = { showChangelog = false })
-                // SY <--
-            }
 
             // SY -->
             ConfigureExhDialog(run = runExhConfigureDialog, onRunning = { runExhConfigureDialog = false })

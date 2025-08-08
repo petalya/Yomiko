@@ -38,6 +38,7 @@ import eu.kanade.tachiyomi.data.notification.NotificationHandler
 import eu.kanade.tachiyomi.data.updater.AppUpdateChecker
 import eu.kanade.tachiyomi.data.updater.AppUpdateDownloadJob
 import eu.kanade.tachiyomi.ui.more.NewUpdateScreen
+import eu.kanade.tachiyomi.ui.more.WhatsNewScreen
 import eu.kanade.tachiyomi.util.CrashLogUtil
 import eu.kanade.tachiyomi.util.lang.toDateTimestampString
 import eu.kanade.tachiyomi.util.storage.getUriCompat
@@ -92,9 +93,6 @@ object AboutScreen : Screen() {
         val navigator = LocalNavigator.currentOrThrow
         var updateCheckState by remember { mutableStateOf(UpdateCheckState.NotChecked) }
 
-        // SY -->
-        var showWhatsNewDialog by remember { mutableStateOf(false) }
-        // SY <--
 
         Scaffold(
             topBar = { scrollBehavior ->
@@ -222,9 +220,7 @@ object AboutScreen : Screen() {
                     item {
                         TextPreferenceWidget(
                             title = stringResource(MR.strings.whats_new),
-                            // SY -->
-                            onPreferenceClick = { showWhatsNewDialog = true },
-                            // SY <--
+                            onPreferenceClick = { navigator.push(WhatsNewScreen()) },
                         )
                     }
                 }
@@ -294,11 +290,6 @@ object AboutScreen : Screen() {
             }
         }
 
-        // SY -->
-        if (showWhatsNewDialog) {
-            WhatsNewDialog(onDismissRequest = { showWhatsNewDialog = false })
-        }
-        // SY <--
     }
 
     /**
