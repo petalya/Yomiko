@@ -51,5 +51,5 @@ Features of Yomiko include:
 
 
 ## Download
-Get the app from our [releases page](https://github.com/petalya/yomiko).
+Get the app from our [releases page](https://github.com/petalya/Yomiko/releases/latest).
 
