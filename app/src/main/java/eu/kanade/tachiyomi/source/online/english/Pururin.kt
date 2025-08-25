@@ -38,6 +38,7 @@ class Pururin(delegate: HttpSource, val context: Context) :
      */
     override val metaClass = PururinSearchMetadata::class
     override fun newMetaInstance() = PururinSearchMetadata()
+    override val isNovelSource: Boolean = false
 
     // Support direct URL importing
     @Deprecated("Use the non-RxJava API instead", replaceWith = ReplaceWith("getSearchManga"))

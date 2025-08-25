@@ -24,6 +24,8 @@ interface Source {
     val lang: String
         get() = ""
 
+    val isNovelSource: Boolean
+
     /**
      * Get the updated details for a manga.
      *

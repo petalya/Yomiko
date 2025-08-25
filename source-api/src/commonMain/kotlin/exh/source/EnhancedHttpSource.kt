@@ -287,6 +287,9 @@ class EnhancedHttpSource(
      */
     override fun getFilterList() = source().getFilterList()
 
+    override val isNovelSource: Boolean
+        get() = source().isNovelSource
+
     fun source(): HttpSource {
         return if (Injekt.get<DelegateSourcePreferences>().delegateSources().get()) {
             enhancedSource

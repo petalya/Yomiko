@@ -81,6 +81,8 @@ actual class LocalSource(
 
     override val lang: String = "other"
 
+    override val isNovelSource: Boolean = false
+
     override fun toString() = name
 
     override val supportsLatest: Boolean = true

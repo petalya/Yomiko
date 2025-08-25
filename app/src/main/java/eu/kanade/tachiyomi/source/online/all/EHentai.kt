@@ -116,6 +116,7 @@ class EHentai(
 
     override val lang = "all"
     override val supportsLatest = true
+    override val isNovelSource: Boolean = false
 
     private val exhPreferences: ExhPreferences by injectLazy()
     private val updateHelper: EHentaiUpdateHelper by injectLazy()

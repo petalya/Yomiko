@@ -15,6 +15,8 @@ import org.jsoup.nodes.Element
 @Suppress("unused")
 abstract class ParsedHttpSource : HttpSource() {
 
+    override val isNovelSource: Boolean = false
+
     /**
      * Parses the response from the site and returns a [MangasPage] object.
      *

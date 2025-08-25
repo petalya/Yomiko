@@ -47,6 +47,7 @@ class MergedSource : HttpSource() {
     override val id: Long = MERGED_SOURCE_ID
 
     override val baseUrl = ""
+    override val isNovelSource: Boolean = false
 
     override fun popularMangaRequest(page: Int) = throw UnsupportedOperationException()
     override fun popularMangaParse(response: Response) = throw UnsupportedOperationException()

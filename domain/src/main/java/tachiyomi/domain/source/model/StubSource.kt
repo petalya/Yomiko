@@ -11,6 +11,8 @@ class StubSource(
     override val name: String,
 ) : Source {
 
+    override val isNovelSource: Boolean = false
+
     private val isInvalid: Boolean = name.isBlank() || lang.isBlank()
 
     override suspend fun getMangaDetails(manga: SManga): SManga =

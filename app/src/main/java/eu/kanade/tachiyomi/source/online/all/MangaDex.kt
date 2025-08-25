@@ -63,6 +63,7 @@ class MangaDex(delegate: HttpSource, val context: Context) :
     RandomMangaSource,
     NamespaceSource {
     override val lang: String = delegate.lang
+    override val isNovelSource: Boolean = false
 
     private val mdLang by lazy {
         MdLang.fromExt(lang) ?: MdLang.ENGLISH
