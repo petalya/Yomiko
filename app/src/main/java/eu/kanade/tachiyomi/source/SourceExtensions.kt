@@ -68,3 +68,14 @@ fun Source.isIncognitoModeEnabled(): Boolean {
     val extensionPackage = Injekt.get<ExtensionManager>().getExtensionPackage(id)
     return extensionPackage in Injekt.get<SourcePreferences>().incognitoExtensions().get()
 }
+
+fun Source.isNovelSourceSafe(): Boolean {
+    return try {
+        val method = this::class.java.getMethod("isNovelSource")
+        method.invoke(this) as? Boolean ?: false
+    } catch (e: NoSuchMethodException) {
+        false
+    } catch (e: Throwable) {
+        false
+    }
+}

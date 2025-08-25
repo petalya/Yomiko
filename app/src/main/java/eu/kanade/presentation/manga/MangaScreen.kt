@@ -71,6 +71,7 @@ import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.getNameForMangaInfo
 import eu.kanade.tachiyomi.source.isIncognitoModeEnabled
+import eu.kanade.tachiyomi.source.isNovelSourceSafe
 import eu.kanade.tachiyomi.source.online.MetadataSource
 import eu.kanade.tachiyomi.source.online.all.EHentai
 import eu.kanade.tachiyomi.source.online.all.MangaDex
@@ -524,7 +525,7 @@ private fun MangaScreenSmallImpl(
                             // SY <--
                             showTrackingButton = true,
                             showNextUpdateTimer = !isEpubManga(state),
-                            onJumpToChapter = if (state.source.id == 10001L || isEpubManga(state)) {
+                            onJumpToChapter = if (state.source.isNovelSourceSafe() || isEpubManga(state)) {
                                 { showJumpDialog = true }
                             } else {
                                 null
@@ -627,7 +628,7 @@ private fun MangaScreenSmallImpl(
                         onDownloadChapter = onDownloadChapter,
                         onChapterSelected = onChapterSelected,
                         onChapterSwipe = onChapterSwipe,
-                        sourceId = state.source.id,
+                        source = state.source,
                     )
                 }
             }
@@ -905,7 +906,7 @@ fun MangaScreenLargeImpl(
                             // SY <--
                             showTrackingButton = true,
                             showNextUpdateTimer = !isEpubManga(state),
-                            onJumpToChapter = if (state.source.id == 10001L || isEpubManga(state)) {
+                            onJumpToChapter = if (state.source.isNovelSourceSafe() || isEpubManga(state)) {
                                 { showJumpDialog = true }
                             } else {
                                 null
@@ -998,7 +999,7 @@ fun MangaScreenLargeImpl(
                                 onDownloadChapter = onDownloadChapter,
                                 onChapterSelected = onChapterSelected,
                                 onChapterSwipe = onChapterSwipe,
-                                sourceId = state.source.id,
+                                source = state.source,
                             )
                         }
                     }
@@ -1113,7 +1114,7 @@ private fun LazyListScope.sharedChapterItems(
     onDownloadChapter: ((List<ChapterList.Item>, ChapterDownloadAction) -> Unit)?,
     onChapterSelected: (ChapterList.Item, Boolean, Boolean, Boolean) -> Unit,
     onChapterSwipe: (ChapterList.Item, ChapterSwipeAction) -> Unit,
-    sourceId: Long,
+    source: Source, // CHANGED: pass Source instead of just sourceId
 ) {
     items(
         items = chapters,
@@ -1141,20 +1142,16 @@ private fun LazyListScope.sharedChapterItems(
                     } else {
                         item.chapter.name
                     },
-                    date = if (sourceId == 10001L) {
-                        null
-                    } else {
-                        item.chapter.dateUpload.takeIf { it > 0L }?.let {
-                            if (manga.isEhBasedManga()) {
-                                MetadataUtil.EX_DATE_FORMAT.format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault()))
-                            } else {
-                                relativeDateText(item.chapter.dateUpload)
-                            }
+                    date = item.chapter.dateUpload.takeIf { it > 0L }?.let {
+                        if (manga.isEhBasedManga()) {
+                            MetadataUtil.EX_DATE_FORMAT.format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault()))
+                        } else {
+                            relativeDateText(item.chapter.dateUpload)
                         }
                     },
                     readProgress = when {
                         item.chapter.lastPageRead > 0L && item.chapter.mangaId != null && item.chapter.mangaId != -1L -> {
-                            val isNovel = manga.source in 10001L..10100L
+                            val isNovel = source.isNovelSourceSafe() // CHANGED: use isNovelSourceSafe
                             val isEpub = item.chapter.url.contains(".epub") || item.chapter.url.contains("::")
                             if (isNovel || isEpub) {
                                 val percent = (item.chapter.lastPageRead / 10).toInt().coerceIn(0, 100)
@@ -1197,10 +1194,10 @@ private fun LazyListScope.sharedChapterItems(
                     },
                     onClick = {
                         onChapterItemClick(
-                            chapterItem = item,
-                            isAnyChapterSelected = isAnyChapterSelected,
-                            onToggleSelection = { onChapterSelected(item, !item.selected, true, false) },
-                            onChapterClicked = onChapterClicked,
+                            item,
+                            isAnyChapterSelected,
+                            { selected -> onChapterSelected(item, selected, true, false) },
+                            onChapterClicked,
                         )
                     },
                     onDownloadClick = if (onDownloadChapter != null) {

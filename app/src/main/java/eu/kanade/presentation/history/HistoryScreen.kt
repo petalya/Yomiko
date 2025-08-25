@@ -37,11 +37,13 @@ import eu.kanade.presentation.components.relativeDateText
 import eu.kanade.presentation.history.components.HistoryItem
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import eu.kanade.presentation.util.animateItemFastScroll
+import eu.kanade.tachiyomi.source.isNovelSourceSafe
 import eu.kanade.tachiyomi.ui.history.HistoryScreenModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.history.model.HistoryWithRelations
+import tachiyomi.domain.source.service.SourceManager
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.FastScrollLazyColumn
 import tachiyomi.presentation.core.components.ListGroupHeader
@@ -49,6 +51,8 @@ import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.screens.LoadingScreen
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 import java.time.LocalDate
 import kotlin.math.min
 
@@ -116,10 +120,12 @@ fun HistoryScreen(
                     },
                     onClickResume = { history ->
                         val chapter = history.chapter
+                        val sourceManager = Injekt.get<SourceManager>()
+                        val source = sourceManager.getOrStub(history.coverData.sourceId)
                         if (isEpubOrNovel(history) && chapter != null) {
                             if (chapter.url.contains(".epub") || chapter.url.contains("::")) {
                                 onOpenEpub(history.mangaId, chapter.id, chapter.url)
-                            } else if (history.coverData.sourceId in 10001L..10100L) {
+                            } else if (source.isNovelSourceSafe()) {
                                 onOpenNovel(history.mangaId, chapter.id)
                             }
                         } else {
@@ -262,9 +268,9 @@ sealed interface HistoryUiModel {
 
 // Helper to check if a history item is EPUB or novel
 private fun isEpubOrNovel(history: HistoryWithRelations): Boolean {
-    // EPUB: chapter URL contains .epub or ::
-    // Novel: sourceId == 10001L
-    return (history.chapter?.url?.contains(".epub") == true || history.chapter?.url?.contains("::") == true) || history.coverData.sourceId in 10001L..10100L
+    val sourceManager = Injekt.get<SourceManager>()
+    val source = sourceManager.getOrStub(history.coverData.sourceId)
+    return (history.chapter?.url?.contains(".epub") == true || history.chapter?.url?.contains("::") == true) || source.isNovelSourceSafe()
 }
 
 @PreviewLightDark

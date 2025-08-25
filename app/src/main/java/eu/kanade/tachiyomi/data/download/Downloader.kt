@@ -360,7 +360,8 @@ class Downloader(
                 download.status = Download.State.DOWNLOADING
                 val textContent: String = pages[0].imageUrl ?: pages[0].url ?: ""
                 // Save as HTML file
-                val htmlFile = tmpDir.createFile("index.html")!!
+                val safeChapterName = DiskUtil.buildValidFilename(download.chapter.name) + ".html"
+                val htmlFile = tmpDir.createFile(safeChapterName)!!
                 htmlFile.openOutputStream().use { output ->
                     output.write(textContent.toByteArray())
                 }

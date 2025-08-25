@@ -43,6 +43,7 @@ import eu.kanade.presentation.util.Screen
 import eu.kanade.presentation.util.isTabletUi
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.isLocalOrStub
+import eu.kanade.tachiyomi.source.isNovelSourceSafe
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.browse.migration.advanced.design.PreMigrationScreen
 import eu.kanade.tachiyomi.ui.browse.source.SourcesScreen
@@ -161,7 +162,7 @@ class MangaScreen(
                 val isEpub = chapter.url.contains(".epub") || chapter.url.contains("::")
                 if (isEpub) {
                     navigator.push(eu.kanade.tachiyomi.ui.reader.epub.EpubReaderScreen(manga.id, chapter.id, chapter.url))
-                } else if (source.isNovelSource) {
+                } else if (source.isNovelSourceSafe()) {
                     navigator.push(eu.kanade.tachiyomi.ui.reader.novel.NovelReaderScreen(manga.id, chapter.id))
                 } else {
                     openChapter(context, chapter)
@@ -375,7 +376,7 @@ class MangaScreen(
             if (unreadChapter != null) {
                 navigator.push(eu.kanade.tachiyomi.ui.reader.epub.EpubReaderScreen(manga.id, unreadChapter.id, unreadChapter.url))
             }
-        } else if (source.isNovelSource) {
+        } else if (source.isNovelSourceSafe()) {
             // Find the chapter after the last read
             val lastReadIndex = chapters.indexOfLast { it.read }
             val nextChapter = when {

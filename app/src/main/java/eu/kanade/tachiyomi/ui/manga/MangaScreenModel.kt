@@ -48,6 +48,7 @@ import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.source.PagePreviewSource
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.getNameForMangaInfo
+import eu.kanade.tachiyomi.source.isNovelSourceSafe
 import eu.kanade.tachiyomi.source.online.MetadataSource
 import eu.kanade.tachiyomi.source.online.all.MergedSource
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
@@ -1172,12 +1173,11 @@ class MangaScreenModel(
             .map { it.chapter }
     }
 
-    private fun getUnreadChaptersSorted(): List<Chapter> {
+    private fun getUnreadChaptersSorted(source: Source): List<Chapter> {
         val manga = successState?.manga ?: return emptyList()
         val chapters = getUnreadChapters()
-
-        // For novels (source ID 10001L), always sort by chapter number in ascending order
-        return if (manga.source in 10001L..10100L) {
+        val isNovelSource = source.isNovelSourceSafe()
+        return if (isNovelSource) {
             chapters.sortedBy { it.chapterNumber }
         } else {
             val chaptersSorted = chapters.sortedWith(getChapterSort(manga))
@@ -1247,10 +1247,10 @@ class MangaScreenModel(
 
     fun runDownloadAction(action: DownloadAction) {
         val chaptersToDownload = when (action) {
-            DownloadAction.NEXT_1_CHAPTER -> getUnreadChaptersSorted().take(1)
-            DownloadAction.NEXT_5_CHAPTERS -> getUnreadChaptersSorted().take(5)
-            DownloadAction.NEXT_10_CHAPTERS -> getUnreadChaptersSorted().take(10)
-            DownloadAction.NEXT_25_CHAPTERS -> getUnreadChaptersSorted().take(25)
+            DownloadAction.NEXT_1_CHAPTER -> getUnreadChaptersSorted(sourceManager.getOrStub(successState?.source?.id ?: 0)).take(1)
+            DownloadAction.NEXT_5_CHAPTERS -> getUnreadChaptersSorted(sourceManager.getOrStub(successState?.source?.id ?: 0)).take(5)
+            DownloadAction.NEXT_10_CHAPTERS -> getUnreadChaptersSorted(sourceManager.getOrStub(successState?.source?.id ?: 0)).take(10)
+            DownloadAction.NEXT_25_CHAPTERS -> getUnreadChaptersSorted(sourceManager.getOrStub(successState?.source?.id ?: 0)).take(25)
             DownloadAction.UNREAD_CHAPTERS -> getUnreadChapters()
         }
         if (chaptersToDownload.isNotEmpty()) {
@@ -1774,7 +1774,7 @@ class MangaScreenModel(
             // SY <--
         ) : State {
             val processedChapters by lazy {
-                chapters.applyFilters(manga).toList()
+                chapters.applyFilters(manga, source).toList()
             }
 
             val isAnySelected by lazy {
@@ -1818,17 +1818,18 @@ class MangaScreenModel(
              * Applies the view filters to the list of chapters obtained from the database.
              * @return an observable of the list of chapters filtered and sorted.
              */
-            private fun List<ChapterList.Item>.applyFilters(manga: Manga): Sequence<ChapterList.Item> {
+            private fun List<ChapterList.Item>.applyFilters(manga: Manga, source: Source): Sequence<ChapterList.Item> {
                 val isLocalManga = manga.isLocal()
                 val unreadFilter = manga.unreadFilter
                 val downloadedFilter = manga.downloadedFilter
                 val bookmarkedFilter = manga.bookmarkedFilter
+                val isNovelSource = source.isNovelSourceSafe()
                 return asSequence()
                     .filter { (chapter) -> applyFilter(unreadFilter) { !chapter.read } }
                     .filter { (chapter) -> applyFilter(bookmarkedFilter) { chapter.bookmark } }
                     .filter { applyFilter(downloadedFilter) { it.isDownloaded || isLocalManga } }
                     .let { seq ->
-                        if (manga.source in 10001L..10100L) {
+                        if (isNovelSource) {
                             seq.sortedByDescending { it.chapter.chapterNumber }
                         } else {
                             seq.sortedWith { (chapter1), (chapter2) -> getChapterSort(manga).invoke(chapter1, chapter2) }

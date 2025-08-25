@@ -13,6 +13,7 @@ import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.data.connections.discord.ReaderData
 import eu.kanade.tachiyomi.source.CatalogueSource
+import eu.kanade.tachiyomi.source.isNovelSourceSafe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -131,7 +132,7 @@ class NovelReaderViewModel(
 
     fun nextChapter() {
         flushReadTimer()
-        // For novels (source ID 10001L), we want to go to the next chapter in the sorted list
+        // For novels, we want to go to the next chapter in the sorted list
         // which should be the next higher chapter number
         if (currentChapterIndex < chapters.lastIndex) {
             currentChapterIndex++
@@ -143,7 +144,7 @@ class NovelReaderViewModel(
 
     fun prevChapter() {
         flushReadTimer()
-        // For novels (source ID 10001L), we want to go to the previous chapter in the sorted list
+        // For novels, we want to go to the previous chapter in the sorted list
         // which should be the previous lower chapter number
         if (currentChapterIndex > 0) {
             currentChapterIndex--
@@ -208,7 +209,9 @@ class NovelReaderViewModel(
                     return@launch
                 }
                 val loadedChapters = getChaptersByMangaId.await(novelId)
-                val sortedChapters = if (manga!!.source in 10001L..10100L) {
+                val source = sourceManager.get(manga!!.source)
+                val isNovelSource = source?.isNovelSourceSafe() == true
+                val sortedChapters = if (isNovelSource) {
                     loadedChapters.sortedBy { chapter -> chapter.chapterNumber }
                 } else {
                     loadedChapters.sortedWith(getChapterSort(manga!!))
