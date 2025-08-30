@@ -461,8 +461,15 @@ class NovelReaderScreen(
                                     viewModel.currentChapterIndex + 1
                                     val currentChapterTitle = s.chapterTitle
                                     val hasNext = s.hasNext
-                                    val nextChapter = chapters.getOrNull(viewModel.currentChapterIndex + 1)
-                                    val nextChapterTitle = nextChapter?.name
+                                    // Compute next chapter title based on filtered list to match navigation
+                                    val filteredForFooter = viewModel.getFilteredChaptersWithCurrent()
+                                    val currentIdForFooter = viewModel.currentChapterId
+                                    val filteredIndexForFooter = filteredForFooter.indexOfFirst { it.id == currentIdForFooter }
+                                    val nextChapterTitle = if (filteredIndexForFooter != -1 && filteredIndexForFooter < filteredForFooter.lastIndex) {
+                                        filteredForFooter[filteredIndexForFooter + 1].name
+                                    } else {
+                                        null
+                                    }
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -637,7 +644,11 @@ class NovelReaderScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // Previous chapter button
-                        val hasPrevChapter = viewModel.prevDownloadedChapterExists()
+                        // Use filtered chapters for navigation button logic
+                        val filteredChapters = viewModel.getFilteredChaptersWithCurrent()
+                        val currentId = chapters.getOrNull(viewModel.currentChapterIndex)?.id
+                        val filteredIndex = filteredChapters.indexOfFirst { it.id == currentId }
+                        val hasPrevChapter = filteredIndex > 0
                         IconButton(
                             onClick = { viewModel.prevChapter() },
                             enabled = hasPrevChapter,
@@ -649,9 +660,7 @@ class NovelReaderScreen(
                                 tint = if (hasPrevChapter) {
                                     MaterialTheme.colorScheme.onSurface
                                 } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(
-                                        alpha = 0.5f,
-                                    )
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                 },
                             )
                         }
@@ -703,7 +712,7 @@ class NovelReaderScreen(
                             Icon(Icons.Filled.Settings, contentDescription = "Settings")
                         }
                         // Next chapter button
-                        val hasNextChapter = viewModel.nextDownloadedChapterExists()
+                        val hasNextChapter = filteredIndex != -1 && filteredIndex < filteredChapters.lastIndex
                         IconButton(
                             onClick = { viewModel.nextChapter() },
                             enabled = hasNextChapter,
@@ -715,9 +724,7 @@ class NovelReaderScreen(
                                 tint = if (hasNextChapter) {
                                     MaterialTheme.colorScheme.onSurface
                                 } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(
-                                        alpha = 0.5f,
-                                    )
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                 },
                             )
                         }

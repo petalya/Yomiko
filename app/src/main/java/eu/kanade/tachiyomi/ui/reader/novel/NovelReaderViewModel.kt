@@ -60,6 +60,7 @@ class NovelReaderViewModel(
     private val downloadManager: DownloadManager = Injekt.get()
     private val downloadProvider: DownloadProvider = Injekt.get()
     private val basePreferences: eu.kanade.domain.base.BasePreferences = Injekt.get()
+    private val readerPreferences: eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences = uy.kohesive.injekt.Injekt.get()
 
     internal val incognitoMode: Boolean by lazy { getIncognitoState.await(manga?.source, manga?.id) }
     internal var currentChapterIndex: Int = -1
@@ -136,68 +137,37 @@ class NovelReaderViewModel(
         chapterReadStartTime = null
     }
 
-    /**
-     * Returns the index of the next downloaded chapter after the current one, or -1 if none.
-     */
-    private fun getNextDownloadedChapterIndex(): Int {
-        val manga = manga ?: return -1
-        for (i in (currentChapterIndex + 1) until chapters.size) {
-            val chapter = chapters[i]
-            if (downloadManager.isChapterDownloaded(
-                    chapter.name,
-                    chapter.scanlator,
-                    manga.ogTitle,
-                    manga.source,
-                )
-            ) {
-                return i
-            }
-        }
-        return -1
-    }
-
-    /**
-     * Returns the index of the previous downloaded chapter before the current one, or -1 if none.
-     */
-    private fun getPrevDownloadedChapterIndex(): Int {
-        val manga = manga ?: return -1
-        for (i in (currentChapterIndex - 1) downTo 0) {
-            val chapter = chapters[i]
-            if (downloadManager.isChapterDownloaded(
-                    chapter.name,
-                    chapter.scanlator,
-                    manga.ogTitle,
-                    manga.source,
-                )
-            ) {
-                return i
-            }
-        }
-        return -1
-    }
-
-    fun nextDownloadedChapterExists(): Boolean = getNextDownloadedChapterIndex() != -1
-    fun prevDownloadedChapterExists(): Boolean = getPrevDownloadedChapterIndex() != -1
-
     fun nextChapter() {
         flushReadTimer()
-        val nextIndex = getNextDownloadedChapterIndex()
-        if (nextIndex != -1) {
-            currentChapterIndex = nextIndex
-            _state.value = NovelReaderState.Loading
-            loadCurrentChapter(chapters)
-            updateDiscordRPC()
+        val filteredChapters = getFilteredChaptersWithCurrent()
+        val currentId = chapters.getOrNull(currentChapterIndex)?.id
+        val filteredIndex = filteredChapters.indexOfFirst { it.id == currentId }
+        if (filteredIndex != -1 && filteredIndex < filteredChapters.lastIndex) {
+            val nextChapter = filteredChapters[filteredIndex + 1]
+            val newIndex = chapters.indexOfFirst { it.id == nextChapter.id }
+            if (newIndex != -1) {
+                currentChapterIndex = newIndex
+                _state.value = NovelReaderState.Loading
+                loadCurrentChapter(chapters)
+                updateDiscordRPC()
+            }
         }
     }
 
     fun prevChapter() {
         flushReadTimer()
-        val prevIndex = getPrevDownloadedChapterIndex()
-        if (prevIndex != -1) {
-            currentChapterIndex = prevIndex
-            _state.value = NovelReaderState.Loading
-            loadCurrentChapter(chapters)
-            updateDiscordRPC()
+        val filteredChapters = getFilteredChaptersWithCurrent()
+        val currentId = chapters.getOrNull(currentChapterIndex)?.id
+        val filteredIndex = filteredChapters.indexOfFirst { it.id == currentId }
+        if (filteredIndex > 0) {
+            val prevChapter = filteredChapters[filteredIndex - 1]
+            val newIndex = chapters.indexOfFirst { it.id == prevChapter.id }
+            if (newIndex != -1) {
+                currentChapterIndex = newIndex
+                _state.value = NovelReaderState.Loading
+                loadCurrentChapter(chapters)
+                updateDiscordRPC()
+            }
         }
     }
     fun jumpToChapter(index: Int) {
@@ -312,12 +282,19 @@ class NovelReaderViewModel(
                     }
                 }
                 val progress = if (chapter.lastPageRead > 0) chapter.lastPageRead / 1000f else 0f
+
+                // Determine next/prev availability based on the filtered list (respecting filters)
+                val filteredWithCurrent = getFilteredChaptersWithCurrent()
+                val filteredCurrentIndex = filteredWithCurrent.indexOfFirst { it.id == chapter.id }
+                val hasPrevFiltered = filteredCurrentIndex > 0
+                val hasNextFiltered = filteredCurrentIndex != -1 && filteredCurrentIndex < filteredWithCurrent.lastIndex
+
                 _state.value = NovelReaderState.Success(
                     novelTitle = manga.title,
                     chapterTitle = chapter.name,
                     content = content ?: "Failed to load chapter content.",
-                    hasNext = currentChapterIndex < chapters.lastIndex,
-                    hasPrev = currentChapterIndex > 0,
+                    hasNext = hasNextFiltered,
+                    hasPrev = hasPrevFiltered,
                     progress = progress,
                     bookmarked = chapter.bookmark,
                 )
@@ -404,21 +381,88 @@ class NovelReaderViewModel(
     }
 
     /**
-     * Returns the list of chapters filtered for downloaded-only mode.
+     * Returns the list of chapters filtered for all reader filters (downloaded-only, skip read, skip filtered, etc.).
      */
     fun getFilteredChapters(): List<tachiyomi.domain.chapter.model.Chapter> {
         val manga = manga ?: return chapters
-        return if (basePreferences.downloadedOnly().get()) {
-            chapters.filter { chapter ->
+        var filtered = chapters
+        if (readerPreferences.skipRead().get()) {
+            filtered = filtered.filterNot { it.read }
+        }
+        if (readerPreferences.skipFiltered().get()) {
+            filtered = filtered.filterNot {
+                (manga.unreadFilterRaw == tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_READ && !it.read) ||
+                    (manga.unreadFilterRaw == tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_UNREAD && it.read) ||
+                    (manga.bookmarkedFilterRaw == tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_BOOKMARKED && !it.bookmark) ||
+                    (manga.bookmarkedFilterRaw == tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_NOT_BOOKMARKED && it.bookmark)
+            }
+
+            // Respect per-manga Downloaded filter when "Skip filtered" is enabled
+            filtered = when (manga.downloadedFilterRaw) {
+                tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_DOWNLOADED ->
+                    filtered.filter { chapter ->
+                        downloadManager.isChapterDownloaded(
+                            chapter.name,
+                            chapter.scanlator,
+                            manga.ogTitle,
+                            manga.source,
+                        )
+                    }
+                tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_NOT_DOWNLOADED ->
+                    filtered.filter { chapter ->
+                        !downloadManager.isChapterDownloaded(
+                            chapter.name,
+                            chapter.scanlator,
+                            manga.ogTitle,
+                            manga.source,
+                        )
+                    }
+                else -> filtered
+            }
+        }
+        if (basePreferences.downloadedOnly().get()) {
+            filtered = filtered.filter {
                 downloadManager.isChapterDownloaded(
-                    chapter.name,
-                    chapter.scanlator,
+                    it.name,
+                    it.scanlator,
                     manga.ogTitle,
                     manga.source,
                 )
             }
-        } else {
-            chapters
         }
+        return filtered
+    }
+
+    /**
+     * Returns the list of chapters filtered for all reader filters, always including the current chapter.
+     */
+    fun getFilteredChaptersWithCurrent(): List<tachiyomi.domain.chapter.model.Chapter> {
+        val manga = manga
+        val filtered = getFilteredChapters().toMutableList()
+        val currentId = chapters.getOrNull(currentChapterIndex)?.id
+        if (currentId != null && filtered.none { it.id == currentId }) {
+            val current = chapters.find { it.id == currentId }
+            if (current != null &&
+                manga != null &&
+                (
+                    manga.downloadedFilterRaw == tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_DOWNLOADED ||
+                        basePreferences.downloadedOnly().get()
+                    )
+            ) {
+                // Only add if downloaded and not already in filtered
+                val isDownloaded = downloadManager.isChapterDownloaded(
+                    current.name,
+                    current.scanlator,
+                    manga.ogTitle,
+                    manga.source,
+                )
+                if (isDownloaded) {
+                    filtered.add(current)
+                }
+            } else if (current != null) {
+                filtered.add(current)
+            }
+        }
+        return filtered
     }
 }
