@@ -48,7 +48,6 @@ import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.source.PagePreviewSource
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.getNameForMangaInfo
-import eu.kanade.tachiyomi.source.isNovelSourceSafe
 import eu.kanade.tachiyomi.source.online.MetadataSource
 import eu.kanade.tachiyomi.source.online.all.MergedSource
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
@@ -1176,18 +1175,13 @@ class MangaScreenModel(
     private fun getUnreadChaptersSorted(source: Source): List<Chapter> {
         val manga = successState?.manga ?: return emptyList()
         val chapters = getUnreadChapters()
-        val isNovelSource = source.isNovelSourceSafe()
-        return if (isNovelSource) {
-            chapters.sortedBy { it.chapterNumber }
-        } else {
-            val chaptersSorted = chapters.sortedWith(getChapterSort(manga))
-                // SY -->
-                .let {
-                    if (manga.isEhBasedManga()) it.reversed() else it
-                }
-            // SY <--
-            if (manga.sortDescending()) chaptersSorted.reversed() else chaptersSorted
-        }
+        val chaptersSorted = chapters.sortedWith(getChapterSort(manga))
+            // SY -->
+            .let {
+                if (manga.isEhBasedManga()) it.reversed() else it
+            }
+        // SY <--
+        return if (manga.sortDescending()) chaptersSorted.reversed() else chaptersSorted
     }
 
     private fun startDownload(
@@ -1823,17 +1817,12 @@ class MangaScreenModel(
                 val unreadFilter = manga.unreadFilter
                 val downloadedFilter = manga.downloadedFilter
                 val bookmarkedFilter = manga.bookmarkedFilter
-                val isNovelSource = source.isNovelSourceSafe()
                 return asSequence()
                     .filter { (chapter) -> applyFilter(unreadFilter) { !chapter.read } }
                     .filter { (chapter) -> applyFilter(bookmarkedFilter) { chapter.bookmark } }
                     .filter { applyFilter(downloadedFilter) { it.isDownloaded || isLocalManga } }
                     .let { seq ->
-                        if (isNovelSource) {
-                            seq.sortedByDescending { it.chapter.chapterNumber }
-                        } else {
-                            seq.sortedWith { (chapter1), (chapter2) -> getChapterSort(manga).invoke(chapter1, chapter2) }
-                        }
+                        seq.sortedWith { (chapter1), (chapter2) -> getChapterSort(manga).invoke(chapter1, chapter2) }
                     }
             }
         }

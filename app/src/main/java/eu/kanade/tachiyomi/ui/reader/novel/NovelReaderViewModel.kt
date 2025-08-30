@@ -15,7 +15,6 @@ import eu.kanade.tachiyomi.data.connections.discord.ReaderData
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.DownloadProvider
 import eu.kanade.tachiyomi.source.CatalogueSource
-import eu.kanade.tachiyomi.source.isNovelSourceSafe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -226,13 +225,7 @@ class NovelReaderViewModel(
                     return@launch
                 }
                 val loadedChapters = getChaptersByMangaId.await(novelId)
-                val source = sourceManager.get(manga!!.source)
-                val isNovelSource = source?.isNovelSourceSafe() == true
-                val sortedChapters = if (isNovelSource) {
-                    loadedChapters.sortedBy { chapter -> chapter.chapterNumber }
-                } else {
-                    loadedChapters.sortedWith(getChapterSort(manga!!))
-                }
+                val sortedChapters = loadedChapters.sortedWith(getChapterSort(manga!!))
                 if (sortedChapters.isEmpty()) {
                     _state.value = NovelReaderState.Error("No chapters found")
                     return@launch
