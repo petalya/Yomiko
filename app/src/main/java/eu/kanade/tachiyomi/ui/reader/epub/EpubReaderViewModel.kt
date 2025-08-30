@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.data.connections.discord.ReaderData
+import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
 import eu.kanade.tachiyomi.util.epub.EpubChapter
 import eu.kanade.tachiyomi.util.epub.EpubContentBlock
 import eu.kanade.tachiyomi.util.epub.EpubDocument
@@ -60,6 +61,7 @@ class EpubReaderViewModel(
     private val epubPreferences = EpubReaderPreferences(Injekt.get())
     private val upsertHistory: UpsertHistory = Injekt.get()
     private val getIncognitoState: GetIncognitoState = Injekt.get()
+    private val readerPreferences: ReaderPreferences = Injekt.get()
 
     // Define a coroutine scope for the view model
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -245,8 +247,8 @@ class EpubReaderViewModel(
                         bookTitle = epub.title,
                         chapterTitle = epubChapter.title ?: ("Chapter " + (currentEpubChapterIndex + 1)),
                         contentBlocks = currentChapterBlocks,
-                        hasPrev = currentChapterIndex > 0,
-                        hasNext = currentChapterIndex < _chapters.value.size - 1,
+                        hasPrev = hasPrevFiltered(),
+                        hasNext = hasNextFiltered(),
                         progress = getSavedProgress(chapter.id),
                     )
                 } else {
@@ -254,8 +256,8 @@ class EpubReaderViewModel(
                         bookTitle = epub.title,
                         chapterTitle = epubChapter.title ?: ("Chapter " + (currentEpubChapterIndex + 1)),
                         content = epubChapter.content,
-                        hasPrev = currentChapterIndex > 0,
-                        hasNext = currentChapterIndex < _chapters.value.size - 1,
+                        hasPrev = hasPrevFiltered(),
+                        hasNext = hasNextFiltered(),
                         progress = getSavedProgress(chapter.id),
                     )
                 }
@@ -415,13 +417,20 @@ class EpubReaderViewModel(
      */
     fun prevChapter() {
         flushReadTimer()
-        if (currentChapterIndex > 0) {
-            currentChapterIndex--
-            currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
-            _state.value = EpubReaderState.Loading
-            coroutineScope.launch {
-                delay(600)
-                loadChapter(_chapters.value[currentChapterIndex])
+        val filtered = getFilteredChaptersWithCurrent()
+        val currentId = _chapters.value.getOrNull(currentChapterIndex)?.id
+        val filteredIndex = filtered.indexOfFirst { it.id == currentId }
+        if (filteredIndex > 0) {
+            val prev = filtered[filteredIndex - 1]
+            val newIndex = _chapters.value.indexOfFirst { it.id == prev.id }
+            if (newIndex != -1) {
+                currentChapterIndex = newIndex
+                currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
+                _state.value = EpubReaderState.Loading
+                coroutineScope.launch {
+                    delay(600)
+                    loadChapter(_chapters.value[currentChapterIndex])
+                }
             }
         }
     }
@@ -431,13 +440,20 @@ class EpubReaderViewModel(
      */
     fun nextChapter() {
         flushReadTimer()
-        if (currentChapterIndex < _chapters.value.size - 1) {
-            currentChapterIndex++
-            currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
-            _state.value = EpubReaderState.Loading
-            coroutineScope.launch {
-                delay(600)
-                loadChapter(_chapters.value[currentChapterIndex])
+        val filtered = getFilteredChaptersWithCurrent()
+        val currentId = _chapters.value.getOrNull(currentChapterIndex)?.id
+        val filteredIndex = filtered.indexOfFirst { it.id == currentId }
+        if (filteredIndex != -1 && filteredIndex < filtered.lastIndex) {
+            val next = filtered[filteredIndex + 1]
+            val newIndex = _chapters.value.indexOfFirst { it.id == next.id }
+            if (newIndex != -1) {
+                currentChapterIndex = newIndex
+                currentChapterId = _chapters.value.getOrNull(currentChapterIndex)?.id
+                _state.value = EpubReaderState.Loading
+                coroutineScope.launch {
+                    delay(600)
+                    loadChapter(_chapters.value[currentChapterIndex])
+                }
             }
         }
     }
@@ -513,6 +529,58 @@ class EpubReaderViewModel(
     private suspend fun refreshChapters() {
         val updatedChapters = getChaptersByMangaId.await(mangaId).sortedBy { it.sourceOrder }
         _chapters.value = updatedChapters
+    }
+
+    /**
+     * Returns chapters filtered by reader preferences and manga-level filters.
+     * For EPUB (local), downloaded-only is effectively a no-op (all chapters are local).
+     */
+    private fun getFilteredChapters(): List<Chapter> {
+        val manga = manga ?: return _chapters.value
+        var filtered = _chapters.value
+
+        // Skip read chapters
+        if (readerPreferences.skipRead().get()) {
+            filtered = filtered.filterNot { it.read }
+        }
+
+        // Apply manga screen filters when "Skip filtered" is enabled
+        if (readerPreferences.skipFiltered().get()) {
+            filtered = filtered.filterNot {
+                (manga.unreadFilterRaw == Manga.CHAPTER_SHOW_READ && !it.read) ||
+                    (manga.unreadFilterRaw == Manga.CHAPTER_SHOW_UNREAD && it.read) ||
+                    (manga.bookmarkedFilterRaw == Manga.CHAPTER_SHOW_BOOKMARKED && !it.bookmark) ||
+                    (manga.bookmarkedFilterRaw == Manga.CHAPTER_SHOW_NOT_BOOKMARKED && it.bookmark)
+            }
+        }
+
+        return filtered
+    }
+
+    /**
+     * Same as getFilteredChapters but ensures the current chapter is present.
+     */
+    private fun getFilteredChaptersWithCurrent(): List<Chapter> {
+        val filtered = getFilteredChapters().toMutableList()
+        val currentId = _chapters.value.getOrNull(currentChapterIndex)?.id
+        if (currentId != null && filtered.none { it.id == currentId }) {
+            _chapters.value.find { it.id == currentId }?.let { filtered.add(it) }
+        }
+        return filtered
+    }
+
+    private fun hasNextFiltered(): Boolean {
+        val filtered = getFilteredChaptersWithCurrent()
+        val currentId = _chapters.value.getOrNull(currentChapterIndex)?.id
+        val idx = filtered.indexOfFirst { it.id == currentId }
+        return idx != -1 && idx < filtered.lastIndex
+    }
+
+    private fun hasPrevFiltered(): Boolean {
+        val filtered = getFilteredChaptersWithCurrent()
+        val currentId = _chapters.value.getOrNull(currentChapterIndex)?.id
+        val idx = filtered.indexOfFirst { it.id == currentId }
+        return idx > 0
     }
 
     /**

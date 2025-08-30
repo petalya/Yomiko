@@ -60,7 +60,7 @@ class NovelReaderViewModel(
     private val downloadManager: DownloadManager = Injekt.get()
     private val downloadProvider: DownloadProvider = Injekt.get()
     private val basePreferences: eu.kanade.domain.base.BasePreferences = Injekt.get()
-    private val readerPreferences: eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences = uy.kohesive.injekt.Injekt.get()
+    private val readerPreferences: eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences = Injekt.get()
 
     internal val incognitoMode: Boolean by lazy { getIncognitoState.await(manga?.source, manga?.id) }
     internal var currentChapterIndex: Int = -1
@@ -292,7 +292,7 @@ class NovelReaderViewModel(
                 _state.value = NovelReaderState.Success(
                     novelTitle = manga.title,
                     chapterTitle = chapter.name,
-                    content = content ?: "Failed to load chapter content.",
+                    content = content,
                     hasNext = hasNextFiltered,
                     hasPrev = hasPrevFiltered,
                     progress = progress,
@@ -323,8 +323,8 @@ class NovelReaderViewModel(
             name.endsWith(".html") && it.isFile
         } ?: return null
         return try {
-            htmlFile.openInputStream()?.bufferedReader()?.use { reader -> reader.readText() }
-        } catch (e: Exception) {
+            htmlFile.openInputStream().bufferedReader().use { reader -> reader.readText() }
+        } catch (_: Exception) {
             null
         }
     }
@@ -367,7 +367,7 @@ class NovelReaderViewModel(
                     DiscordRPCService.setReaderActivity(
                         context = context,
                         readerData = ReaderData(
-                            incognitoMode = incognito,
+                            incognitoMode = false,
                             mangaId = latestManga.id,
                             mangaTitle = latestManga.title,
                             thumbnailUrl = coverUrl,
@@ -383,7 +383,7 @@ class NovelReaderViewModel(
     /**
      * Returns the list of chapters filtered for all reader filters (downloaded-only, skip read, skip filtered, etc.).
      */
-    fun getFilteredChapters(): List<tachiyomi.domain.chapter.model.Chapter> {
+    fun getFilteredChapters(): List<Chapter> {
         val manga = manga ?: return chapters
         var filtered = chapters
         if (readerPreferences.skipRead().get()) {
@@ -391,15 +391,15 @@ class NovelReaderViewModel(
         }
         if (readerPreferences.skipFiltered().get()) {
             filtered = filtered.filterNot {
-                (manga.unreadFilterRaw == tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_READ && !it.read) ||
-                    (manga.unreadFilterRaw == tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_UNREAD && it.read) ||
-                    (manga.bookmarkedFilterRaw == tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_BOOKMARKED && !it.bookmark) ||
-                    (manga.bookmarkedFilterRaw == tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_NOT_BOOKMARKED && it.bookmark)
+                (manga.unreadFilterRaw == Manga.CHAPTER_SHOW_READ && !it.read) ||
+                    (manga.unreadFilterRaw == Manga.CHAPTER_SHOW_UNREAD && it.read) ||
+                    (manga.bookmarkedFilterRaw == Manga.CHAPTER_SHOW_BOOKMARKED && !it.bookmark) ||
+                    (manga.bookmarkedFilterRaw == Manga.CHAPTER_SHOW_NOT_BOOKMARKED && it.bookmark)
             }
 
             // Respect per-manga Downloaded filter when "Skip filtered" is enabled
             filtered = when (manga.downloadedFilterRaw) {
-                tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_DOWNLOADED ->
+                Manga.CHAPTER_SHOW_DOWNLOADED ->
                     filtered.filter { chapter ->
                         downloadManager.isChapterDownloaded(
                             chapter.name,
@@ -408,7 +408,7 @@ class NovelReaderViewModel(
                             manga.source,
                         )
                     }
-                tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_NOT_DOWNLOADED ->
+                Manga.CHAPTER_SHOW_NOT_DOWNLOADED ->
                     filtered.filter { chapter ->
                         !downloadManager.isChapterDownloaded(
                             chapter.name,
@@ -436,7 +436,7 @@ class NovelReaderViewModel(
     /**
      * Returns the list of chapters filtered for all reader filters, always including the current chapter.
      */
-    fun getFilteredChaptersWithCurrent(): List<tachiyomi.domain.chapter.model.Chapter> {
+    fun getFilteredChaptersWithCurrent(): List<Chapter> {
         val manga = manga
         val filtered = getFilteredChapters().toMutableList()
         val currentId = chapters.getOrNull(currentChapterIndex)?.id
@@ -445,7 +445,7 @@ class NovelReaderViewModel(
             if (current != null &&
                 manga != null &&
                 (
-                    manga.downloadedFilterRaw == tachiyomi.domain.manga.model.Manga.CHAPTER_SHOW_DOWNLOADED ||
+                    manga.downloadedFilterRaw == Manga.CHAPTER_SHOW_DOWNLOADED ||
                         basePreferences.downloadedOnly().get()
                     )
             ) {
