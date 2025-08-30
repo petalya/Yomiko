@@ -12,6 +12,8 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
 import eu.kanade.tachiyomi.data.connections.discord.ReaderData
+import eu.kanade.tachiyomi.data.download.DownloadManager
+import eu.kanade.tachiyomi.data.download.DownloadProvider
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.isNovelSourceSafe
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +56,10 @@ class NovelReaderViewModel(
         private set
     var manga: Manga? = null
         private set
+
+    private val downloadManager: DownloadManager = Injekt.get()
+    private val downloadProvider: DownloadProvider = Injekt.get()
+    private val basePreferences: eu.kanade.domain.base.BasePreferences = Injekt.get()
 
     internal val incognitoMode: Boolean by lazy { getIncognitoState.await(manga?.source, manga?.id) }
     internal var currentChapterIndex: Int = -1
@@ -130,12 +136,54 @@ class NovelReaderViewModel(
         chapterReadStartTime = null
     }
 
+    /**
+     * Returns the index of the next downloaded chapter after the current one, or -1 if none.
+     */
+    private fun getNextDownloadedChapterIndex(): Int {
+        val manga = manga ?: return -1
+        for (i in (currentChapterIndex + 1) until chapters.size) {
+            val chapter = chapters[i]
+            if (downloadManager.isChapterDownloaded(
+                    chapter.name,
+                    chapter.scanlator,
+                    manga.ogTitle,
+                    manga.source,
+                )
+            ) {
+                return i
+            }
+        }
+        return -1
+    }
+
+    /**
+     * Returns the index of the previous downloaded chapter before the current one, or -1 if none.
+     */
+    private fun getPrevDownloadedChapterIndex(): Int {
+        val manga = manga ?: return -1
+        for (i in (currentChapterIndex - 1) downTo 0) {
+            val chapter = chapters[i]
+            if (downloadManager.isChapterDownloaded(
+                    chapter.name,
+                    chapter.scanlator,
+                    manga.ogTitle,
+                    manga.source,
+                )
+            ) {
+                return i
+            }
+        }
+        return -1
+    }
+
+    fun nextDownloadedChapterExists(): Boolean = getNextDownloadedChapterIndex() != -1
+    fun prevDownloadedChapterExists(): Boolean = getPrevDownloadedChapterIndex() != -1
+
     fun nextChapter() {
         flushReadTimer()
-        // For novels, we want to go to the next chapter in the sorted list
-        // which should be the next higher chapter number
-        if (currentChapterIndex < chapters.lastIndex) {
-            currentChapterIndex++
+        val nextIndex = getNextDownloadedChapterIndex()
+        if (nextIndex != -1) {
+            currentChapterIndex = nextIndex
             _state.value = NovelReaderState.Loading
             loadCurrentChapter(chapters)
             updateDiscordRPC()
@@ -144,10 +192,9 @@ class NovelReaderViewModel(
 
     fun prevChapter() {
         flushReadTimer()
-        // For novels, we want to go to the previous chapter in the sorted list
-        // which should be the previous lower chapter number
-        if (currentChapterIndex > 0) {
-            currentChapterIndex--
+        val prevIndex = getPrevDownloadedChapterIndex()
+        if (prevIndex != -1) {
+            currentChapterIndex = prevIndex
             _state.value = NovelReaderState.Loading
             loadCurrentChapter(chapters)
             updateDiscordRPC()
@@ -240,23 +287,35 @@ class NovelReaderViewModel(
             _state.value = NovelReaderState.Loading
             delay(600) // Reduced delay for skeleton UI
             try {
-                val source = sourceManager.get(manga.source) as? CatalogueSource
-                if (source == null) {
-                    _state.value = NovelReaderState.Error("Source not found")
-                    return@launch
+                val isDownloaded = downloadManager.isChapterDownloaded(
+                    chapter.name,
+                    chapter.scanlator,
+                    manga.ogTitle,
+                    manga.source,
+                )
+                var content: String? = null
+                if (isDownloaded) {
+                    content = readDownloadedNovelChapter(chapter, manga)
                 }
-                val sChapter = chapter.toSChapter()
-                val pages = source.getPageList(sChapter)
-                val content = if (pages.size == 1 && isHtmlOrTextContent(pages[0].imageUrl)) {
-                    pages[0].imageUrl ?: pages[0].url
-                } else {
-                    "This chapter is not in a supported novel format."
+                if (content == null) {
+                    val source = sourceManager.get(manga.source) as? CatalogueSource
+                    if (source == null) {
+                        _state.value = NovelReaderState.Error("Source not found")
+                        return@launch
+                    }
+                    val sChapter = chapter.toSChapter()
+                    val pages = source.getPageList(sChapter)
+                    content = if (pages.size == 1 && isHtmlOrTextContent(pages[0].imageUrl)) {
+                        pages[0].imageUrl ?: pages[0].url
+                    } else {
+                        "This chapter is not in a supported novel format."
+                    }
                 }
                 val progress = if (chapter.lastPageRead > 0) chapter.lastPageRead / 1000f else 0f
                 _state.value = NovelReaderState.Success(
                     novelTitle = manga.title,
                     chapterTitle = chapter.name,
-                    content = content,
+                    content = content ?: "Failed to load chapter content.",
                     hasNext = currentChapterIndex < chapters.lastIndex,
                     hasPrev = currentChapterIndex > 0,
                     progress = progress,
@@ -266,6 +325,30 @@ class NovelReaderViewModel(
             } catch (e: Exception) {
                 _state.value = NovelReaderState.Error(e.message ?: "Failed to load chapter content")
             }
+        }
+    }
+
+    /**
+     * Reads the downloaded novel chapter content from storage, if available.
+     * Returns the content as a String, or null if not found.
+     */
+    private fun readDownloadedNovelChapter(chapter: Chapter, manga: Manga): String? {
+        val source = sourceManager.get(manga.source) ?: return null
+        val chapterDir = downloadProvider.findChapterDir(
+            chapter.name,
+            chapter.scanlator,
+            manga.ogTitle,
+            source,
+        ) ?: return null
+        // Look for a .html file in the chapter directory
+        val htmlFile = chapterDir.listFiles()?.firstOrNull {
+            val name = it.name?.lowercase() ?: ""
+            name.endsWith(".html") && it.isFile
+        } ?: return null
+        return try {
+            htmlFile.openInputStream()?.bufferedReader()?.use { reader -> reader.readText() }
+        } catch (e: Exception) {
+            null
         }
     }
 
@@ -317,6 +400,25 @@ class NovelReaderViewModel(
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * Returns the list of chapters filtered for downloaded-only mode.
+     */
+    fun getFilteredChapters(): List<tachiyomi.domain.chapter.model.Chapter> {
+        val manga = manga ?: return chapters
+        return if (basePreferences.downloadedOnly().get()) {
+            chapters.filter { chapter ->
+                downloadManager.isChapterDownloaded(
+                    chapter.name,
+                    chapter.scanlator,
+                    manga.ogTitle,
+                    manga.source,
+                )
+            }
+        } else {
+            chapters
         }
     }
 }

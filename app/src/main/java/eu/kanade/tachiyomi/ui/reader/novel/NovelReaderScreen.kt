@@ -637,7 +637,7 @@ class NovelReaderScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // Previous chapter button
-                        val hasPrevChapter = viewModel.currentChapterIndex > 0
+                        val hasPrevChapter = viewModel.prevDownloadedChapterExists()
                         IconButton(
                             onClick = { viewModel.prevChapter() },
                             enabled = hasPrevChapter,
@@ -703,7 +703,7 @@ class NovelReaderScreen(
                             Icon(Icons.Filled.Settings, contentDescription = "Settings")
                         }
                         // Next chapter button
-                        val hasNextChapter = viewModel.currentChapterIndex < chapters.lastIndex
+                        val hasNextChapter = viewModel.nextDownloadedChapterExists()
                         IconButton(
                             onClick = { viewModel.nextChapter() },
                             enabled = hasNextChapter,
@@ -751,14 +751,17 @@ class NovelReaderScreen(
                         // Build ReaderChapterItem list
                         val currentChapterId = viewModel.currentChapterId
 
+                        // Use filtered chapters for downloaded-only mode
+                        val filteredChapters = viewModel.getFilteredChapters()
+
                         // Create a list of chapter items that will update when any dependency changes
                         val chapterItems = remember(
-                            chapters,
+                            filteredChapters,
                             currentChapterId,
                             downloadQueue,
                             downloadProgressMap,
                         ) {
-                            chapters.map { chapter ->
+                            filteredChapters.map { chapter ->
                                 val isCurrent = chapter.id == currentChapterId
                                 val activeDownload = downloadQueue.find { it.chapter.id == chapter.id }
                                 val progress = activeDownload?.progress ?: downloadProgressMap[chapter.id] ?: 0
