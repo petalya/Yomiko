@@ -225,7 +225,8 @@ class NovelReaderViewModel(
                     return@launch
                 }
                 val loadedChapters = getChaptersByMangaId.await(novelId)
-                val sortedChapters = loadedChapters.sortedWith(getChapterSort(manga!!))
+                // next/prev chapter navigation should be unaffected by sort settings
+                val sortedChapters = loadedChapters.sortedWith(getChapterSort(manga!!, sortDescending = false))
                 if (sortedChapters.isEmpty()) {
                     _state.value = NovelReaderState.Error("No chapters found")
                     return@launch

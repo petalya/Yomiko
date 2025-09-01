@@ -30,6 +30,7 @@ import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
+import eu.kanade.tachiyomi.source.isNovelSourceSafe
 import eu.kanade.tachiyomi.ui.browse.migration.advanced.design.PreMigrationScreen
 import eu.kanade.tachiyomi.ui.category.CategoryScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
@@ -40,6 +41,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.domain.chapter.model.Chapter
+import tachiyomi.domain.manga.interactor.GetManga
+import tachiyomi.domain.source.service.SourceManager
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 import uy.kohesive.injekt.Injekt
@@ -177,14 +180,14 @@ data object HistoryTab : Tab {
                         snackbarHostState.showSnackbar(context.stringResource(MR.strings.internal_error))
                     HistoryScreenModel.Event.HistoryCleared ->
                         snackbarHostState.showSnackbar(context.stringResource(MR.strings.clear_history_completed))
-                    is HistoryScreenModel.Event.OpenChapter -> openChapter(context, e.chapter)
+                    is HistoryScreenModel.Event.OpenChapter -> openChapter(context, navigator, e.chapter)
                 }
             }
         }
 
         LaunchedEffect(Unit) {
             resumeLastChapterReadEvent.receiveAsFlow().collectLatest {
-                openChapter(context, screenModel.getNextChapter())
+                openChapter(context, navigator, screenModel.getNextChapter())
             }
         }
 
@@ -193,12 +196,30 @@ data object HistoryTab : Tab {
         }
     }
 
-    private suspend fun openChapter(context: Context, chapter: Chapter?) {
-        if (chapter != null) {
-            val intent = ReaderActivity.newIntent(context, chapter.mangaId, chapter.id)
-            context.startActivity(intent)
-        } else {
+    private suspend fun openChapter(context: Context, navigator: Navigator, chapter: Chapter?) {
+        if (chapter == null) {
             snackbarHostState.showSnackbar(context.stringResource(MR.strings.no_next_chapter))
+            return
         }
+
+        // Determine reader type: EPUB by URL, Novel by source, else open image reader
+        val isEpub = chapter.url.contains(".epub") || chapter.url.contains("::")
+        if (isEpub) {
+            navigator.push(eu.kanade.tachiyomi.ui.reader.epub.EpubReaderScreen(chapter.mangaId, chapter.id, chapter.url))
+            return
+        }
+
+        val getManga = Injekt.get<GetManga>()
+        val manga = getManga.await(chapter.mangaId)
+        if (manga != null) {
+            val source = Injekt.get<SourceManager>().getOrStub(manga.source)
+            if (source.isNovelSourceSafe()) {
+                navigator.push(eu.kanade.tachiyomi.ui.reader.novel.NovelReaderScreen(chapter.mangaId, chapter.id))
+                return
+            }
+        }
+
+        val intent = ReaderActivity.newIntent(context, chapter.mangaId, chapter.id)
+        context.startActivity(intent)
     }
 }
