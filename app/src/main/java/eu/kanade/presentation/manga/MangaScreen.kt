@@ -453,7 +453,8 @@ private fun MangaScreenSmallImpl(
                 ExtendedFloatingActionButton(
                     text = {
                         val isReading = remember(state.chapters) {
-                            state.chapters.fastAny { it.chapter.read }
+                            // Show Resume if any chapter is read OR has some progress
+                            state.chapters.fastAny { it.chapter.read || it.chapter.lastPageRead > 0L }
                         }
                         Text(
                             text = stringResource(if (isReading) MR.strings.action_resume else MR.strings.action_start),
@@ -844,7 +845,8 @@ fun MangaScreenLargeImpl(
                 ExtendedFloatingActionButton(
                     text = {
                         val isReading = remember(state.chapters) {
-                            state.chapters.fastAny { it.chapter.read }
+                            // Show Resume if any chapter is read OR has progress
+                            state.chapters.fastAny { it.chapter.read || it.chapter.lastPageRead > 0L }
                         }
                         Text(
                             text = stringResource(

@@ -78,6 +78,7 @@ import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.lang.withNonCancellableContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.chapter.model.Chapter
+import tachiyomi.domain.chapter.service.getChapterSort
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.service.SourceManager
 import tachiyomi.i18n.MR
@@ -373,24 +374,63 @@ class MangaScreen(
     private fun continueReading(navigator: Navigator, context: Context, manga: Manga, source: Source, unreadChapter: Chapter?, chapters: List<Chapter>) {
         val isEpub = unreadChapter?.url?.contains(".epub") == true || unreadChapter?.url?.contains("::") == true
         if (isEpub) {
-            if (unreadChapter != null) {
+            // EPUB resume should use ascending order (oldest -> newest)
+            val ascending = chapters.sortedWith(getChapterSort(manga, sortDescending = false))
+            val lastInProgressIndex = ascending.indexOfLast { it.lastPageRead > 0 && !it.read }
+            val lastReadIndex = ascending.indexOfLast { it.read }
+            // If there's a read chapter AFTER an in-progress one, prioritize continuing it
+            val target = when {
+                ascending.isEmpty() -> null
+                lastReadIndex > lastInProgressIndex && lastReadIndex + 1 < ascending.size -> ascending[lastReadIndex + 1]
+                lastReadIndex > lastInProgressIndex && lastReadIndex + 1 >= ascending.size -> ascending.last()
+                lastInProgressIndex != -1 -> ascending[lastInProgressIndex]
+                lastReadIndex == -1 -> ascending.first()
+                lastReadIndex + 1 < ascending.size -> ascending[lastReadIndex + 1]
+                else -> ascending.last()
+            }
+            if (target != null) {
+                navigator.push(eu.kanade.tachiyomi.ui.reader.epub.EpubReaderScreen(manga.id, target.id, target.url))
+            } else if (unreadChapter != null) {
+                // Fallback
                 navigator.push(eu.kanade.tachiyomi.ui.reader.epub.EpubReaderScreen(manga.id, unreadChapter.id, unreadChapter.url))
             }
         } else if (source.isNovelSourceSafe()) {
-            // Find the chapter after the last read
-            val lastReadIndex = chapters.indexOfLast { it.read }
+            // For novels, always operate on ascending (oldest -> newest) order
+            val ascending = chapters.sortedWith(getChapterSort(manga, sortDescending = false))
+            val lastInProgressIndex = ascending.indexOfLast { it.lastPageRead > 0 && !it.read }
+            val lastReadIndex = ascending.indexOfLast { it.read }
             val nextChapter = when {
-                chapters.isEmpty() -> null
-                lastReadIndex == -1 -> chapters.first() // No chapters read, start from first
-                lastReadIndex + 1 < chapters.size -> chapters[lastReadIndex + 1] // Next after last read
-                else -> chapters.last() // All read, open last
+                ascending.isEmpty() -> null
+                lastReadIndex > lastInProgressIndex && lastReadIndex + 1 < ascending.size -> ascending[lastReadIndex + 1]
+                lastReadIndex > lastInProgressIndex && lastReadIndex + 1 >= ascending.size -> ascending.last()
+                lastInProgressIndex != -1 -> ascending[lastInProgressIndex]
+                lastReadIndex == -1 -> ascending.first()
+                lastReadIndex + 1 < ascending.size -> ascending[lastReadIndex + 1]
+                else -> ascending.last()
             }
             if (nextChapter != null) {
                 navigator.push(eu.kanade.tachiyomi.ui.reader.novel.NovelReaderScreen(manga.id, nextChapter.id))
             }
         } else {
-            if (unreadChapter == null) return
-            openChapter(context, unreadChapter)
+            // Standard manga: use ascending order and apply same prioritization rule
+            val ascending = chapters.sortedWith(getChapterSort(manga, sortDescending = false))
+            val lastInProgressIndex = ascending.indexOfLast { it.lastPageRead > 0 && !it.read }
+            val lastReadIndex = ascending.indexOfLast { it.read }
+            val target = when {
+                ascending.isEmpty() -> null
+                lastReadIndex > lastInProgressIndex && lastReadIndex + 1 < ascending.size -> ascending[lastReadIndex + 1]
+                lastReadIndex > lastInProgressIndex && lastReadIndex + 1 >= ascending.size -> ascending.last()
+                lastInProgressIndex != -1 -> ascending[lastInProgressIndex]
+                lastReadIndex == -1 -> ascending.first()
+                lastReadIndex + 1 < ascending.size -> ascending[lastReadIndex + 1]
+                else -> ascending.last()
+            }
+            if (target != null) {
+                openChapter(context, target)
+            } else if (unreadChapter != null) {
+                // Fallback to previously computed next unread
+                openChapter(context, unreadChapter)
+            }
         }
     }
 
