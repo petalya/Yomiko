@@ -1,5 +1,5 @@
 name: 🐞 Issue report
-description: Report an issue in TachiyomiSY
+description: Report an issue in Yomiko
 labels: [Bug]
 body:
 
@@ -48,12 +48,12 @@ body:
         You can upload the crash log file as an attachment, or paste the crash logs in plain text if needed.
 
   - type: input
-    id: tachiyomisy-version
+    id: yomiko-version
     attributes:
-      label: TachiyomiSY version
-      description: You can find your TachiyomiSY version in **More → About**.
+      label: Yomiko version
+      description: You can find your Yomiko version in **More → About**.
       placeholder: |
-        Example: "1.12.0"
+        Example: "1.7.3"
     validations:
       required: true
 
@@ -96,7 +96,7 @@ body:
           required: true
         - label: I have gone through the [FAQ](https://mihon.app/docs/faq/general) and [troubleshooting guide](https://mihon.app/docs/guides/troubleshooting/).
           required: true
-        - label: I have updated the app to version **[1.12.0](https://github.com/jobobby04/tachiyomisy/releases/latest)**.
+        - label: I have updated the app to the latest version from the [releases page](https://github.com/petalya/Yomiko/releases/latest).
           required: true
         - label: I have filled out all of the requested information in this form, including specific version numbers.
           required: true
