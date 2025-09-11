@@ -22,6 +22,10 @@ jobs:
 
       - name: Set up gradle
         uses: gradle/actions/setup-gradle@v4
+        
+      - name: Write google-services.json
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > app/google-services.json
 
       - name: Build app
         run: ./gradlew spotlessCheck assembleDevDebug
