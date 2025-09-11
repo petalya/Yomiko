@@ -1,7 +1,14 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:base"],
-  "labels": ["Dependencies"],
-  "includePaths": [".github/workflows/*", "gradle/sy.versions.toml"],
-  "semanticCommits": "disabled"
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+  ],
+  labels: [
+    'Dependencies',
+  ],
+  includePaths: [
+    '.github/workflows/*',
+    'gradle/sy.versions.toml',
+  ],
+  semanticCommits: 'disabled',
 }
