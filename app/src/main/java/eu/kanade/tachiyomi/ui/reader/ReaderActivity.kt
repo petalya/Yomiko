@@ -56,6 +56,8 @@ import dev.chrisbanes.insetter.applyInsetter
 import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.connections.service.ConnectionsPreferences
 import eu.kanade.domain.manga.model.readingMode
+import eu.kanade.domain.track.model.AutoRereadResetMode
+import eu.kanade.domain.track.service.TrackPreferences
 import eu.kanade.presentation.reader.ChapterListDialog
 import eu.kanade.presentation.reader.DisplayRefreshHost
 import eu.kanade.presentation.reader.OrientationSelectDialog
@@ -668,6 +670,35 @@ class ReaderActivity : BaseActivity() {
                     },
                     title = { Text(text = stringResource(SYMR.strings.eh_retry_all_help)) },
                     text = { Text(text = stringResource(SYMR.strings.eh_retry_all_help_message)) },
+                )
+                ReaderViewModel.Dialog.RereadPrompt -> AlertDialog(
+                    onDismissRequest = viewModel::cancelRereadPrompt,
+                    confirmButton = {
+                        TextButton(onClick = { viewModel.confirmStartReread() }) {
+                            Text(text = stringResource(MR.strings.action_ok))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = viewModel::cancelRereadPrompt) {
+                            Text(text = stringResource(MR.strings.action_cancel))
+                        }
+                    },
+                    title = { Text(text = stringResource(MR.strings.reread_prompt_title)) },
+                    text = {
+                        val trackPreferences = remember { Injekt.get<TrackPreferences>() }
+                        val resetMode = trackPreferences.autoRereadResetMode().get()
+                        val chapterLabel = if (resetMode == AutoRereadResetMode.RESET_TO_ZERO) {
+                            stringResource(MR.strings.chapter_label, "0")
+                        } else {
+                            val chapterNum = state.currentChapter?.chapter?.chapter_number
+                            chapterNum?.let {
+                                val intPart = it.toInt()
+                                val display = if (it == intPart.toFloat()) intPart.toString() else it.toString()
+                                stringResource(MR.strings.chapter_label, display)
+                            } ?: stringResource(MR.strings.this_chapter_label)
+                        }
+                        Text(text = stringResource(MR.strings.reread_prompt_body, chapterLabel))
+                    },
                 )
                 // SY <--
                 null -> {}

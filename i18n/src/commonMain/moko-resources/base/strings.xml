@@ -524,12 +524,19 @@
     <string name="tracking_guide">Tracking guide</string>
     <string name="pref_auto_update_manga_sync">Update progress after reading</string>
     <string name="pref_auto_update_manga_on_mark_read">Update progress when marked as read</string>
+    <string name="pref_auto_reread_behavior">Auto reread</string>
     <string name="services">Trackers</string>
     <string name="tracking_info">One-way sync to update the chapter progress in external tracker services. Set up tracking for individual entries from their tracking button.</string>
     <string name="enhanced_services">Enhanced trackers</string>
     <string name="enhanced_services_not_installed">Available but source not installed: %s</string>
     <string name="enhanced_tracking_info">Provides enhanced features for specific sources. Entries are automatically tracked when added to your library.</string>
     <string name="track_activity_name">Tracker login</string>
+
+    <!-- Reread prompt -->
+    <string name="reread_prompt_title">Start rereading?</string>
+    <string name="reread_prompt_body">Reset progress to %1$s and set status to Rereading?\n(You can always change this in Settings &gt; Tracking &gt; Auto reread)</string>
+    <string name="chapter_label">Chapter %s</string>
+    <string name="this_chapter_label">this chapter</string>
 
     <!-- Connections section -->
     <string name="special_services">Special Services</string>
@@ -1030,4 +1037,10 @@
 
     <!-- Notes screen -->
     <string name="notes_placeholder">Enjoyed the part where…</string>
+
+    <!-- Auto Reread settings -->
+    <string name="pref_auto_reread_behaviour_title">Auto reread behaviour</string>
+    <string name="pref_auto_reread_reset_to">Reset to</string>
+    <string name="pref_auto_reread_reset_to_zero">Reset to 0</string>
+    <string name="pref_auto_reread_reset_to_current_chapter">Reset to current chapter</string>
 </resources>
