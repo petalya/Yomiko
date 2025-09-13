@@ -34,42 +34,38 @@ fun BatteryTimeBar(
     var batteryPct by remember { mutableStateOf(-1) }
 
     if (showBatteryAndTime) {
-        DisposableEffect(showBatteryAndTime) {
-            if (!showBatteryAndTime) {
-                onDispose { }
-            } else {
-                val timeReceiver = object : android.content.BroadcastReceiver() {
-                    override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
-                        timeText = LocalTime.now().format(timeFormatter)
-                    }
+        DisposableEffect(showBatteryAndTime, ctx) {
+            val timeReceiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                    timeText = LocalTime.now().format(timeFormatter)
                 }
-                val batteryReceiver = object : android.content.BroadcastReceiver() {
-                    override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
-                        val level = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
-                        val scale = intent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
-                        batteryPct = if (level >= 0 && scale > 0) ((level.toFloat() / scale) * 100).toInt().coerceIn(0, 100) else -1
-                    }
-                }
-
-                // Initial sticky battery intent
-                ctx.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))?.let { initial ->
-                    val level = initial.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
-                    val scale = initial.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+            }
+            val batteryReceiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                    val level = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                    val scale = intent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
                     batteryPct = if (level >= 0 && scale > 0) ((level.toFloat() / scale) * 100).toInt().coerceIn(0, 100) else -1
                 }
+            }
 
-                // Register receivers
-                ctx.registerReceiver(timeReceiver, android.content.IntentFilter(android.content.Intent.ACTION_TIME_TICK))
-                ctx.registerReceiver(batteryReceiver, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            // Initial sticky battery intent
+            ctx.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))?.let { initial ->
+                val level = initial.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+                val scale = initial.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+                batteryPct = if (level >= 0 && scale > 0) ((level.toFloat() / scale) * 100).toInt().coerceIn(0, 100) else -1
+            }
 
-                onDispose {
-                    try {
-                        ctx.unregisterReceiver(timeReceiver)
-                    } catch (_: Exception) {}
-                    try {
-                        ctx.unregisterReceiver(batteryReceiver)
-                    } catch (_: Exception) {}
-                }
+            // Register receivers
+            ctx.registerReceiver(timeReceiver, android.content.IntentFilter(android.content.Intent.ACTION_TIME_TICK))
+            ctx.registerReceiver(batteryReceiver, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+
+            onDispose {
+                try {
+                    ctx.unregisterReceiver(timeReceiver)
+                } catch (_: Exception) {}
+                try {
+                    ctx.unregisterReceiver(batteryReceiver)
+                } catch (_: Exception) {}
             }
         }
     }
