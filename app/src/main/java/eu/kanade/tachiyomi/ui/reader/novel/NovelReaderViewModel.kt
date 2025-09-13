@@ -17,6 +17,8 @@ import eu.kanade.tachiyomi.data.download.DownloadProvider
 import eu.kanade.tachiyomi.source.CatalogueSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,12 +43,16 @@ class NovelReaderViewModel(
     private val novelId: Long,
     private val initialChapterId: Long,
 ) : ScreenModel {
+    // Model-scoped coroutine scope
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val chapterRepo: ChapterRepository = Injekt.get()
     private val getManga: GetManga = Injekt.get()
     private val getChaptersByMangaId: GetChaptersByMangaId = Injekt.get()
     internal val sourceManager: SourceManager = Injekt.get()
     private val upsertHistory: UpsertHistory = Injekt.get()
     private val getIncognitoState: GetIncognitoState = Injekt.get()
+    private val connectionsPreferences: ConnectionsPreferences = Injekt.get()
+    private val appContext: Context = Injekt.get()
     private val updateChapter: UpdateChapter = Injekt.get()
     private val _state = MutableStateFlow<NovelReaderState>(NovelReaderState.Loading)
     val state: StateFlow<NovelReaderState> = _state.asStateFlow()
@@ -61,7 +67,7 @@ class NovelReaderViewModel(
     private val basePreferences: eu.kanade.domain.base.BasePreferences = Injekt.get()
     private val readerPreferences: eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences = Injekt.get()
 
-    internal val incognitoMode: Boolean by lazy { getIncognitoState.await(manga?.source, manga?.id) }
+    internal var incognitoMode: Boolean = false
     internal var currentChapterIndex: Int = -1
     val currentChapterId: Long?
         get() = chapters.getOrNull(currentChapterIndex)?.id
@@ -79,7 +85,7 @@ class NovelReaderViewModel(
         if (kotlin.math.abs(progress - lastSavedProgress) < 0.001) return
         lastSavedProgress = progress
         saveProgressJob?.cancel()
-        saveProgressJob = CoroutineScope(Dispatchers.IO).launch {
+        saveProgressJob = scope.launch {
             delay(500) // 0.5s debounce
             val percentInt = (progress * 1000).toLong()
             if (!incognitoMode) {
@@ -112,7 +118,7 @@ class NovelReaderViewModel(
             this[idx] = chapters[idx].copy(bookmark = newValue)
         }
         if (!incognitoMode) {
-            CoroutineScope(Dispatchers.IO).launch {
+            scope.launch {
                 chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapter.id, bookmark = newValue))
             }
         }
@@ -137,46 +143,41 @@ class NovelReaderViewModel(
     }
 
     fun nextChapter() {
-        flushReadTimer()
         val filteredChapters = getFilteredChaptersWithCurrent()
         val currentId = chapters.getOrNull(currentChapterIndex)?.id
         val filteredIndex = filteredChapters.indexOfFirst { it.id == currentId }
         if (filteredIndex != -1 && filteredIndex < filteredChapters.lastIndex) {
             val nextChapter = filteredChapters[filteredIndex + 1]
             val newIndex = chapters.indexOfFirst { it.id == nextChapter.id }
-            if (newIndex != -1) {
-                currentChapterIndex = newIndex
-                _state.value = NovelReaderState.Loading
-                loadCurrentChapter(chapters)
-                updateDiscordRPC()
-            }
+            if (newIndex != -1) jumpToIndex(newIndex)
         }
     }
 
     fun prevChapter() {
-        flushReadTimer()
         val filteredChapters = getFilteredChaptersWithCurrent()
         val currentId = chapters.getOrNull(currentChapterIndex)?.id
         val filteredIndex = filteredChapters.indexOfFirst { it.id == currentId }
         if (filteredIndex > 0) {
             val prevChapter = filteredChapters[filteredIndex - 1]
             val newIndex = chapters.indexOfFirst { it.id == prevChapter.id }
-            if (newIndex != -1) {
-                currentChapterIndex = newIndex
-                _state.value = NovelReaderState.Loading
-                loadCurrentChapter(chapters)
-                updateDiscordRPC()
-            }
+            if (newIndex != -1) jumpToIndex(newIndex)
         }
     }
-    fun jumpToChapter(index: Int) {
+    private fun jumpToIndex(newIndex: Int) {
         flushReadTimer()
-        if (index in chapters.indices) {
-            currentChapterIndex = index
+        if (newIndex in chapters.indices) {
+            currentChapterIndex = newIndex
             _state.value = NovelReaderState.Loading
             loadCurrentChapter(chapters)
-            updateDiscordRPC()
+            recomputeFilteredChaptersWithCurrent()
         }
+    }
+    fun jumpToChapterId(id: Long) {
+        val newIndex = chapters.indexOfFirst { it.id == id }
+        if (newIndex != -1) jumpToIndex(newIndex)
+    }
+    fun jumpToChapter(index: Int) {
+        jumpToIndex(index)
     }
 
     fun markCurrentChapterReadIfNeeded() {
@@ -201,7 +202,7 @@ class NovelReaderViewModel(
                 this[idx] = chapters[idx].copy(read = newRead)
             }
             if (!incognitoMode) {
-                CoroutineScope(Dispatchers.IO).launch {
+                scope.launch {
                     chapterRepo.update(tachiyomi.domain.chapter.model.ChapterUpdate(id = chapter.id, read = newRead))
                 }
             }
@@ -210,20 +211,22 @@ class NovelReaderViewModel(
     private fun recordHistory(chapterId: Long, sessionReadDuration: Long = 0L) {
         if (incognitoMode) return
         val chapter = chapters.find { it.id == chapterId } ?: return
-        CoroutineScope(Dispatchers.IO).launch {
+        scope.launch {
             val now = java.util.Date()
             updateChapter.await(chapter.toChapterUpdate())
             upsertHistory.await(HistoryUpdate(chapterId, now, sessionReadDuration))
         }
     }
     init {
-        CoroutineScope(Dispatchers.IO).launch {
+        scope.launch {
             try {
                 manga = getManga.await(novelId)
                 if (manga == null) {
                     _state.value = NovelReaderState.Error("Novel not found")
                     return@launch
                 }
+                // Compute incognito after manga is loaded
+                incognitoMode = getIncognitoState.await(manga!!.source, manga!!.id)
                 val loadedChapters = getChaptersByMangaId.await(novelId)
                 // next/prev chapter navigation should be unaffected by sort settings
                 val sortedChapters = loadedChapters.sortedWith(getChapterSort(manga!!, sortDescending = false))
@@ -234,6 +237,8 @@ class NovelReaderViewModel(
                 currentChapterIndex = sortedChapters.indexOfFirst { chapter -> chapter.id == initialChapterId }.takeIf { idx -> idx != -1 } ?: 0
                 chapters = sortedChapters
                 loadCurrentChapter(sortedChapters)
+                // Also precompute filtered list
+                recomputeFilteredChaptersWithCurrent()
             } catch (e: Exception) {
                 _state.value = NovelReaderState.Error(e.message ?: "Unknown error")
             }
@@ -247,7 +252,7 @@ class NovelReaderViewModel(
             _state.value = NovelReaderState.Error("Chapter not found")
             return
         }
-        CoroutineScope(Dispatchers.IO).launch {
+        scope.launch {
             _state.value = NovelReaderState.Loading
             delay(600) // Reduced delay for skeleton UI
             try {
@@ -332,11 +337,9 @@ class NovelReaderViewModel(
     }
 
     private fun updateDiscordRPC() {
-        val connectionsPreferences = Injekt.get<ConnectionsPreferences>()
         val chapter = chapters.getOrNull(currentChapterIndex)
-        val context = Injekt.get<Context>()
         val chapterNumberFloat = chapter?.chapterNumber?.toFloat() ?: -1f
-        CoroutineScope(Dispatchers.IO).launch {
+        scope.launch {
             val latestManga = getManga.await(novelId)
             val mangaCover = latestManga?.asMangaCover()
             val coverUrl = mangaCover?.url
@@ -346,20 +349,20 @@ class NovelReaderViewModel(
                 if (incognito) {
                     // Show simplified status when incognito mode is enabled
                     DiscordRPCService.setScreen(
-                        context = context,
+                        context = appContext,
                         discordScreen = DiscordScreen.MANGA,
                         readerData = ReaderData(
                             incognitoMode = true,
                             mangaId = latestManga.id,
-                            mangaTitle = context.getString(R.string.novel_incognito_title),
+                            mangaTitle = appContext.getString(R.string.novel_incognito_title),
                             thumbnailUrl = coverUrl,
                             chapterNumber = Pair(-1f, -1),
-                            chapterTitle = context.getString(R.string.novel_incognito_subtitle),
+                            chapterTitle = appContext.getString(R.string.novel_incognito_subtitle),
                         ),
                     )
                 } else {
                     DiscordRPCService.setReaderActivity(
-                        context = context,
+                        context = appContext,
                         readerData = ReaderData(
                             incognitoMode = false,
                             mangaId = latestManga.id,
@@ -425,6 +428,22 @@ class NovelReaderViewModel(
             }
         }
         return filtered
+    }
+
+    // Expose a flow for filtered chapters including current to avoid doing work in composition
+    private val _filteredChaptersWithCurrent = MutableStateFlow<List<Chapter>>(emptyList())
+    val filteredChaptersWithCurrent: StateFlow<List<Chapter>> = _filteredChaptersWithCurrent.asStateFlow()
+
+    private fun recomputeFilteredChaptersWithCurrent() {
+        scope.launch {
+            val result = getFilteredChaptersWithCurrent()
+            _filteredChaptersWithCurrent.value = result
+        }
+    }
+
+    override fun onDispose() {
+        super.onDispose()
+        scope.cancel()
     }
 
     /**

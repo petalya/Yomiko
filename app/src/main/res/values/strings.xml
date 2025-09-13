@@ -7,4 +7,17 @@
     <string name="novel_incognito_subtitle">Novel</string>
     <string name="epub_incognito_title">Reading an EPUB</string>
     <string name="epub_incognito_subtitle">Enjoying a good novel..</string>
+    <!-- Novel Reader Screen -->
+    <string name="novel_default_title">Novel</string>
+    <string name="chapter_default_title">Chapter</string>
+    <string name="desc_previous_chapter">Previous chapter</string>
+    <string name="desc_chapter_list">Chapter list</string>
+    <string name="desc_open_in_webview">Open in WebView</string>
+    <string name="desc_scroll_to_top">Scroll to top</string>
+    <string name="desc_settings">Settings</string>
+    <string name="desc_next_chapter">Next chapter</string>
+    <string name="label_finished_chapter">Finished: %1$s</string>
+    <string name="label_next_chapter">Next: %1$s</string>
+    <string name="msg_no_url_for_chapter">No URL available for this chapter</string>
+    <string name="msg_could_not_open_chapter">Could not open chapter</string>
 </resources>

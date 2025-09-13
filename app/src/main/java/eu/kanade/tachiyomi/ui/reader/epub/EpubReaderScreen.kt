@@ -43,19 +43,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material.icons.filled.FormatListNumbered
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -73,13 +61,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -109,13 +95,15 @@ import com.valentinilk.shimmer.ShimmerBounds
 import com.valentinilk.shimmer.rememberShimmer
 import com.valentinilk.shimmer.shimmer
 import eu.kanade.presentation.components.AdaptiveSheet
-import eu.kanade.presentation.components.AppBar
-import eu.kanade.presentation.components.AppBarTitle
 import eu.kanade.presentation.manga.components.MangaChapterListItem
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.model.Download
+import eu.kanade.tachiyomi.ui.reader.common.BatteryTimeBar
+import eu.kanade.tachiyomi.ui.reader.common.ReaderBottomBar
+import eu.kanade.tachiyomi.ui.reader.common.ReaderProgressSlider
+import eu.kanade.tachiyomi.ui.reader.common.ReaderTopBar
 import eu.kanade.tachiyomi.ui.reader.setting.NovelReaderSettingsScreenModel
 import eu.kanade.tachiyomi.ui.reader.viewer.ReaderPageImageView
 import eu.kanade.tachiyomi.util.epub.EpubTableOfContentsEntry
@@ -128,8 +116,6 @@ import tachiyomi.domain.library.model.ChapterSwipeAction
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.ByteArrayOutputStream
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 
 @Suppress("NAME_SHADOWING")
 class EpubReaderScreen(
@@ -413,58 +399,15 @@ class EpubReaderScreen(
                         .height(progressBarHeight)
                         .background(backgroundColor),
                 ) {
-                    if (readerSettings.showBatteryAndTime) {
-                        val ctx = LocalContext.current
-                        val timeFormatter = remember { DateTimeFormatter.ofPattern("h:mm a") }
-                        var timeText by remember { mutableStateOf(LocalTime.now().format(timeFormatter)) }
-                        var batteryPct by remember { mutableStateOf(-1) }
-                        // Update once a minute
-                        LaunchedEffect(readerSettings.showBatteryAndTime) {
-                            while (readerSettings.showBatteryAndTime) {
-                                timeText = LocalTime.now().format(timeFormatter)
-                                val intent = android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED)
-                                val status = ctx.registerReceiver(null, intent)
-                                val level = status?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
-                                val scale = status?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
-                                batteryPct = if (level >= 0 && scale > 0) ((level.toFloat() / scale) * 100).toInt().coerceIn(0, 100) else -1
-                                kotlinx.coroutines.delay(3_000L)
-                            }
-                        }
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            // Center: progress percent stays fixed center
-                            Text(
-                                text = "$progressPercent%",
-                                color = percentTextColor,
-                                style = MaterialTheme.typography.labelLarge,
-                                modifier = Modifier.align(Alignment.Center),
-                            )
-                            // Left: Battery percentage
-                            Text(
-                                text = if (batteryPct >= 0) "$batteryPct%" else "--%",
-                                color = percentTextColor,
-                                style = MaterialTheme.typography.labelLarge,
-                                modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp),
-                            )
-                            // Right: current time
-                            Text(
-                                text = timeText,
-                                color = percentTextColor,
-                                style = MaterialTheme.typography.labelLarge,
-                                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
-                            )
-                        }
-                    } else {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "$progressPercent%",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = percentTextColor,
-                            )
-                        }
-                    }
+                    BatteryTimeBar(
+                        progressPercent = progressPercent,
+                        showBatteryAndTime = readerSettings.showBatteryAndTime,
+                        textColor = percentTextColor,
+                        modifier = Modifier.fillMaxSize(),
+                        backgroundColor = backgroundColor,
+                    )
                 }
             }
-
             // Main content area with fade transition
             AnimatedContent(
                 targetState = state,
@@ -547,39 +490,19 @@ class EpubReaderScreen(
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.TopCenter),
             ) {
-                when (state) {
-                    is EpubReaderState.ReflowSuccess -> state as EpubReaderState.ReflowSuccess
-                    is EpubReaderState.HtmlSuccess -> state as EpubReaderState.HtmlSuccess
-                    else -> return@AnimatedVisibility
+                val (titleText, subtitleText) = when (val s = state) {
+                    is EpubReaderState.ReflowSuccess -> s.bookTitle to s.chapterTitle
+                    is EpubReaderState.HtmlSuccess -> s.bookTitle to s.chapterTitle
+                    else -> "EPUB Reader" to null
                 }
-
-                AppBar(
-                    titleContent = {
-                        when (val currentState = state) {
-                            is EpubReaderState.ReflowSuccess -> {
-                                AppBarTitle(title = currentState.bookTitle, subtitle = currentState.chapterTitle)
-                            }
-                            is EpubReaderState.HtmlSuccess -> {
-                                AppBarTitle(title = currentState.bookTitle, subtitle = currentState.chapterTitle)
-                            }
-                            else -> {
-                                AppBarTitle(title = "EPUB Reader")
-                            }
-                        }
-                    },
-                    navigateUp = { navigator?.pop() },
-                    actions = {
-                        val currentChapter = viewModel.chapters.find { it.id == viewModel.currentChapterId }
-                        IconButton(onClick = {
-                            currentChapter?.let { viewModel.toggleBookmark(it) }
-                        }) {
-                            val isBookmarked = currentChapter?.bookmark == true
-                            Icon(
-                                imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
-                                contentDescription = if (isBookmarked) "Remove bookmark" else "Add bookmark",
-                            )
-                        }
-                    },
+                val currentChapter = viewModel.chapters.find { it.id == viewModel.currentChapterId }
+                val bookmarked = currentChapter?.bookmark == true
+                ReaderTopBar(
+                    title = titleText,
+                    subtitle = subtitleText,
+                    bookmarked = bookmarked,
+                    onBack = { navigator?.pop() },
+                    onToggleBookmark = { currentChapter?.let { viewModel.toggleBookmark(it) } },
                     backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                 )
             }
@@ -588,7 +511,7 @@ class EpubReaderScreen(
             var sliderInUse by remember { mutableStateOf(false) }
             // Measure bottom bar height for dynamic slider padding
             val density = LocalDensity.current
-            var bottomBarHeightDp by remember { mutableStateOf(72.dp) }
+            var bottomBarHeightDp by remember { mutableStateOf(52.dp) }
             val sliderExtraBottomPadding = 16.dp
             AnimatedVisibility(
                 visible = (barsVisible || sliderInUse) && (state !is EpubReaderState.Loading),
@@ -597,26 +520,24 @@ class EpubReaderScreen(
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
                 val maxScroll = scrollState.maxValue
+                val textColor = when (readerSettings.theme) {
+                    ReaderTheme.LIGHT -> Color(0xFF222222)
+                    ReaderTheme.SEPIA -> Color(0xFF6B4F1D)
+                    ReaderTheme.MINT -> Color(0xFF2B3A35)
+                    ReaderTheme.BLUE_GRAY -> Color(0xFFE6E6F2)
+                    ReaderTheme.BLACK -> Color(0xFFECECEC)
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 16.dp, end = 16.dp, top = 8.dp)
                         .navigationBarsPadding()
-                        .padding(bottom = bottomBarHeightDp + sliderExtraBottomPadding), // above bottom bar dynamically with slight offset
+                        .padding(bottom = bottomBarHeightDp + sliderExtraBottomPadding),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val percent = (sliderProgress.floatValue * 100).toInt()
-                    val textColor = when (readerSettings.theme) {
-                        ReaderTheme.LIGHT -> Color(0xFF222222)
-                        ReaderTheme.SEPIA -> Color(0xFF6B4F1D)
-                        ReaderTheme.MINT -> Color(0xFF2B3A35)
-                        ReaderTheme.BLUE_GRAY -> Color(0xFFE6E6F2)
-                        ReaderTheme.BLACK -> Color(0xFFECECEC)
-                    }
-                    Text("$percent%", modifier = Modifier.padding(end = 8.dp), color = textColor)
-                    Slider(
-                        value = sliderProgress.floatValue,
-                        onValueChange = { newProgress ->
+                    ReaderProgressSlider(
+                        progress = sliderProgress.floatValue,
+                        onProgressChange = { newProgress ->
                             sliderInUse = true
                             sliderProgress.floatValue = newProgress
                             if (maxScroll > 0) {
@@ -624,13 +545,10 @@ class EpubReaderScreen(
                                 coroutineScope.launch { scrollState.scrollTo(target) }
                             }
                         },
-                        onValueChangeFinished = {
-                            sliderInUse = false
-                        },
-                        valueRange = 0f..1f,
-                        modifier = Modifier.weight(1f),
+                        onProgressChangeFinished = { sliderInUse = false },
+                        percentTextColor = textColor,
+                        modifier = Modifier,
                     )
-                    Text("100%", modifier = Modifier.padding(start = 8.dp), color = textColor)
                 }
             }
 
@@ -647,102 +565,26 @@ class EpubReaderScreen(
                     else -> return@AnimatedVisibility
                 }
 
-                Surface(
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                    shape = RectangleShape,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .padding(8.dp)
-                            .onGloballyPositioned { layoutCoordinates ->
-                                bottomBarHeightDp = with(density) { layoutCoordinates.size.height.toDp() }
-                            },
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        // Next chapter button
-                        IconButton(
-                            onClick = { viewModel.nextChapter() },
-                            enabled = when (s) {
-                                is EpubReaderState.ReflowSuccess -> s.hasNext
-                                is EpubReaderState.HtmlSuccess -> s.hasNext
-                                else -> false
-                            },
-                            modifier = Modifier.alpha(
-                                if (when (s) {
-                                        is EpubReaderState.ReflowSuccess -> s.hasNext
-                                        is EpubReaderState.HtmlSuccess -> s.hasNext
-                                        else -> false
-                                    }
-                                ) {
-                                    1f
-                                } else {
-                                    0.3f
-                                },
-                            ),
-                        ) {
-                            val hasNext = when (s) {
-                                is EpubReaderState.ReflowSuccess -> s.hasNext
-                                is EpubReaderState.HtmlSuccess -> s.hasNext
-                                else -> false
-                            }
-                            Icon(
-                                Icons.Filled.SkipPrevious,
-                                contentDescription = "Next chapter",
-                                tint = if (hasNext) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                            )
-                        }
-                        IconButton(onClick = { showChapterListSheet.value = true }) {
-                            Icon(Icons.Filled.FormatListNumbered, contentDescription = "Chapter list")
-                        }
-                        IconButton(
-                            onClick = {
-                                // Scroll to top
-                                coroutineScope.launch { scrollState.animateScrollTo(0) }
-                            },
-                        ) {
-                            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Scroll to top")
-                        }
-                        IconButton(onClick = { showSettingsSheet.value = true }) {
-                            Icon(Icons.Filled.Settings, contentDescription = "Settings")
-                        }
-                        // Previous chapter button (moved to the right)
-                        IconButton(
-                            onClick = { viewModel.prevChapter() },
-                            enabled = when (s) {
-                                is EpubReaderState.ReflowSuccess -> s.hasPrev
-                                is EpubReaderState.HtmlSuccess -> s.hasPrev
-                                else -> false
-                            },
-                            modifier = Modifier.alpha(
-                                if (when (s) {
-                                        is EpubReaderState.ReflowSuccess -> s.hasPrev
-                                        is EpubReaderState.HtmlSuccess -> s.hasPrev
-                                        else -> false
-                                    }
-                                ) {
-                                    1f
-                                } else {
-                                    0.3f // Make disabled more visually distinct
-                                },
-                            ),
-                        ) {
-                            val hasPrev = when (s) {
-                                is EpubReaderState.ReflowSuccess -> s.hasPrev
-                                is EpubReaderState.HtmlSuccess -> s.hasPrev
-                                else -> false
-                            }
-                            Icon(
-                                Icons.Filled.SkipNext,
-                                contentDescription = "Previous chapter",
-                                tint = if (hasPrev) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                            )
-                        }
-                    }
-                }
+                ReaderBottomBar(
+                    hasPrev = when (s) {
+                        is EpubReaderState.ReflowSuccess -> s.hasPrev
+                        is EpubReaderState.HtmlSuccess -> s.hasPrev
+                        else -> false
+                    },
+                    hasNext = when (s) {
+                        is EpubReaderState.ReflowSuccess -> s.hasNext
+                        is EpubReaderState.HtmlSuccess -> s.hasNext
+                        else -> false
+                    },
+                    onPrev = { viewModel.prevChapter() },
+                    onNext = { viewModel.nextChapter() },
+                    onChapterList = { showChapterListSheet.value = true },
+                    onScrollTop = { coroutineScope.launch { scrollState.animateScrollTo(0) } },
+                    onSettings = { showSettingsSheet.value = true },
+                    backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                    modifier = Modifier.onGloballyPositioned { layoutCoordinates ->
+                    },
+                )
             }
 
             // Chapter list bottom sheet
