@@ -146,6 +146,12 @@ android {
         abortOnError = false
         checkReleaseBuilds = false
     }
+
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+        }
+    }
 }
 
 kotlin {
@@ -286,6 +292,7 @@ dependencies {
 
     // Tests
     testImplementation(libs.bundles.test)
+    testRuntimeOnly(libs.junit)
 
     // For detecting memory leaks; see https://square.github.io/leakcanary/
     // debugImplementation(libs.leakcanary.android)
