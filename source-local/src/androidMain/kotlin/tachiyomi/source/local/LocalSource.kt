@@ -166,20 +166,26 @@ actual class LocalSource(
                                 // Parse EPUB and update ComicInfo.xml
                                 epubFile.openInputStream().use { inputStream ->
                                     try {
-                                        val epub = EpubFile(inputStream)
-                                        val book = epub.book
-                                        book.title?.takeIf { it.isNotBlank() }?.let { title = it }
-                                        val authors = book.metadata.authors
-                                        if (authors.isNotEmpty()) {
-                                            author = authors.joinToString(", ") { it.firstname + " " + it.lastname }.trim()
-                                        }
-                                        book.metadata.descriptions.firstOrNull()?.let { desc ->
-                                            description = desc
-                                        }
-                                        // Save ComicInfo.xml
-                                        val comicInfo = this.getComicInfo()
-                                        mangaDir.createFile(COMIC_INFO_FILE)?.openOutputStream()?.use { out ->
-                                            out.write(xml.encodeToString(ComicInfo.serializer(), comicInfo).toByteArray())
+                                        EpubFile(inputStream).use { epub ->
+                                            val book = epub.book
+                                            book.title?.takeIf { it.isNotBlank() }?.let { title = it }
+                                            val authors = book.metadata.authors
+                                            if (authors.isNotEmpty()) {
+                                                author = authors.mapNotNull { a ->
+                                                    listOfNotNull(
+                                                        a.firstname?.takeIf { it.isNotBlank() },
+                                                        a.lastname?.takeIf { it.isNotBlank() },
+                                                    ).takeIf { it.isNotEmpty() }?.joinToString(" ")
+                                                }.filterNotNull().joinToString(", ").ifBlank { null }
+                                            }
+                                            book.metadata.descriptions.firstOrNull()?.let { desc ->
+                                                description = desc
+                                            }
+                                            // Save ComicInfo.xml
+                                            val comicInfo = this.getComicInfo()
+                                            mangaDir.createFile(COMIC_INFO_FILE)?.openOutputStream()?.use { out ->
+                                                out.write(xml.encodeToString(ComicInfo.serializer(), comicInfo).toByteArray())
+                                            }
                                         }
                                     } catch (e: Exception) {
                                         // fallback to directory name for title, leave author as null
@@ -474,7 +480,8 @@ actual class LocalSource(
             return false
         }
 
-        val cacheKey = "${manga.url}:cover"
+        val version = epubFiles.maxOfOrNull { it.lastModified() } ?: 0L
+        val cacheKey = "${manga.url}:cover:$version"
         val cached = epubCoverCache.get(cacheKey)
         if (cached == true) {
             return false
@@ -490,82 +497,7 @@ actual class LocalSource(
                                 val epub = EpubFile(inputStream)
                                 val book = epub.book
 
-                                var coverResource: io.documentnode.epub4j.domain.Resource? = null
-                                var opfResource: io.documentnode.epub4j.domain.Resource? = null
-                                var opfXml: String?
-                                var opfDoc: org.jsoup.nodes.Document?
-                                val coverHtmlResource: io.documentnode.epub4j.domain.Resource?
-                                try {
-                                    // Try to get the OPF resource using reflection if available
-                                    try {
-                                        opfResource = book.javaClass.getMethod("getOpfResource").invoke(book) as? io.documentnode.epub4j.domain.Resource
-                                    } catch (e: Exception) {
-                                        // ignore reflection failure
-                                    }
-                                    // Fallback: try to find .opf resource as before
-                                    if (opfResource == null) {
-                                        opfResource = book.resources.all.firstOrNull { it.href.endsWith(".opf", ignoreCase = true) }
-                                    }
-
-                                    if (opfResource != null) {
-                                        opfXml = String(opfResource.data ?: ByteArray(0), Charsets.UTF_8)
-                                        opfDoc = org.jsoup.Jsoup.parse(opfXml, "", org.jsoup.parser.Parser.xmlParser())
-                                        val guideRef = opfDoc.selectFirst("guide > reference[type=cover]")
-                                        val coverHref = guideRef?.attr("href")
-
-                                        if (!coverHref.isNullOrBlank()) {
-                                            coverHtmlResource = findImageResource(book, coverHref)
-                                            if (coverHtmlResource != null) {
-                                                // For HTML covers, use the proper extraction function that supports SVG
-                                                coverResource = extractImageFromHtmlCover(coverHtmlResource, book)
-                                            }
-                                        } else {
-                                            // Manifest fallback
-                                            val manifestItems = opfDoc.select("manifest > item")
-                                            // Try id="cover"
-                                            val coverItem =
-                                                manifestItems.firstOrNull { it.attr("id").equals("cover", true) }
-                                            // Try properties="cover-image" (EPUB 3)
-                                            val coverImageItem = manifestItems.firstOrNull {
-                                                it.attr("properties").contains("cover-image", ignoreCase = true)
-                                            }
-
-                                            val fallbackItem = coverItem ?: coverImageItem
-                                            val fallbackHref = fallbackItem?.attr("href")
-
-                                            if (!fallbackHref.isNullOrBlank()) {
-                                                val foundImage = findImageResource(book, fallbackHref)
-                                                if (foundImage != null) {
-                                                    coverResource = foundImage
-                                                }
-                                            }
-                                        }
-                                    }
-                                } catch (_: Exception) {
-                                }
-
-                                if (coverResource == null && opfResource != null) {
-                                    // Fallback: look for <item id="cover"> or properties="cover-image" in <manifest>
-                                    opfXml = String(opfResource.data ?: ByteArray(0), Charsets.UTF_8)
-                                    opfDoc = org.jsoup.Jsoup.parse(opfXml, "", org.jsoup.parser.Parser.xmlParser())
-                                    val manifestItems = opfDoc.select("manifest > item")
-
-                                    // Try id="cover"
-                                    val coverItem = manifestItems.firstOrNull { it.attr("id").equals("cover", true) }
-                                    // Try properties="cover-image" (EPUB 3)
-                                    val coverImageItem = manifestItems.firstOrNull { it.attr("properties").contains("cover-image", ignoreCase = true) }
-
-                                    val fallbackItem = coverItem ?: coverImageItem
-                                    val fallbackHref = fallbackItem?.attr("href")
-
-                                    if (!fallbackHref.isNullOrBlank()) {
-                                        val foundImage = findImageResource(book, fallbackHref)
-                                        if (foundImage != null) {
-                                            coverResource = foundImage
-                                        }
-                                    }
-                                    // Release references ASAP
-                                }
+                                val coverResource = findCoverResourceFromOpf(book)
 
                                 if (coverResource != null) {
                                     // Check if this is an HTML/XHTML file that needs parsing
@@ -579,32 +511,24 @@ actual class LocalSource(
                                             val coverFile = coverManager.update(manga, coverStream)
                                             if (coverFile != null) {
                                                 epubCoverCache.put(cacheKey, true)
-                                                // Release references ASAP
-                                                coverResource = null
-                                                opfResource = null
                                                 return@async true
                                             }
                                         }
                                     } else {
                                         // Direct image resource
-                                        coverResource!!.inputStream.use { coverStream ->
+                                        coverResource.inputStream.use { coverStream ->
                                             val coverFile = coverManager.update(manga, coverStream)
                                             if (coverFile != null) {
                                                 epubCoverCache.put(cacheKey, true)
-                                                // Release references ASAP
-                                                coverResource = null
-                                                opfResource = null
                                                 return@async true
                                             }
                                         }
                                     }
-                                    // Release references ASAP
-                                    coverResource = null
-                                    opfResource = null
                                 }
                             }
                         } catch (e: Exception) {
-                            // Swallow exception to continue processing others
+                            // Swallow exception to continue processing others, but log context
+                            logcat(LogPriority.DEBUG, e) { "extractCoversFromEpubs: failed for ${manga.url} -> ${epubFile.name}" }
                         }
                         false // If nothing found
                     }
@@ -640,14 +564,62 @@ actual class LocalSource(
             baseComponents.removeLastOrNull()
         }
         val relComponents = relativePath.split("/").toMutableList()
-        while (relComponents.isNotEmpty() && relComponents[0] == "..") {
-            relComponents.removeAt(0)
-            if (baseComponents.isNotEmpty()) {
-                baseComponents.removeAt(baseComponents.size - 1)
+        // Normalize '.' segments
+        val normalizedRel = mutableListOf<String>()
+        for (seg in relComponents) {
+            when (seg) {
+                "." -> { /* skip current dir */ }
+                ".." -> {
+                    if (normalizedRel.isNotEmpty()) {
+                        normalizedRel.removeAt(normalizedRel.size - 1)
+                    } else if (baseComponents.isNotEmpty()) {
+                        baseComponents.removeAt(baseComponents.size - 1)
+                    }
+                }
+                else -> normalizedRel.add(seg)
             }
         }
-        val resultPath = (baseComponents + relComponents).joinToString("/")
+        val resultPath = (baseComponents + normalizedRel).joinToString("/")
         return resultPath
+    }
+
+    // OPF cover extraction
+    private fun findCoverResourceFromOpf(book: io.documentnode.epub4j.domain.Book): io.documentnode.epub4j.domain.Resource? {
+        var opfResource: io.documentnode.epub4j.domain.Resource? = null
+        // Try reflection first
+        try {
+            opfResource = book.javaClass.getMethod("getOpfResource").invoke(book) as? io.documentnode.epub4j.domain.Resource
+        } catch (_: Exception) {
+        }
+        if (opfResource == null) {
+            opfResource = book.resources.all.firstOrNull { it.href.endsWith(".opf", ignoreCase = true) }
+        }
+        val opf = opfResource ?: return null
+        return try {
+            val opfXml = String(opf.data ?: ByteArray(0), Charsets.UTF_8)
+            val opfDoc = org.jsoup.Jsoup.parse(opfXml, "", org.jsoup.parser.Parser.xmlParser())
+            // Guide reference
+            opfDoc.selectFirst("guide > reference[type=cover]")?.attr("href")?.let { href ->
+                val res = findImageResource(book, href)
+                if (res != null) {
+                    if (res.href.endsWith(".xhtml", true) || res.href.endsWith(".html", true) || res.mediaType?.toString()?.contains("html") == true) {
+                        return extractImageFromHtmlCover(res, book)
+                    }
+                    return res
+                }
+            }
+            // Manifest fallbacks
+            val manifestItems = opfDoc.select("manifest > item")
+            val coverItem = manifestItems.firstOrNull { it.attr("id").equals("cover", true) }
+            val coverImageItem = manifestItems.firstOrNull { it.attr("properties").contains("cover-image", ignoreCase = true) }
+            val fallbackHref = (coverItem ?: coverImageItem)?.attr("href")
+            if (!fallbackHref.isNullOrBlank()) {
+                return findImageResource(book, fallbackHref)
+            }
+            null
+        } catch (_: Exception) {
+            null
+        }
     }
 
     // Helper function to extract actual image from HTML/XHTML cover file
@@ -745,7 +717,7 @@ actual class LocalSource(
 
         // Try decoded path
         val decoded = try {
-            URLDecoder.decode(path, "UTF-8")
+            URLDecoder.decode(path, StandardCharsets.UTF_8.name())
         } catch (e: Exception) {
             path
         }
@@ -767,7 +739,7 @@ actual class LocalSource(
 
         // Try matching by decoded filename
         val decodedFilename = try {
-            URLDecoder.decode(filename, "UTF-8")
+            URLDecoder.decode(filename, StandardCharsets.UTF_8.name())
         } catch (e: Exception) {
             filename
         }
@@ -882,11 +854,17 @@ actual class LocalSource(
                         val entry = reader.useEntries { entries ->
                             entries
                                 .sortedWith { f1, f2 -> f1.name.compareToCaseInsensitiveNaturalOrder(f2.name) }
-                                .find { it.isFile && ImageUtil.isImage(it.name) { reader.getInputStream(it.name)!! } }
+                                .find {
+                                    if (!it.isFile) return@find false
+                                    val stream = reader.getInputStream(it.name) ?: return@find false
+                                    ImageUtil.isImage(it.name) { stream }
+                                }
                         }
 
                         if (entry != null) {
-                            cover = coverManager.update(manga, reader.getInputStream(entry.name)!!, reader.encrypted)
+                            reader.getInputStream(entry.name)?.let { stream ->
+                                cover = coverManager.update(manga, stream, reader.encrypted)
+                            }
                         }
                     }
                 }
@@ -894,7 +872,9 @@ actual class LocalSource(
                     EpubFile(format.file.openInputStream()).use { epub ->
                         val entry = epub.getImagesFromPages().firstOrNull()
                         if (entry != null) {
-                            cover = coverManager.update(manga, epub.getInputStream(entry)!!)
+                            epub.getInputStream(entry)?.let { stream ->
+                                cover = coverManager.update(manga, stream)
+                            }
                         }
                     }
                 }
