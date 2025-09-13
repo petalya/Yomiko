@@ -16,18 +16,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -47,7 +42,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -71,14 +65,8 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichText
-import eu.kanade.presentation.components.AdaptiveSheet
-import eu.kanade.presentation.manga.components.ChapterDownloadAction
-import eu.kanade.presentation.manga.components.MangaChapterListItem
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
-import eu.kanade.tachiyomi.data.download.DownloadManager
-import eu.kanade.tachiyomi.data.download.model.Download
-import eu.kanade.tachiyomi.ui.reader.chapter.ReaderChapterItem
 import eu.kanade.tachiyomi.ui.reader.common.BatteryTimeBar
 import eu.kanade.tachiyomi.ui.reader.common.ReaderBottomBar
 import eu.kanade.tachiyomi.ui.reader.common.ReaderProgressSlider
@@ -91,11 +79,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import tachiyomi.domain.library.model.ChapterSwipeAction
 import tachiyomi.domain.source.service.SourceManager
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
-import java.time.format.DateTimeFormatter
 
 @Suppress("NAME_SHADOWING")
 class NovelReaderScreen(
@@ -653,185 +639,11 @@ class NovelReaderScreen(
                     )
                 }
                 // Chapter list bottom sheet
-                if (showChapterListSheet) {
-                    val manga = viewModel.manga
-                    LocalContext.current
-                    val downloadManager: DownloadManager = Injekt.get()
-                    val downloadQueue by downloadManager.queueState.collectAsState()
-                    val downloadProgressMap = remember { mutableStateMapOf<Long, Int>() }
-                    val downloadedCache = remember { mutableStateMapOf<Long, Boolean>() }
-
-                    // Collect download progress
-                    LaunchedEffect(Unit) {
-                        downloadManager.progressFlow().collect { download ->
-                            downloadProgressMap[download.chapter.id] = download.progress
-                        }
-                    }
-                    // Create a derived state for the current download states
-                    val downloadStates by remember(downloadQueue) {
-                        derivedStateOf {
-                            downloadQueue.associate { download ->
-                                download.chapter.id to (download.status to download.progress)
-                            }
-                        }
-                    }
-
-                    if (manga != null) {
-                        // Build ReaderChapterItem list
-                        val currentChapterId = viewModel.currentChapterId
-
-                        // Use filtered chapters for downloaded-only mode
-                        val filteredChapters = viewModel.getFilteredChapters()
-
-                        // Create a list of chapter items that will update when any dependency changes
-                        val chapterItems = remember(
-                            filteredChapters,
-                            currentChapterId,
-                            downloadQueue,
-                            downloadProgressMap,
-                        ) {
-                            filteredChapters.map { chapter ->
-                                val isCurrent = chapter.id == currentChapterId
-                                val activeDownload = downloadQueue.find { it.chapter.id == chapter.id }
-                                val progress = activeDownload?.progress ?: downloadProgressMap[chapter.id] ?: 0
-                                val downloaded = downloadedCache[chapter.id] ?: downloadManager.isChapterDownloaded(
-                                    chapter.name,
-                                    chapter.scanlator,
-                                    manga.ogTitle,
-                                    manga.source,
-                                ).also { downloadedCache[chapter.id] = it }
-                                val downloadState = when {
-                                    activeDownload != null -> activeDownload.status
-                                    downloaded -> Download.State.DOWNLOADED
-                                    else -> Download.State.NOT_DOWNLOADED
-                                }
-
-                                ReaderChapterItem(
-                                    chapter = chapter,
-                                    manga = manga,
-                                    isCurrent = isCurrent,
-                                    dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd"),
-                                    downloadState = downloadState,
-                                    downloadProgress = progress,
-                                )
-                            }
-                        }
-
-                        AdaptiveSheet(
-                            onDismissRequest = { showChapterListSheet = false },
-                        ) {
-                            val state =
-                                rememberLazyListState(chapterItems.indexOfFirst { it.isCurrent }.coerceAtLeast(0))
-                            LazyColumn(
-                                state = state,
-                                modifier = Modifier.heightIn(min = 200.dp, max = 500.dp),
-                                contentPadding = PaddingValues(vertical = 16.dp),
-                            ) {
-                                items(
-                                    items = chapterItems,
-                                    key = { "chapter-${it.chapter.id}" },
-                                ) { chapterItem ->
-                                    downloadProgressMap[chapterItem.chapter.id] ?: 0
-
-// Get the current download state for this chapter
-                                    val (downloadState, downloadProgress) = remember(
-                                        chapterItem.chapter.id,
-                                        downloadStates[chapterItem.chapter.id],
-                                        downloadProgressMap[chapterItem.chapter.id],
-                                        downloadedCache[chapterItem.chapter.id],
-                                    ) {
-                                        val state = downloadStates[chapterItem.chapter.id]
-                                        downloadProgressMap[chapterItem.chapter.id] ?: 0
-                                        val isDownloaded = downloadedCache[chapterItem.chapter.id]
-                                            ?: downloadManager.isChapterDownloaded(
-                                                chapterItem.chapter.name,
-                                                chapterItem.chapter.scanlator,
-                                                manga.ogTitle,
-                                                manga.source,
-                                            ).also { downloadedCache[chapterItem.chapter.id] = it }
-
-                                        when {
-                                            state != null -> state.first to state.second
-                                            isDownloaded -> Download.State.DOWNLOADED to 0
-                                            else -> Download.State.NOT_DOWNLOADED to 0
-                                        }
-                                    }
-
-                                    MangaChapterListItem(
-                                        title = chapterItem.chapter.name,
-                                        date = null, // Add date formatting if needed
-                                        readProgress = viewModel.getSavedProgress(chapterItem.chapter.id)
-                                            .let { percent ->
-                                                val pct = (percent * 100).toInt().coerceIn(0, 100)
-                                                if (pct > 0) "Progress $pct%" else null
-                                            },
-                                        scanlator = chapterItem.chapter.scanlator,
-                                        sourceName = null,
-                                        read = chapterItem.chapter.read,
-                                        bookmark = chapterItem.chapter.bookmark,
-                                        selected = chapterItem.isCurrent,
-                                        downloadIndicatorEnabled = true,
-                                        downloadStateProvider = { downloadState },
-                                        downloadProgressProvider = { downloadProgress },
-                                        chapterSwipeStartAction = ChapterSwipeAction.ToggleRead,
-                                        chapterSwipeEndAction = ChapterSwipeAction.ToggleBookmark,
-                                        onLongClick = {},
-                                        onClick = {
-                                            viewModel.jumpToChapterId(chapterItem.chapter.id)
-                                            showChapterListSheet = false
-                                        },
-                                        onDownloadClick = { action ->
-                                            when (action) {
-                                                ChapterDownloadAction.START -> downloadManager.downloadChapters(
-                                                    chapterItem.manga,
-                                                    listOf(chapterItem.chapter),
-                                                )
-
-                                                ChapterDownloadAction.START_NOW -> downloadManager.startDownloadNow(
-                                                    chapterItem.chapter.id,
-                                                )
-
-                                                ChapterDownloadAction.CANCEL -> {
-                                                    val queued =
-                                                        downloadQueue.find { it.chapter.id == chapterItem.chapter.id }
-                                                    if (queued != null) {
-                                                        downloadManager.cancelQueuedDownloads(listOf(queued))
-                                                        downloadProgressMap.remove(chapterItem.chapter.id)
-                                                        downloadedCache.remove(chapterItem.chapter.id)
-                                                    }
-                                                }
-
-                                                ChapterDownloadAction.DELETE -> {
-                                                    val source = viewModel.sourceManager.get(chapterItem.manga.source)
-                                                    if (source != null) {
-                                                        downloadManager.deleteChapters(
-                                                            listOf(chapterItem.chapter),
-                                                            chapterItem.manga,
-                                                            source,
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        onChapterSwipe = { action ->
-                                            when (action) {
-                                                ChapterSwipeAction.ToggleRead -> {
-                                                    viewModel.toggleRead(chapterItem.chapter)
-                                                }
-
-                                                ChapterSwipeAction.ToggleBookmark -> {
-                                                    viewModel.toggleBookmark(chapterItem.chapter)
-                                                }
-
-                                                else -> {}
-                                            }
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                NovelChapterListSheet(
+                    viewModel = viewModel,
+                    show = showChapterListSheet,
+                    onDismiss = { showChapterListSheet = false },
+                )
             }
 
             // Loading state handling

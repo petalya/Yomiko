@@ -28,18 +28,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -50,10 +45,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -94,11 +87,8 @@ import coil3.size.Size
 import com.valentinilk.shimmer.ShimmerBounds
 import com.valentinilk.shimmer.rememberShimmer
 import com.valentinilk.shimmer.shimmer
-import eu.kanade.presentation.components.AdaptiveSheet
-import eu.kanade.presentation.manga.components.MangaChapterListItem
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
-import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.ui.reader.common.BatteryTimeBar
 import eu.kanade.tachiyomi.ui.reader.common.ReaderBottomBar
@@ -112,9 +102,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import tachiyomi.domain.chapter.model.Chapter
-import tachiyomi.domain.library.model.ChapterSwipeAction
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 import java.io.ByteArrayOutputStream
 
 @Suppress("NAME_SHADOWING")
@@ -588,115 +575,11 @@ class EpubReaderScreen(
             }
 
             // Chapter list bottom sheet
-            if (showChapterListSheet.value) {
-                val downloadManager: DownloadManager = Injekt.get()
-                val downloadQueue by downloadManager.queueState.collectAsState()
-                val downloadProgressMap = remember { mutableStateMapOf<Long, Int>() }
-
-                // Collect download progress
-                LaunchedEffect(Unit) {
-                    downloadManager.progressFlow().collect { download ->
-                        downloadProgressMap[download.chapter.id] = download.progress
-                    }
-                }
-
-                // Create a derived state for the current download states
-                val downloadStates = remember(downloadQueue) {
-                    derivedStateOf {
-                        downloadQueue.associate { download ->
-                            download.chapter.id to (download.status to download.progress)
-                        }
-                    }
-                }
-
-                val chapterItems = chapters.mapIndexed { _, chapter ->
-                    val isCurrent = chapter.id == viewModel.currentChapterId
-                    val downloadState = downloadStates.value[chapter.id]?.first ?: Download.State.NOT_DOWNLOADED
-                    val progress = downloadStates.value[chapter.id]?.second ?: 0
-
-                    ChapterItem(
-                        chapter = chapter,
-                        isCurrent = isCurrent,
-                        downloadState = downloadState,
-                        downloadProgress = progress,
-                    )
-                }
-
-                AdaptiveSheet(
-                    onDismissRequest = { showChapterListSheet.value = false },
-                ) {
-                    val state = rememberLazyListState(chapterItems.indexOfFirst { it.isCurrent }.coerceAtLeast(0))
-                    LazyColumn(
-                        state = state,
-                        modifier = Modifier.heightIn(min = 200.dp, max = 500.dp),
-                        contentPadding = PaddingValues(vertical = 16.dp),
-                    ) {
-                        items(
-                            items = chapterItems,
-                            key = { "chapter-${it.chapter.id}" },
-                        ) { chapterItem ->
-                            downloadProgressMap[chapterItem.chapter.id] ?: 0
-
-                            // Get the current download state for this chapter
-                            val (downloadState, downloadProgress) = remember(
-                                chapterItem.chapter.id,
-                                downloadStates.value[chapterItem.chapter.id],
-                                downloadProgressMap[chapterItem.chapter.id],
-                            ) {
-                                val state = downloadStates.value[chapterItem.chapter.id]
-                                downloadProgressMap[chapterItem.chapter.id] ?: 0
-                                val isDownloaded = viewModel.manga?.let { manga ->
-                                    downloadManager.isChapterDownloaded(
-                                        chapterItem.chapter.name,
-                                        chapterItem.chapter.scanlator,
-                                        manga.ogTitle,
-                                        manga.source,
-                                    )
-                                } ?: false
-
-                                when {
-                                    state != null -> state.first to state.second
-                                    isDownloaded -> Download.State.DOWNLOADED to 0
-                                    else -> Download.State.NOT_DOWNLOADED to 0
-                                }
-                            }
-
-                            MangaChapterListItem(
-                                title = chapterItem.chapter.name,
-                                date = null,
-                                readProgress = viewModel.getSavedProgress(chapterItem.chapter.id)
-                                    .let { percent ->
-                                        val pct = (percent * 100).toInt().coerceIn(0, 100)
-                                        if (pct > 0) "Progress $pct%" else null
-                                    },
-                                scanlator = chapterItem.chapter.scanlator,
-                                sourceName = null,
-                                read = chapterItem.chapter.read,
-                                bookmark = chapterItem.chapter.bookmark,
-                                selected = chapterItem.isCurrent,
-                                downloadIndicatorEnabled = true,
-                                downloadStateProvider = { downloadState },
-                                downloadProgressProvider = { downloadProgress },
-                                chapterSwipeStartAction = ChapterSwipeAction.ToggleRead,
-                                chapterSwipeEndAction = ChapterSwipeAction.ToggleBookmark,
-                                onLongClick = {},
-                                onClick = {
-                                    viewModel.jumpToChapter(chapters.indexOf(chapterItem.chapter))
-                                    showChapterListSheet.value = false
-                                },
-                                onDownloadClick = {},
-                                onChapterSwipe = { action ->
-                                    when (action) {
-                                        ChapterSwipeAction.ToggleRead -> viewModel.toggleRead(chapterItem.chapter)
-                                        ChapterSwipeAction.ToggleBookmark -> viewModel.toggleBookmark(chapterItem.chapter)
-                                        else -> {}
-                                    }
-                                },
-                            )
-                        }
-                    }
-                }
-            }
+            EpubChapterListSheet(
+                viewModel = viewModel,
+                show = showChapterListSheet.value,
+                onDismiss = { showChapterListSheet.value = false },
+            )
         }
 
         // Settings bottom sheet (outside of main Box)
