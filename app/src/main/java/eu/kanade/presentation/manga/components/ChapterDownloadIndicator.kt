@@ -90,7 +90,8 @@ fun ChapterDownloadIndicator(
                         onClick = onClick,
                     )
                 } else {
-                    // Show circular progress bar
+                    // Show circular progress bar with menu actions on click (Start now / Cancel)
+                    var isMenuExpanded by remember { mutableStateOf(false) }
                     Box(
                         modifier = modifier
                             .size(IconButtonTokens.StateLayerSize)
@@ -98,19 +99,14 @@ fun ChapterDownloadIndicator(
                                 enabled = enabled,
                                 hapticFeedback = LocalHapticFeedback.current,
                                 onLongClick = {
+                                    // Quick action: cancel when downloading/queued, otherwise start now
                                     if (currentState == Download.State.QUEUE || currentState == Download.State.DOWNLOADING) {
                                         onClick(ChapterDownloadAction.CANCEL)
                                     } else {
                                         onClick(ChapterDownloadAction.START_NOW)
                                     }
                                 },
-                                onClick = {
-                                    if (currentState == Download.State.QUEUE || currentState == Download.State.DOWNLOADING) {
-                                        onClick(ChapterDownloadAction.CANCEL)
-                                    } else {
-                                        onClick(ChapterDownloadAction.START)
-                                    }
-                                },
+                                onClick = { isMenuExpanded = true },
                             ),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -120,6 +116,23 @@ fun ChapterDownloadIndicator(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             strokeWidth = IndicatorStrokeWidth,
                         )
+
+                        DropdownMenu(expanded = isMenuExpanded, onDismissRequest = { isMenuExpanded = false }) {
+                            DropdownMenuItem(
+                                text = { Text(text = stringResource(MR.strings.action_start_downloading_now)) },
+                                onClick = {
+                                    onClick(ChapterDownloadAction.START_NOW)
+                                    isMenuExpanded = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(text = stringResource(MR.strings.action_cancel)) },
+                                onClick = {
+                                    onClick(ChapterDownloadAction.CANCEL)
+                                    isMenuExpanded = false
+                                },
+                            )
+                        }
                     }
                 }
             }
