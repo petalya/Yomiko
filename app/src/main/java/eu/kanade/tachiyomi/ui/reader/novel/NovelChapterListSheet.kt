@@ -10,8 +10,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.components.AdaptiveSheet
@@ -20,8 +22,6 @@ import eu.kanade.presentation.manga.components.MangaChapterListItem
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.ui.reader.chapter.ReaderChapterItem
-import eu.kanade.tachiyomi.ui.reader.novel.NovelReaderScreen
-import eu.kanade.tachiyomi.ui.reader.novel.NovelReaderViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import tachiyomi.domain.library.model.ChapterSwipeAction
@@ -40,6 +40,8 @@ fun NovelChapterListSheet(
     val manga = viewModel.manga
     val downloadManager: DownloadManager = Injekt.get()
     val downloadQueue by downloadManager.queueState.collectAsState()
+    val isDownloaderRunning by downloadManager.isDownloaderRunning.collectAsState(initial = false)
+    var statusVersion by remember { mutableIntStateOf(0) }
     val downloadProgressMap = remember { mutableStateMapOf<Long, Int>() }
     val downloadedCache = remember { mutableStateMapOf<Long, Boolean>() }
 
@@ -56,11 +58,12 @@ fun NovelChapterListSheet(
                 downloadedCache[download.chapter.id] = true
                 downloadProgressMap[download.chapter.id] = 100
             }
+            statusVersion++
         }
     }
 
     // Derive current download states
-    val downloadStates by remember(downloadQueue) {
+    val downloadStates by remember(downloadQueue, statusVersion) {
         derivedStateOf {
             downloadQueue.associate { it.chapter.id to (it.status to it.progress) }
         }
@@ -91,9 +94,14 @@ fun NovelChapterListSheet(
                     manga.source,
                 ).also { downloadedCache[chapter.id] = it }
                 val (downloadState, progress) = when {
+                    queueStatus == Download.State.ERROR ->
+                        Download.State.ERROR to 0
+                    !isDownloaderRunning && queueStatus == Download.State.QUEUE ->
+                        Download.State.ERROR to 0
                     queueStatus == Download.State.DOWNLOADED || mergedProgress >= 100 || downloaded ->
                         Download.State.DOWNLOADED to 100
-                    queueStatus == Download.State.QUEUE || queueStatus == Download.State.DOWNLOADING || mergedProgress in 1..99 ->
+                    // Only show ring when actually queued or downloading
+                    queueStatus == Download.State.QUEUE || queueStatus == Download.State.DOWNLOADING ->
                         Download.State.DOWNLOADING to mergedProgress
                     else -> Download.State.NOT_DOWNLOADED to 0
                 }
@@ -138,9 +146,14 @@ fun NovelChapterListSheet(
                             ).also { downloadedCache[chapterItem.chapter.id] = it }
 
                         when {
+                            queueStatus == Download.State.ERROR ->
+                                Download.State.ERROR to 0
+                            !isDownloaderRunning && queueStatus == Download.State.QUEUE ->
+                                Download.State.ERROR to 0
                             queueStatus == Download.State.DOWNLOADED || mergedProgress >= 100 || isDownloaded ->
                                 Download.State.DOWNLOADED to 100
-                            queueStatus == Download.State.QUEUE || queueStatus == Download.State.DOWNLOADING || mergedProgress in 1..99 ->
+                            // Only show ring when actually queued or downloading
+                            queueStatus == Download.State.QUEUE || queueStatus == Download.State.DOWNLOADING ->
                                 Download.State.DOWNLOADING to mergedProgress
                             else -> Download.State.NOT_DOWNLOADED to 0
                         }
