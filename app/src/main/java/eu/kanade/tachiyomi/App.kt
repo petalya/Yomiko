@@ -105,7 +105,8 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
     override fun onCreate() {
         super<Application>.onCreate()
 
-        GlobalExceptionHandler.initialize(applicationContext, CrashActivity::class.java)
+        val currentProcess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) getProcessName() else null
+        val isErrorHandlerProcess = currentProcess?.endsWith(":error_handler") == true
 
         // TLS 1.3 support for Android < 10
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
@@ -128,9 +129,13 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         initExpensiveComponents(this)
         // SY <--
 
-        FirebaseConfig.init(this)
-        FirebaseConfig.setAnalyticsEnabled(privacyPreferences.analytics().get())
-        FirebaseConfig.setCrashlyticsEnabled(privacyPreferences.crashlytics().get())
+        if (!isErrorHandlerProcess) {
+            FirebaseConfig.init(this)
+            FirebaseConfig.setAnalyticsEnabled(privacyPreferences.analytics().get())
+            FirebaseConfig.setCrashlyticsEnabled(privacyPreferences.crashlytics().get())
+
+            GlobalExceptionHandler.initialize(applicationContext, CrashActivity::class.java)
+        }
 
         setupExhLogging() // EXH logging
         LogcatLogger.install(XLogLogcatLogger()) // SY Redirect Logcat to XLog
