@@ -89,8 +89,23 @@ class ShizukuInstaller(private val service: Service) : Installer(service) {
     override fun cancelEntry(entry: Entry): Boolean = getActiveEntry() != entry
 
     override fun onDestroy() {
-        Shizuku.removeBinderDeadListener(shizukuDeadListener)
-        Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
+        // Avoid crashing the service on stop.
+        try {
+            Shizuku.removeBinderDeadListener(shizukuDeadListener)
+        } catch (e: UnsupportedOperationException) {
+            logcat(LogPriority.WARN, e) { "Failed to remove Shizuku binder dead listener" }
+        } catch (e: Throwable) {
+            // we don't want service teardown to crash
+            logcat(LogPriority.WARN, e) { "Unexpected error removing Shizuku binder dead listener" }
+        }
+
+        try {
+            Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
+        } catch (e: UnsupportedOperationException) {
+            logcat(LogPriority.WARN, e) { "Failed to remove Shizuku permission listener" }
+        } catch (e: Throwable) {
+            logcat(LogPriority.WARN, e) { "Unexpected error removing Shizuku permission listener" }
+        }
         scope.cancel()
         super.onDestroy()
     }
