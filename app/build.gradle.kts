@@ -124,6 +124,7 @@ android {
                 "META-INF/README.md",
                 "META-INF/NOTICE",
                 "META-INF/*.version",
+                "META-INF/INDEX.LIST",
             ),
         )
     }
