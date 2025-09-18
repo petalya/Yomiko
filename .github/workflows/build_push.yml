@@ -38,6 +38,13 @@ jobs:
         run: |
           echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > app/google-services.json
 
+      - name: Write client_secrets.json
+        uses: DamianReeves/write-file-action@v1.3
+        with:
+          path: app/src/main/assets/client_secrets.json
+          contents: ${{ secrets.CLIENT_SECRETS_TEXT }}
+          write-mode: overwrite
+
       - name: Build app
         run: ./gradlew assembleStandardRelease
 
