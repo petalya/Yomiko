@@ -54,6 +54,7 @@ class DownloadJob(context: Context, workerParams: WorkerParameters) : CoroutineW
     }
 
     override suspend fun doWork(): Result {
+        setForegroundSafely()
         var networkCheck = checkNetworkState(
             applicationContext.activeNetworkState(),
             downloadPreferences.downloadOnlyOverWifi().get(),
@@ -63,8 +64,6 @@ class DownloadJob(context: Context, workerParams: WorkerParameters) : CoroutineW
         if (!active) {
             return Result.failure()
         }
-
-        setForegroundSafely()
 
         coroutineScope {
             combineTransform(
