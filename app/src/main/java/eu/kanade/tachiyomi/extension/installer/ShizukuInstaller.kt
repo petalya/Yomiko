@@ -3,6 +3,8 @@ package eu.kanade.tachiyomi.extension.installer
 import android.app.Service
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.Process
 import eu.kanade.tachiyomi.extension.model.InstallStep
 import eu.kanade.tachiyomi.util.system.getUriSize
@@ -39,7 +41,15 @@ class ShizukuInstaller(private val service: Service) : Installer(service) {
                 } else {
                     service.stopSelf()
                 }
-                Shizuku.removeRequestPermissionResultListener(this)
+                Handler(Looper.getMainLooper()).post {
+                    try {
+                        Shizuku.removeRequestPermissionResultListener(this)
+                    } catch (e: UnsupportedOperationException) {
+                        logcat(LogPriority.WARN, e) { "Failed to remove Shizuku permission listener (deferred)" }
+                    } catch (e: Throwable) {
+                        logcat(LogPriority.WARN, e) { "Unexpected error removing Shizuku permission listener (deferred)" }
+                    }
+                }
             }
         }
     }
