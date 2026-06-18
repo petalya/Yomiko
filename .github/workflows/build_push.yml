@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Clone repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Android SDK
         run: |
